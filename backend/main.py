@@ -1,43 +1,24 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from supabase import create_client
-import os
-import uuid
-import re
-import datetime
-from dotenv import load_dotenv
-from typing import List, Dict, Any
-import logging
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Load environment variables
-load_dotenv()
-
-app = FastAPI(
-    title="Invoice OCR API",
-    description="API for uploading and processing PDF invoices with OCR",
-    version="0.1.0"
-)
+app = FastAPI(title="Invoice OCR API", version="0.1.0")
 
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=["http://localhost:3000"],  # Next.js default port
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Initialize Supabase client
+BUCKET = "invoices"  # Define bucket name globally
 try:
     supabase = create_client(
         os.getenv("SUPA_URL", ""), 
         os.getenv("SUPA_KEY", "")
     )
-    BUCKET = "invoices"
     logger.info("Supabase client initialized successfully")
 except Exception as e:
     logger.error(f"Failed to initialize Supabase client: {e}")
@@ -45,20 +26,14 @@ except Exception as e:
 
 @app.get("/")
 async def root():
-    """Root endpoint with API information"""
-    return {
-        "message": "Invoice OCR API is running",
-        "version": "0.1.0",
-        "docs": "/docs",
-        "health": "/health"
-    }
+    return {"message": "Invoice OCR API is running", "version": "0.1.0"}
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "timestamp": datetime.datetime.utcnow().isoformat(),
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "supabase_connected": supabase is not None
     }
 
@@ -123,7 +98,7 @@ async def upload_pdf(file: UploadFile = File(...)):
             "url": public_url,
             "status": "uploaded",
             "file_size": file_size,
-            "created_at": datetime.datetime.utcnow().isoformat()
+            "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
         }
         
         db_response = supabase.table("invoices").insert(invoice_data).execute()
@@ -185,6 +160,10 @@ async def get_invoice(invoice_id: str):
     """
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
+    
+    # Validate that invoice_id is not empty
+    if not invoice_id or invoice_id.strip() == "":
+        raise HTTPException(status_code=404, detail="Invoice not found")
     
     try:
         response = supabase.table("invoices").select("*").eq("id", invoice_id).execute()
@@ -255,4 +234,4 @@ async def delete_invoice(invoice_id: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
