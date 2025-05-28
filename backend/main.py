@@ -35,6 +35,58 @@ if url and key:
 # Filename validation pattern
 FILENAME_PATTERN = r'^\d{8}_[A-Z0-9]+_[A-Za-z]+_[A-Za-z]+\.pdf$'
 
+# In-memory storage for demo mode (when Supabase is not configured)
+mock_invoices = []
+
+async def upload_file_mock(file: UploadFile):
+    """Mock upload function for when Supabase is not configured"""
+    # Validate file type
+    if file.content_type != "application/pdf":
+        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+    
+    # Validate filename pattern
+    if not re.match(FILENAME_PATTERN, file.filename):
+        raise HTTPException(
+            status_code=400, 
+            detail="Filename must follow pattern: YYYYMMDD_IDENTIFIER_VENDOR_TYPE.pdf"
+        )
+    
+    try:
+        # Read file content
+        content = await file.read()
+        
+        # Check if file is empty
+        if len(content) == 0:
+            raise HTTPException(status_code=400, detail="File is empty")
+        
+        # Generate UUID for invoice record
+        invoice_id = str(uuid.uuid4())
+        
+        # Mock storage - in a real app this would be saved to disk or cloud storage
+        invoice_data = {
+            "id": invoice_id,
+            "filename": file.filename,
+            "url": f"http://localhost:8000/mock-storage/{file.filename}",
+            "status": "uploaded",
+            "file_size": len(content),
+            "created_at": "2025-05-29T10:30:00Z"
+        }
+        
+        # Store in mock database
+        mock_invoices.append(invoice_data)
+        
+        return {
+            "status": "uploaded",
+            "filename": file.filename,
+            "url": invoice_data["url"],
+            "id": invoice_id,
+            "file_size": len(content),
+            "message": "File uploaded successfully"
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
 @app.get("/")
 async def root():
     return {"message": "Invoice OCR API is running", "version": "0.1.0"}
@@ -47,7 +99,8 @@ async def health_check():
 async def upload_file(file: UploadFile = File(...)):
     """Upload a PDF invoice file"""
     if not supabase:
-        raise HTTPException(status_code=500, detail="Supabase not configured")
+        # For demo purposes, work without Supabase
+        return await upload_file_mock(file)
     
     # Validate file type
     if file.content_type != "application/pdf":
@@ -106,7 +159,8 @@ async def upload_file(file: UploadFile = File(...)):
 async def get_invoices():
     """Get all invoices"""
     if not supabase:
-        raise HTTPException(status_code=500, detail="Supabase not configured")
+        # Return mock data when Supabase is not configured
+        return {"invoices": mock_invoices}
     
     try:
         response = supabase.table("invoices").select("*").order("created_at", desc=True).execute()
@@ -118,7 +172,11 @@ async def get_invoices():
 async def get_invoice(invoice_id: str):
     """Get a specific invoice by ID"""
     if not supabase:
-        raise HTTPException(status_code=500, detail="Supabase not configured")
+        # Search in mock data when Supabase is not configured
+        invoice = next((inv for inv in mock_invoices if inv["id"] == invoice_id), None)
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+        return {"status": "success", "invoice": invoice}
     
     try:
         response = supabase.table("invoices").select("*").eq("id", invoice_id).execute()
@@ -139,7 +197,20 @@ async def get_invoice(invoice_id: str):
 async def delete_invoice(invoice_id: str):
     """Delete an invoice by ID"""
     if not supabase:
-        raise HTTPException(status_code=500, detail="Supabase not configured")
+        # Delete from mock data when Supabase is not configured
+        global mock_invoices
+        invoice = next((inv for inv in mock_invoices if inv["id"] == invoice_id), None)
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+        
+        mock_invoices = [inv for inv in mock_invoices if inv["id"] != invoice_id]
+        
+        return {
+            "status": "success",
+            "message": "Invoice deleted successfully",
+            "invoice_id": invoice_id,
+            "filename": invoice["filename"]
+        }
     
     try:
         # First, get the invoice to retrieve filename
@@ -171,5 +242,8 @@ async def delete_invoice(invoice_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to delete invoice: {str(e)}")
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    try:
+        import uvicorn
+        uvicorn.run(app, host="0.0.0.0", port=8000)
+    except ImportError:
+        print("uvicorn not available, run with: uvicorn main:app --reload")
