@@ -1,125 +1,135 @@
-"use client";
+'use client'
 
-import { useState } from "react";
-import Dropzone from "../../components/Dropzone";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import React, { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import Dropzone from '../../components/Dropzone'
+import toast, { Toaster } from 'react-hot-toast'
+
+interface UploadedFile {
+  id: string
+  url: string
+  status: string
+  filename: string
+  file_size: number
+  message: string
+}
 
 export default function UploadPage() {
-  const router = useRouter();
-  const [uploadSuccess, setUploadSuccess] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState<any[]>([]);
-  
-  const handleUploadComplete = (data: any) => {
-    setUploadSuccess(true);
-    setUploadedFiles(prev => [...prev, data]);
-    
-    // Auto-redirect to dashboard after 3 seconds
-    setTimeout(() => {
-      router.push('/dashboard');
-    }, 3000);
-  };
-  
+  const [uploadedFile, setUploadedFile] = useState<UploadedFile | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const router = useRouter()
+
+  const handleUploadStart = () => {
+    setIsUploading(true)
+    toast.loading('Uploading file...', { id: 'upload' })
+  }
+
+  const handleUploadComplete = (data: UploadedFile) => {
+    setUploadedFile(data)
+    setIsUploading(false)
+    toast.success('File uploaded successfully!', { id: 'upload' })
+  }
+
+  const handleUploadError = (error: string) => {
+    setIsUploading(false)
+    toast.error(error, { id: 'upload' })
+  }
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes'
+    const k = 1024
+    const sizes = ['Bytes', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
+  }
+
+  const navigateToDashboard = () => {
+    router.push('/dashboard')
+  }
+
+  const uploadAnother = () => {
+    setUploadedFile(null)
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="max-w-3xl mx-auto">
-        {/* Header */}
+      <Toaster position="top-right" />
+      
+      <div className="max-w-2xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Upload Invoice</h1>
-          <p className="text-gray-600">
-            Upload your PDF invoices for OCR processing. Make sure the filename follows the required format.
-          </p>
-        </div>
-        
-        {/* Upload Area */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <Dropzone onUploadComplete={handleUploadComplete} />
-        </div>
-        
-        {/* Upload Success Summary */}
-        {uploadedFiles.length > 0 && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-6">
-            <h3 className="text-lg font-medium text-green-800 mb-3">
-              Recently Uploaded Files
-            </h3>
-            <div className="space-y-2">
-              {uploadedFiles.map((file, index) => (
-                <div key={index} className="flex items-center justify-between bg-white p-3 rounded border border-green-200">
-                  <div>
-                    <p className="font-medium text-gray-900">{file.filename}</p>
-                    <p className="text-sm text-gray-500">Status: {file.status}</p>
-                  </div>
-                  <a 
-                    href={file.url} 
-                    target="_blank" 
-                    rel="noreferrer"
-                    className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                  >
-                    View PDF
-                  </a>
-                </div>
-              ))}
-            </div>
-            {uploadSuccess && (
-              <p className="text-sm text-green-600 mt-3">
-                Redirecting to dashboard in 3 seconds...
-              </p>
-            )}
-          </div>
-        )}
-        
-        {/* Navigation */}
-        <div className="flex justify-between items-center">
           <Link 
             href="/" 
-            className="text-gray-600 hover:text-gray-900 font-medium flex items-center"
+            className="text-blue-600 hover:text-blue-800 flex items-center gap-2 mb-4"
           >
-            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
             Back to Home
           </Link>
           
-          <Link 
-            href="/dashboard" 
-            className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg font-medium flex items-center"
-          >
-            View Dashboard
-            <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </Link>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Upload Invoice</h1>
+          <p className="text-gray-600">
+            Upload your PDF invoice for OCR processing and data extraction.
+          </p>
         </div>
-        
-        {/* Filename Format Help */}
-        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
-          <h3 className="text-lg font-medium text-blue-800 mb-3">
-            Filename Format Requirements
-          </h3>
-          <div className="text-sm text-blue-700">
-            <p className="mb-2">Your PDF filename must follow this exact pattern:</p>
-            <code className="bg-blue-100 px-2 py-1 rounded font-mono">
-              YYYYMMDD_IDENTIFIER_VENDOR_TYPE.pdf
-            </code>
+
+        {!uploadedFile ? (
+          <div className="space-y-6">
+            <Dropzone
+              onUploadStart={handleUploadStart}
+              onUploadComplete={handleUploadComplete}
+              onUploadError={handleUploadError}
+            />
             
-            <div className="mt-4 space-y-2">
-              <p><strong>YYYYMMDD:</strong> Date in format (e.g., 20250528)</p>
-              <p><strong>IDENTIFIER:</strong> Alphanumeric ID (e.g., INV001, REF123)</p>
-              <p><strong>VENDOR:</strong> Vendor name in letters (e.g., ACME, Google)</p>
-              <p><strong>TYPE:</strong> Document type in letters (e.g., SERVICE, PRODUCT)</p>
-            </div>
-            
-            <div className="mt-4">
-              <p className="font-medium">Valid examples:</p>
-              <ul className="list-disc list-inside mt-1 space-y-1">
-                <li><code>20250528_INV001_ACME_SERVICE.pdf</code></li>
-                <li><code>20250527_REF123_Google_PRODUCT.pdf</code></li>
-                <li><code>20250526_ORD456_Microsoft_LICENSE.pdf</code></li>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="font-medium text-gray-900 mb-2">Filename Requirements:</h3>
+              <p className="text-sm text-gray-600 mb-2">
+                <code className="bg-gray-200 px-2 py-1 rounded">
+                  YYYYMMDD_IDENTIFIER_VENDOR_TYPE.pdf
+                </code>
+              </p>
+              <ul className="text-sm text-gray-600 space-y-1">
+                <li>• <strong>YYYYMMDD:</strong> Date in format (e.g., 20241201)</li>
+                <li>• <strong>IDENTIFIER:</strong> Invoice or order number (e.g., INV001)</li>
+                <li>• <strong>VENDOR:</strong> Company name (e.g., ACME)</li>
+                <li>• <strong>TYPE:</strong> Document type (e.g., SUPPLY, SERVICE)</li>
               </ul>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+            <div className="flex items-center mb-4">
+              <svg className="w-6 h-6 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <h2 className="text-lg font-semibold text-green-800">Upload Successful!</h2>
+            </div>
+            
+            <div className="space-y-2 mb-6">
+              <p><strong>Filename:</strong> {uploadedFile.filename}</p>
+              <p><strong>File Size:</strong> {formatFileSize(uploadedFile.file_size)}</p>
+              <p><strong>Status:</strong> {uploadedFile.status}</p>
+              <p><strong>File ID:</strong> {uploadedFile.id}</p>
+            </div>
+            
+            <div className="flex gap-4">
+              <button
+                onClick={navigateToDashboard}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+              >
+                View Dashboard
+              </button>
+              <button
+                onClick={uploadAnother}
+                className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-6 py-2 rounded-lg font-medium transition-colors"
+              >
+                Upload Another File
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
-  );
+  )
 }

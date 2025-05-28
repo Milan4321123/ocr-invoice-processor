@@ -1,5 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from supabase import create_client, Client
 import os
 import re
@@ -15,7 +16,7 @@ app = FastAPI(title="Invoice OCR API", version="0.1.0")
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Next.js default port
+    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:3003"],  # Next.js ports
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -94,6 +95,40 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+@app.get("/mock-storage/{filename}")
+async def get_mock_file(filename: str):
+    """Serve mock PDF files for demo purposes"""
+    
+    # Generate a simple PDF response (in real app, this would serve actual files)
+    pdf_text = f"Mock PDF: {filename}"
+    pdf_content = f"""%PDF-1.4
+1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj
+2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj
+3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Resources<</Font<</F1 4 0 R>>>>/Contents 5 0 R>>endobj
+4 0 obj<</Type/Font/Subtype/Type1/BaseFont/Arial>>endobj
+5 0 obj<</Length {len(pdf_text) + 30}>>stream
+BT /F1 12 Tf 100 700 Td ({pdf_text}) Tj ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000267 00000 n 
+0000000343 00000 n 
+trailer<</Size 6/Root 1 0 R>>
+startxref
+500
+%%EOF""".encode('utf-8')
+    
+    return Response(
+        content=pdf_content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename={filename}"}
+    )
 
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
