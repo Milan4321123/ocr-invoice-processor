@@ -41,10 +41,14 @@ class DocumentAIOCRService:
             if not ocr_config.validate_config():
                 raise ValueError("Invalid OCR configuration")
             
-            self.client = documentai.DocumentProcessorServiceClient()
+            # Initialize client with proper regional endpoint
+            client_options = {"api_endpoint": f"{ocr_config.gcp_location}-documentai.googleapis.com"}
+            self.client = documentai.DocumentProcessorServiceClient(client_options=client_options)
             self.processor_name = ocr_config.get_processor_name()
             
             logger.info(f"Document AI client initialized with processor: {self.processor_name}")
+            logger.info(f"OCR Config - Project: {ocr_config.gcp_project_id}, Location: {ocr_config.gcp_location}, Processor ID: {ocr_config.processor_id}")
+            logger.info(f"Using API endpoint: {ocr_config.gcp_location}-documentai.googleapis.com")
             
         except Exception as e:
             logger.error(f"Failed to initialize Document AI client: {e}")
@@ -156,6 +160,9 @@ class DocumentAIOCRService:
                         mime_type=mime_type
                     )
                 )
+                
+                logger.info(f"Making Document AI request with processor name: {self.processor_name}")
+                logger.info(f"Request attempt {attempt + 1}/{ocr_config.max_retries}")
                 
                 # Process the document
                 response = self.client.process_document(
