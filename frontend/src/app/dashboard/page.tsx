@@ -11,7 +11,36 @@ interface Invoice {
   status: 'uploaded' | 'processing' | 'completed' | 'error'
   file_size: number
   created_at: string
-  ocr_data?: any
+  
+  // OCR Data Fields
+  ocr_status?: 'completed' | 'failed' | 'processing' | null
+  ocr_text?: string
+  ocr_confidence?: number
+  ocr_pages?: number
+  ocr_processing_time?: number
+  ocr_error?: string
+  ocr_processed_at?: string
+  
+  // Structured Invoice Data
+  invoice_number?: string
+  invoice_date?: string
+  due_date?: string
+  vendor_name?: string
+  vendor_address?: string
+  customer_name?: string
+  customer_address?: string
+  subtotal?: number
+  tax_amount?: number
+  total_amount?: number
+  currency?: string
+  payment_terms?: string
+  po_number?: string
+  
+  // Complex OCR Data
+  entities?: any[]
+  form_fields?: any[]
+  tables?: any[]
+  line_items?: any[]
 }
 
 export default function DashboardPage() {
@@ -76,6 +105,27 @@ export default function DashboardPage() {
     }
   }
 
+  const getOcrStatusColor = (status: string | null | undefined): string => {
+    switch (status) {
+      case 'completed':
+        return 'bg-green-100 text-green-800 border-green-200'
+      case 'failed':
+        return 'bg-red-100 text-red-800 border-red-200'
+      case 'processing':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200'
+    }
+  }
+
+  const formatCurrency = (amount: number | null | undefined, currency: string = 'USD'): string => {
+    if (!amount) return 'N/A'
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency || 'USD'
+    }).format(amount)
+  }
+
   const deleteInvoice = async (id: string) => {
     if (!confirm('Are you sure you want to delete this invoice?')) {
       return
@@ -100,7 +150,7 @@ export default function DashboardPage() {
 
   const processInvoice = async (id: string) => {
     try {
-      const response = await fetch(`http://localhost:8000/invoices/${id}/process`, {
+      const response = await fetch(`http://localhost:8000/ocr/process/${id}`, {
         method: 'POST'
       })
 
@@ -108,10 +158,61 @@ export default function DashboardPage() {
         throw new Error('Failed to process invoice')
       }
 
-      toast.success('Invoice processing started')
+      toast.success('Invoice OCR processing started')
       fetchInvoices() // Refresh the list
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to process invoice'
+      toast.error(errorMessage)
+    }
+  }
+
+  const viewOcrData = async (invoice: Invoice) => {
+    try {
+      const response = await fetch(`http://localhost:8000/invoices/${invoice.id}/ocr`)
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch OCR data')
+      }
+      
+      const data = await response.json()
+      
+      // Create a detailed OCR data display
+      const ocrInfo = data.ocr_data
+      let message = `📄 OCR Data for ${invoice.filename}\n\n`
+      
+      if (ocrInfo.ocr_status === 'completed') {
+        message += `✅ Status: Completed\n`
+        message += `🎯 Confidence: ${(ocrInfo.ocr_confidence * 100).toFixed(1)}%\n`
+        message += `📝 Pages: ${ocrInfo.ocr_pages}\n`
+        message += `⏱️ Processing Time: ${ocrInfo.ocr_processing_time?.toFixed(2)}s\n\n`
+        
+        if (ocrInfo.structured_data) {
+          const structured = ocrInfo.structured_data
+          message += `📋 EXTRACTED DATA:\n`
+          if (structured.invoice_number) message += `Invoice #: ${structured.invoice_number}\n`
+          if (structured.invoice_date) message += `Date: ${structured.invoice_date}\n`
+          if (structured.vendor_name) message += `Vendor: ${structured.vendor_name}\n`
+          if (structured.total_amount) message += `Total: ${formatCurrency(structured.total_amount, structured.currency)}\n`
+          if (structured.payment_terms) message += `Terms: ${structured.payment_terms}\n`
+        }
+        
+        if (ocrInfo.entities?.length > 0) {
+          message += `\n🏷️ ENTITIES (${ocrInfo.entities.length}):\n`
+          ocrInfo.entities.slice(0, 5).forEach((entity: any) => {
+            message += `• ${entity.type}: ${entity.text} (${(entity.confidence * 100).toFixed(1)}%)\n`
+          })
+        }
+      } else if (ocrInfo.ocr_status === 'failed') {
+        message += `❌ Status: Failed\n`
+        message += `Error: ${ocrInfo.ocr_error}\n`
+      } else {
+        message += `⏳ Status: ${ocrInfo.ocr_status || 'Not processed'}\n`
+      }
+      
+      alert(message)
+      
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch OCR data'
       toast.error(errorMessage)
     }
   }
@@ -185,7 +286,7 @@ export default function DashboardPage() {
       ) : (
         <div>
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
             <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
               <div className="flex items-center">
                 <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center mr-4">
@@ -203,12 +304,29 @@ export default function DashboardPage() {
               <div className="flex items-center">
                 <div className="w-10 h-10 bg-green-50 rounded-full flex items-center justify-center mr-4">
                   <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-gray-900">{invoices.length}</div>
-                  <div className="text-sm text-gray-500">Uploaded</div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {invoices.filter(i => i.ocr_status === 'completed').length}
+                  </div>
+                  <div className="text-sm text-gray-500">OCR Processed</div>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+              <div className="flex items-center">
+                <div className="w-10 h-10 bg-yellow-50 rounded-full flex items-center justify-center mr-4">
+                  <svg className="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {invoices.filter(i => i.ocr_status === 'failed').length}
+                  </div>
+                  <div className="text-sm text-gray-500">OCR Failed</div>
                 </div>
               </div>
             </div>
@@ -241,6 +359,12 @@ export default function DashboardPage() {
                     Status
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    OCR Status
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Extracted Data
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Size
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -253,7 +377,7 @@ export default function DashboardPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {invoices.map((invoice) => (
-                  <tr key={invoice.id}>
+                  <tr key={invoice.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <svg className="w-5 h-5 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -270,6 +394,57 @@ export default function DashboardPage() {
                         {invoice.status}
                       </span>
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex flex-col space-y-1">
+                        <span className={`px-2 py-1 text-xs font-medium rounded border ${getOcrStatusColor(invoice.ocr_status)}`}>
+                          {invoice.ocr_status || 'not processed'}
+                        </span>
+                        {invoice.ocr_confidence !== undefined && invoice.ocr_confidence > 0 && (
+                          <span className="text-xs text-gray-500">
+                            {(invoice.ocr_confidence * 100).toFixed(1)}% confidence
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-900 max-w-xs">
+                        {invoice.ocr_status === 'completed' ? (
+                          <div className="space-y-1">
+                            {invoice.invoice_number && (
+                              <div className="text-xs">
+                                <span className="font-medium">Invoice:</span> {invoice.invoice_number}
+                              </div>
+                            )}
+                            {invoice.vendor_name && (
+                              <div className="text-xs">
+                                <span className="font-medium">Vendor:</span> {invoice.vendor_name}
+                              </div>
+                            )}
+                            {invoice.total_amount && (
+                              <div className="text-xs">
+                                <span className="font-medium">Total:</span> {formatCurrency(invoice.total_amount, invoice.currency)}
+                              </div>
+                            )}
+                            {invoice.invoice_date && (
+                              <div className="text-xs">
+                                <span className="font-medium">Date:</span> {invoice.invoice_date}
+                              </div>
+                            )}
+                            {(!invoice.invoice_number && !invoice.vendor_name && !invoice.total_amount) && (
+                              <div className="text-xs text-gray-500">No key data extracted</div>
+                            )}
+                          </div>
+                        ) : invoice.ocr_status === 'failed' ? (
+                          <div className="text-xs text-red-600">
+                            OCR processing failed
+                          </div>
+                        ) : (
+                          <div className="text-xs text-gray-500">
+                            OCR not processed
+                          </div>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatFileSize(invoice.file_size)}
                     </td>
@@ -281,6 +456,22 @@ export default function DashboardPage() {
                         <a href={invoice.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800">
                           View PDF
                         </a>
+                        {invoice.ocr_status && (
+                          <button 
+                            onClick={() => viewOcrData(invoice)}
+                            className="text-green-600 hover:text-green-800"
+                          >
+                            OCR Data
+                          </button>
+                        )}
+                        {(!invoice.ocr_status || invoice.ocr_status === 'failed') && (
+                          <button 
+                            onClick={() => processInvoice(invoice.id)}
+                            className="text-purple-600 hover:text-purple-800"
+                          >
+                            Process OCR
+                          </button>
+                        )}
                         <button 
                           onClick={() => deleteInvoice(invoice.id)}
                           className="text-red-600 hover:text-red-800"

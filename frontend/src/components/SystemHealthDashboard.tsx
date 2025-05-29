@@ -12,6 +12,13 @@ interface HealthComponent {
   available_endpoints?: string[];
   write_access?: boolean;
   bucket?: string;
+  // OCR-specific properties
+  service?: string;
+  timestamp?: number;
+  checks?: Record<string, {
+    status: string;
+    details: string;
+  }>;
 }
 
 interface SystemHealth {
@@ -23,6 +30,7 @@ interface SystemHealth {
     environment?: HealthComponent;
     api_endpoints?: HealthComponent;
     filesystem?: HealthComponent;
+    ocr?: HealthComponent;
   };
 }
 
@@ -76,16 +84,22 @@ export default function SystemHealthDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  const renderComponent = (name: string, component: HealthComponent) => (
-    <div key={name} className="bg-white rounded-lg shadow-md p-6 border-l-4 border-gray-200">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-900 capitalize">
-          {name.replace('_', ' ')}
-        </h3>
-        <span className={`px-3 py-1 rounded-full text-sm font-medium border ${statusColors[component.status]}`}>
-          {statusIcons[component.status]} {component.status.toUpperCase()}
-        </span>
-      </div>
+  const renderComponent = (name: string, component: HealthComponent) => {
+    const isOcrComponent = name === 'ocr';
+    const borderColor = isOcrComponent ? 'border-l-4 border-blue-400' : 'border-l-4 border-gray-200';
+    
+    return (
+      <div key={name} className={`bg-white rounded-lg shadow-md p-6 ${borderColor}`}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 capitalize flex items-center gap-2">
+            {isOcrComponent && <span className="text-xl">🔍</span>}
+            {name.replace('_', ' ')}
+            {isOcrComponent && <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded">OCR</span>}
+          </h3>
+          <span className={`px-3 py-1 rounded-full text-sm font-medium border ${statusColors[component.status]}`}>
+            {statusIcons[component.status]} {component.status.toUpperCase()}
+          </span>
+        </div>
       
       <div className="space-y-2">
         {component.response_time_ms !== undefined && (
@@ -156,6 +170,38 @@ export default function SystemHealthDashboard() {
           </div>
         )}
         
+        {component.service && (
+          <div className="flex justify-between">
+            <span className="text-gray-600">Service:</span>
+            <span className="font-mono text-blue-600">{component.service}</span>
+          </div>
+        )}
+        
+        {component.checks && (
+          <div className="mt-3">
+            <span className="text-gray-600 text-sm">Health Checks:</span>
+            <div className="mt-2 space-y-2">
+              {Object.entries(component.checks).map(([checkName, checkData]) => (
+                <div key={checkName} className="bg-gray-50 rounded p-2">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm font-medium text-gray-700">
+                      {checkName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </span>
+                    <span className={`px-2 py-1 text-xs rounded ${
+                      checkData.status === 'healthy' ? 'bg-green-100 text-green-800' :
+                      checkData.status === 'unhealthy' ? 'bg-red-100 text-red-800' :
+                      'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {checkData.status}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-600">{checkData.details}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        
         {component.error && (
           <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded">
             <span className="text-red-600 text-sm font-medium">Error:</span>
@@ -165,6 +211,7 @@ export default function SystemHealthDashboard() {
       </div>
     </div>
   );
+};
 
   if (loading && !health) {
     return (
