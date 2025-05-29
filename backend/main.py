@@ -10,6 +10,10 @@ import datetime
 from dotenv import load_dotenv
 from typing import List, Dict, Any
 
+# OCR imports
+from ocr.workflow import ocr_workflow
+from config.ocr_config import ocr_config
+
 # Load environment variables
 load_dotenv()
 
@@ -65,6 +69,33 @@ async def upload_file_mock(file: UploadFile):
         # Generate UUID for invoice record
         invoice_id = str(uuid.uuid4())
         
+        # Process OCR if enabled
+        ocr_result = None
+        if ocr_config.enable_ocr:
+            try:
+                # Validate file for OCR processing
+                is_valid, validation_error = ocr_workflow.validate_file_for_ocr(len(content), file.content_type)
+                
+                if is_valid:
+                    # Process document with OCR
+                    ocr_result = await ocr_workflow.process_document(
+                        content, file.content_type, file.filename, "invoice"
+                    )
+                else:
+                    # OCR validation failed, but still upload the file
+                    ocr_result = {
+                        "success": False,
+                        "error": validation_error,
+                        "ocr_enabled": True
+                    }
+            except Exception as e:
+                # OCR failed, but still upload the file
+                ocr_result = {
+                    "success": False,
+                    "error": f"OCR processing failed: {str(e)}",
+                    "ocr_enabled": True
+                }
+        
         # Mock storage - in a real app this would be saved to disk or cloud storage
         invoice_data = {
             "id": invoice_id,
@@ -75,17 +106,50 @@ async def upload_file_mock(file: UploadFile):
             "created_at": "2025-05-29T10:30:00Z"
         }
         
+        # Add OCR data if available
+        if ocr_result:
+            invoice_data.update({
+                "ocr_status": "completed" if ocr_result.get("success") else "failed",
+                "ocr_text": ocr_result.get("raw_text", ""),
+                "ocr_confidence": ocr_result.get("confidence", 0.0),
+                "ocr_pages": ocr_result.get("pages", 0),
+                "ocr_processing_time": ocr_result.get("processing_time", 0.0),
+                "ocr_error": ocr_result.get("error"),
+                "ocr_processed_at": datetime.datetime.utcnow().isoformat(),
+                "structured_data": ocr_result.get("structured_data")
+            })
+        else:
+            invoice_data.update({
+                "ocr_status": "disabled",
+                "ocr_enabled": False
+            })
+        
         # Store in mock database
         mock_invoices.append(invoice_data)
         
-        return {
+        # Prepare response
+        response_data = {
             "status": "uploaded",
             "filename": file.filename,
             "url": invoice_data["url"],
             "id": invoice_id,
             "file_size": len(content),
-            "message": "File uploaded successfully"
+            "message": "File uploaded successfully",
+            "ocr_enabled": ocr_config.enable_ocr
         }
+        
+        # Include OCR results in response
+        if ocr_result:
+            response_data["ocr_result"] = {
+                "success": ocr_result.get("success", False),
+                "confidence": ocr_result.get("confidence", 0.0),
+                "pages": ocr_result.get("pages", 0),
+                "processing_time": ocr_result.get("processing_time", 0.0),
+                "error": ocr_result.get("error"),
+                "structured_data_available": bool(ocr_result.get("structured_data"))
+            }
+        
+        return response_data
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
@@ -171,7 +235,34 @@ async def upload_file(file: UploadFile = File(...)):
         # Generate UUID for invoice record
         invoice_id = str(uuid.uuid4())
         
-        # Store metadata in database
+        # Process OCR if enabled
+        ocr_result = None
+        if ocr_config.enable_ocr:
+            try:
+                # Validate file for OCR processing
+                is_valid, validation_error = ocr_workflow.validate_file_for_ocr(len(content), file.content_type)
+                
+                if is_valid:
+                    # Process document with OCR
+                    ocr_result = await ocr_workflow.process_document(
+                        content, file.content_type, file.filename, "invoice"
+                    )
+                else:
+                    # OCR validation failed, but still upload the file
+                    ocr_result = {
+                        "success": False,
+                        "error": validation_error,
+                        "ocr_enabled": True
+                    }
+            except Exception as e:
+                # OCR failed, but still upload the file
+                ocr_result = {
+                    "success": False,
+                    "error": f"OCR processing failed: {str(e)}",
+                    "ocr_enabled": True
+                }
+        
+        # Prepare database record with OCR data
         invoice_data = {
             "id": invoice_id,
             "filename": file.filename,
@@ -180,14 +271,74 @@ async def upload_file(file: UploadFile = File(...)):
             "file_size": len(content)
         }
         
+        # Add OCR data if available
+        if ocr_result:
+            invoice_data.update({
+                "ocr_status": "completed" if ocr_result.get("success") else "failed",
+                "ocr_text": ocr_result.get("raw_text", ""),
+                "ocr_confidence": ocr_result.get("confidence", 0.0),
+                "ocr_pages": ocr_result.get("pages", 0),
+                "ocr_processing_time": ocr_result.get("processing_time", 0.0),
+                "ocr_error": ocr_result.get("error"),
+                "ocr_processed_at": datetime.datetime.utcnow().isoformat(),
+                "ocr_entities": ocr_result.get("entities", []),
+                "ocr_form_fields": ocr_result.get("form_fields", []),
+                "ocr_tables": ocr_result.get("tables", [])
+            })
+            
+            # Add structured invoice data if available
+            structured_data = ocr_result.get("structured_data")
+            if structured_data:
+                invoice_data.update({
+                    "invoice_number": structured_data.get("invoice_number"),
+                    "invoice_date": structured_data.get("invoice_date"),
+                    "due_date": structured_data.get("due_date"),
+                    "vendor_name": structured_data.get("vendor_name"),
+                    "vendor_address": structured_data.get("vendor_address"),
+                    "customer_name": structured_data.get("customer_name"),
+                    "customer_address": structured_data.get("customer_address"),
+                    "subtotal": float(structured_data.get("subtotal")) if structured_data.get("subtotal") else None,
+                    "tax_amount": float(structured_data.get("tax_amount")) if structured_data.get("tax_amount") else None,
+                    "total_amount": float(structured_data.get("total_amount")) if structured_data.get("total_amount") else None,
+                    "currency": structured_data.get("currency"),
+                    "payment_terms": structured_data.get("payment_terms"),
+                    "po_number": structured_data.get("po_number"),
+                    "line_items": structured_data.get("line_items", [])
+                })
+        else:
+            # OCR disabled
+            invoice_data.update({
+                "ocr_status": "disabled",
+                "ocr_text": "",
+                "ocr_confidence": 0.0,
+                "ocr_pages": 0,
+                "ocr_processing_time": 0.0
+            })
+        
         supabase.table("invoices").insert(invoice_data).execute()
         
-        return {
+        # Prepare response
+        response_data = {
             "status": "uploaded",
             "filename": file.filename,
             "url": public_url,
-            "id": invoice_id
+            "id": invoice_id,
+            "file_size": len(content),
+            "ocr_enabled": ocr_config.enable_ocr
         }
+        
+        # Include OCR results in response
+        if ocr_result:
+            response_data["ocr_result"] = {
+                "success": ocr_result.get("success", False),
+                "confidence": ocr_result.get("confidence", 0.0),
+                "pages": ocr_result.get("pages", 0),
+                "processing_time": ocr_result.get("processing_time", 0.0),
+                "error": ocr_result.get("error"),
+                "structured_data_available": bool(ocr_result.get("structured_data"))
+            }
+        
+        return response_data
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
@@ -349,7 +500,10 @@ async def system_health():
     env_status = {
         "supa_url": "configured" if url else "missing",
         "supa_key": "configured" if key else "missing",
-        "filename_pattern": "configured"
+        "filename_pattern": "configured",
+        "ocr_enabled": ocr_config.enable_ocr,
+        "gcp_project_id": "configured" if ocr_config.gcp_project_id else "missing",
+        "google_credentials": "configured" if ocr_config.google_application_credentials else "default"
     }
     
     health_status["components"]["environment"] = {
@@ -357,7 +511,22 @@ async def system_health():
         "config": env_status
     }
     
-    # 4. API Endpoints Test
+    # 4. OCR Service Test
+    try:
+        ocr_health = await ocr_workflow.health_check()
+        health_status["components"]["ocr"] = ocr_health
+        
+        if ocr_health["status"] != "healthy":
+            health_status["overall_status"] = "degraded"
+            
+    except Exception as e:
+        health_status["components"]["ocr"] = {
+            "status": "error",
+            "error": str(e)
+        }
+        health_status["overall_status"] = "degraded"
+    
+    # 5. API Endpoints Test
     health_status["components"]["api_endpoints"] = {
         "status": "healthy",
         "available_endpoints": [
@@ -366,11 +535,14 @@ async def system_health():
             "/upload", 
             "/invoices", 
             "/invoices/{id}",
+            "/invoices/{id}/ocr",
+            "/ocr/status",
+            "/ocr/process/{id}",
             "/mock-storage/{filename}"
         ]
     }
     
-    # 5. File System Test
+    # 6. File System Test
     try:
         # Test if we can write to temp directory
         temp_file = "/tmp/health_check_test.txt"
@@ -391,6 +563,167 @@ async def system_health():
         health_status["overall_status"] = "degraded"
     
     return health_status
+
+@app.get("/ocr/status")
+async def get_ocr_status():
+    """Get OCR service status and configuration"""
+    try:
+        status = ocr_workflow.get_ocr_status()
+        return {"status": "success", "ocr": status}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+@app.post("/ocr/process/{invoice_id}")
+async def process_invoice_ocr(invoice_id: str):
+    """Process OCR for an existing invoice"""
+    if not supabase:
+        raise HTTPException(status_code=501, detail="OCR processing requires Supabase configuration")
+    
+    try:
+        # Get invoice from database
+        response = supabase.table("invoices").select("*").eq("id", invoice_id).execute()
+        
+        if not response.data:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+        
+        invoice = response.data[0]
+        filename = invoice["filename"]
+        
+        # Download file from storage
+        bucket_name = "invoices"
+        file_data = supabase.storage.from_(bucket_name).download(filename)
+        
+        # Determine MIME type from filename
+        mime_type = "application/pdf" if filename.lower().endswith('.pdf') else "image/jpeg"
+        
+        # Process with OCR
+        ocr_result = await ocr_workflow.process_document(
+            file_data, mime_type, filename, "invoice"
+        )
+        
+        # Update database with OCR results
+        update_data = {
+            "ocr_status": "completed" if ocr_result.get("success") else "failed",
+            "ocr_text": ocr_result.get("raw_text", ""),
+            "ocr_confidence": ocr_result.get("confidence", 0.0),
+            "ocr_pages": ocr_result.get("pages", 0),
+            "ocr_processing_time": ocr_result.get("processing_time", 0.0),
+            "ocr_error": ocr_result.get("error"),
+            "ocr_processed_at": datetime.datetime.utcnow().isoformat(),
+            "ocr_entities": ocr_result.get("entities", []),
+            "ocr_form_fields": ocr_result.get("form_fields", []),
+            "ocr_tables": ocr_result.get("tables", [])
+        }
+        
+        # Add structured data if available
+        structured_data = ocr_result.get("structured_data")
+        if structured_data:
+            update_data.update({
+                "invoice_number": structured_data.get("invoice_number"),
+                "invoice_date": structured_data.get("invoice_date"),
+                "due_date": structured_data.get("due_date"),
+                "vendor_name": structured_data.get("vendor_name"),
+                "vendor_address": structured_data.get("vendor_address"),
+                "customer_name": structured_data.get("customer_name"),
+                "customer_address": structured_data.get("customer_address"),
+                "subtotal": float(structured_data.get("subtotal")) if structured_data.get("subtotal") else None,
+                "tax_amount": float(structured_data.get("tax_amount")) if structured_data.get("tax_amount") else None,
+                "total_amount": float(structured_data.get("total_amount")) if structured_data.get("total_amount") else None,
+                "currency": structured_data.get("currency"),
+                "payment_terms": structured_data.get("payment_terms"),
+                "po_number": structured_data.get("po_number"),
+                "line_items": structured_data.get("line_items", [])
+            })
+        
+        supabase.table("invoices").update(update_data).eq("id", invoice_id).execute()
+        
+        return {
+            "status": "success",
+            "invoice_id": invoice_id,
+            "ocr_result": {
+                "success": ocr_result.get("success", False),
+                "confidence": ocr_result.get("confidence", 0.0),
+                "pages": ocr_result.get("pages", 0),
+                "processing_time": ocr_result.get("processing_time", 0.0),
+                "error": ocr_result.get("error"),
+                "structured_data_available": bool(structured_data)
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"OCR processing failed: {str(e)}")
+
+@app.get("/invoices/{invoice_id}/ocr")
+async def get_invoice_ocr_data(invoice_id: str):
+    """Get OCR data for a specific invoice"""
+    if not supabase:
+        # Search in mock data
+        invoice = next((inv for inv in mock_invoices if inv["id"] == invoice_id), None)
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+        
+        return {
+            "status": "success",
+            "invoice_id": invoice_id,
+            "ocr_data": {
+                "ocr_status": invoice.get("ocr_status", "unknown"),
+                "ocr_text": invoice.get("ocr_text", ""),
+                "ocr_confidence": invoice.get("ocr_confidence", 0.0),
+                "ocr_pages": invoice.get("ocr_pages", 0),
+                "ocr_processing_time": invoice.get("ocr_processing_time", 0.0),
+                "ocr_error": invoice.get("ocr_error"),
+                "structured_data": invoice.get("structured_data")
+            }
+        }
+    
+    try:
+        response = supabase.table("invoices").select("*").eq("id", invoice_id).execute()
+        
+        if not response.data:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+        
+        invoice = response.data[0]
+        
+        # Compile OCR data
+        ocr_data = {
+            "ocr_status": invoice.get("ocr_status"),
+            "ocr_text": invoice.get("ocr_text"),
+            "ocr_confidence": invoice.get("ocr_confidence"),
+            "ocr_pages": invoice.get("ocr_pages"),
+            "ocr_processing_time": invoice.get("ocr_processing_time"),
+            "ocr_error": invoice.get("ocr_error"),
+            "ocr_processed_at": invoice.get("ocr_processed_at"),
+            "entities": invoice.get("ocr_entities"),
+            "form_fields": invoice.get("ocr_form_fields"),
+            "tables": invoice.get("ocr_tables"),
+            "structured_data": {
+                "invoice_number": invoice.get("invoice_number"),
+                "invoice_date": invoice.get("invoice_date"),
+                "due_date": invoice.get("due_date"),
+                "vendor_name": invoice.get("vendor_name"),
+                "vendor_address": invoice.get("vendor_address"),
+                "customer_name": invoice.get("customer_name"),
+                "customer_address": invoice.get("customer_address"),
+                "subtotal": invoice.get("subtotal"),
+                "tax_amount": invoice.get("tax_amount"),
+                "total_amount": invoice.get("total_amount"),
+                "currency": invoice.get("currency"),
+                "payment_terms": invoice.get("payment_terms"),
+                "po_number": invoice.get("po_number"),
+                "line_items": invoice.get("line_items")
+            }
+        }
+        
+        return {
+            "status": "success",
+            "invoice_id": invoice_id,
+            "ocr_data": ocr_data
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch OCR data: {str(e)}")
 
 if __name__ == "__main__":
     try:
