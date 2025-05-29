@@ -23,10 +23,23 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      - ./backend/keys:/app/keys:ro
     environment:
       - SUPA_URL=${SUPA_URL}
       - SUPA_KEY=${SUPA_KEY}
       - DEBUG=True
+      # OCR Configuration
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      - GCP_LOCATION=${GCP_LOCATION}
+      - DOCUMENT_AI_PROCESSOR_ID=${DOCUMENT_AI_PROCESSOR_ID}
+      - DOCUMENT_AI_PROCESSOR_VERSION=${DOCUMENT_AI_PROCESSOR_VERSION}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/keys/ocr-implementation-461310-fb38bc34ba2c.json
+      - ENABLE_OCR=${ENABLE_OCR}
+      - USE_MOCK_OCR=${USE_MOCK_OCR}
+      - OCR_MAX_FILE_SIZE_MB=${OCR_MAX_FILE_SIZE_MB}
+      - OCR_REQUEST_TIMEOUT=${OCR_REQUEST_TIMEOUT}
+      - OCR_MAX_RETRIES=${OCR_MAX_RETRIES}
+      - OCR_RETRY_DELAY=${OCR_RETRY_DELAY}
 
 networks:
   default:
