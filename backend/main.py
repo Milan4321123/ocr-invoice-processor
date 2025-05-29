@@ -17,6 +17,12 @@ from config.ocr_config import ocr_config
 # Load environment variables
 load_dotenv()
 
+# Debug environment variables
+print(f"DEBUG: GCP_PROJECT_ID = {os.getenv('GCP_PROJECT_ID')}")
+print(f"DEBUG: GCP_LOCATION = {os.getenv('GCP_LOCATION')}")
+print(f"DEBUG: DOCUMENT_AI_PROCESSOR_ID = {os.getenv('DOCUMENT_AI_PROCESSOR_ID')}")
+print(f"DEBUG: OCR Config - Project: {ocr_config.gcp_project_id}, Location: {ocr_config.gcp_location}, Processor ID: {ocr_config.processor_id}")
+
 app = FastAPI(title="Invoice OCR API", version="0.1.0")
 
 # Configure CORS
@@ -161,6 +167,23 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+@app.get("/debug/ocr-config")
+async def debug_ocr_config():
+    """Debug endpoint to show OCR configuration"""
+    return {
+        "gcp_project_id": ocr_config.gcp_project_id,
+        "gcp_location": ocr_config.gcp_location,
+        "processor_id": ocr_config.processor_id,
+        "processor_name": ocr_config.get_processor_name(),
+        "enable_ocr": ocr_config.enable_ocr,
+        "env_vars": {
+            "GCP_PROJECT_ID": os.getenv("GCP_PROJECT_ID"),
+            "GCP_LOCATION": os.getenv("GCP_LOCATION"),
+            "DOCUMENT_AI_PROCESSOR_ID": os.getenv("DOCUMENT_AI_PROCESSOR_ID"),
+            "ENABLE_OCR": os.getenv("ENABLE_OCR")
+        }
+    }
 
 @app.get("/mock-storage/{filename}")
 async def get_mock_file(filename: str):
