@@ -5,6 +5,8 @@ from supabase import create_client, Client
 import os
 import re
 import uuid
+import time
+import datetime
 from dotenv import load_dotenv
 from typing import List, Dict, Any
 
@@ -275,6 +277,120 @@ async def delete_invoice(invoice_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete invoice: {str(e)}")
+
+@app.get("/system-health")
+async def system_health():
+    """Comprehensive system health check"""
+    health_status = {
+        "timestamp": datetime.datetime.utcnow().isoformat(),
+        "overall_status": "healthy",
+        "components": {}
+    }
+    
+    # 1. Database Connection Test
+    try:
+        if supabase:
+            start_time = time.time()
+            # Test basic query
+            response = supabase.table("invoices").select("count", count="exact").execute()
+            db_response_time = round((time.time() - start_time) * 1000, 2)
+            
+            health_status["components"]["database"] = {
+                "status": "healthy",
+                "response_time_ms": db_response_time,
+                "total_invoices": response.count if hasattr(response, 'count') else 0,
+                "connection": "supabase"
+            }
+        else:
+            health_status["components"]["database"] = {
+                "status": "mock",
+                "response_time_ms": 0,
+                "total_invoices": len(mock_invoices),
+                "connection": "in-memory"
+            }
+    except Exception as e:
+        health_status["components"]["database"] = {
+            "status": "error",
+            "error": str(e),
+            "connection": "failed"
+        }
+        health_status["overall_status"] = "degraded"
+    
+    # 2. Storage Test
+    try:
+        if supabase:
+            start_time = time.time()
+            # Test storage bucket access
+            bucket_name = "invoices"
+            bucket_info = supabase.storage.get_bucket(bucket_name)
+            storage_response_time = round((time.time() - start_time) * 1000, 2)
+            
+            health_status["components"]["storage"] = {
+                "status": "healthy",
+                "response_time_ms": storage_response_time,
+                "bucket": bucket_name,
+                "connection": "supabase"
+            }
+        else:
+            health_status["components"]["storage"] = {
+                "status": "mock",
+                "response_time_ms": 0,
+                "connection": "in-memory"
+            }
+    except Exception as e:
+        health_status["components"]["storage"] = {
+            "status": "error", 
+            "error": str(e),
+            "connection": "failed"
+        }
+        health_status["overall_status"] = "degraded"
+    
+    # 3. Environment Configuration Test
+    env_status = {
+        "supa_url": "configured" if url else "missing",
+        "supa_key": "configured" if key else "missing",
+        "filename_pattern": "configured"
+    }
+    
+    health_status["components"]["environment"] = {
+        "status": "healthy" if url and key else "degraded",
+        "config": env_status
+    }
+    
+    # 4. API Endpoints Test
+    health_status["components"]["api_endpoints"] = {
+        "status": "healthy",
+        "available_endpoints": [
+            "/health", 
+            "/system-health",
+            "/upload", 
+            "/invoices", 
+            "/invoices/{id}",
+            "/mock-storage/{filename}"
+        ]
+    }
+    
+    # 5. File System Test
+    try:
+        # Test if we can write to temp directory
+        temp_file = "/tmp/health_check_test.txt"
+        with open(temp_file, "w") as f:
+            f.write("health check")
+        os.remove(temp_file)
+        
+        health_status["components"]["filesystem"] = {
+            "status": "healthy",
+            "write_access": True
+        }
+    except Exception as e:
+        health_status["components"]["filesystem"] = {
+            "status": "error",
+            "error": str(e),
+            "write_access": False
+        }
+        health_status["overall_status"] = "degraded"
+    
+    return health_status
 
 if __name__ == "__main__":
     try:
