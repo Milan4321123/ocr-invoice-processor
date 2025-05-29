@@ -36,6 +36,13 @@ venv.bak/
 .env.test.local
 .env.production.local
 
+# Google Cloud credentials
+backend/keys/
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+
 # IDEs
 .vscode/
 .idea/
