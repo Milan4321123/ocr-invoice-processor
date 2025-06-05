@@ -465,6 +465,12 @@ export default function DashboardPage() {
                         <a href={invoice.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800">
                           View PDF
                         </a>
+                        <Link 
+                          href={`/invoice-editor/${invoice.id}`}
+                          className="text-indigo-600 hover:text-indigo-800"
+                        >
+                          Edit
+                        </Link>
                         {invoice.ocr_status && (
                           <button 
                             onClick={() => viewOcrData(invoice)}

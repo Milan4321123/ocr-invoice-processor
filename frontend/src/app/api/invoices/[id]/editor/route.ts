@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const invoiceId = params.id;
+    const { id: invoiceId } = await params;
 
     // TODO: Replace with actual API call to backend
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:8000';
-    const response = await fetch(`${backendUrl}/api/invoices/${invoiceId}/editor`, {
+    const response = await fetch(`${backendUrl}/invoices/${invoiceId}/editor`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -41,15 +41,15 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const invoiceId = params.id;
+    const { id: invoiceId } = await params;
     const body = await request.json();
 
     // TODO: Replace with actual API call to backend
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:8000';
-    const response = await fetch(`${backendUrl}/api/invoices/${invoiceId}/editor`, {
+    const response = await fetch(`${backendUrl}/invoices/${invoiceId}/editor`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',

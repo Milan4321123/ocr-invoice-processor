@@ -24,8 +24,8 @@ export default function InvoiceEditorPage() {
       }
 
       try {
-        // TODO: Replace with actual API call to validate invoice exists
-        const response = await fetch(`/api/invoices/${invoiceId}/validate`);
+        // Use the existing editor endpoint to validate and fetch invoice data
+        const response = await fetch(`/api/invoices/${invoiceId}/editor`);
         
         if (response.ok) {
           setIsValid(true);
