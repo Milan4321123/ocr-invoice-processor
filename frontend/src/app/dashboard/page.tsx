@@ -249,12 +249,20 @@ export default function DashboardPage() {
               Manage and track your uploaded invoices and their processing status.
             </p>
           </div>
-          <Link
-            href="/upload"
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
-          >
-            Upload New Invoice
-          </Link>
+          <div className="flex space-x-3">
+            <Link
+              href="/invoice-editor-test"
+              className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+            >
+              Test Invoice Editor
+            </Link>
+            <Link
+              href="/upload"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+            >
+              Upload New Invoice
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -349,7 +357,8 @@ export default function DashboardPage() {
           
           {/* Table */}
           <div className="bg-white shadow-sm rounded-lg overflow-hidden border border-gray-100">
-            <table className="min-w-full divide-y divide-gray-200">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200" style={{ minWidth: '800px' }}>
               <thead className="bg-gray-50">
                 <tr>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -484,6 +493,7 @@ export default function DashboardPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
