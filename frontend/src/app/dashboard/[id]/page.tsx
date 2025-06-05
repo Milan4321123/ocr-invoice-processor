@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { toast, Toaster } from 'react-hot-toast'
+import { toastConfig } from '@/lib/toast-config'
 
 interface Invoice {
   id: string
@@ -145,7 +146,7 @@ export default function InvoiceDetailPage({ params }: { params: { id: string } }
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <Toaster position="top-right" />
+      <Toaster {...toastConfig} />
       
       {/* Header */}
       <div className="mb-8">

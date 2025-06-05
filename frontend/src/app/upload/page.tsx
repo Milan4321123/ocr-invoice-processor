@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Dropzone from '../../components/Dropzone'
 import toast, { Toaster } from 'react-hot-toast'
+import { toastConfig } from '@/lib/toast-config'
 
 interface UploadedFile {
   id: string
@@ -54,7 +55,7 @@ export default function UploadPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <Toaster position="top-right" />
+      <Toaster {...toastConfig} />
       
       <div className="max-w-2xl mx-auto">
         <div className="mb-8">

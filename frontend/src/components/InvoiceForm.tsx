@@ -221,14 +221,27 @@ export default function InvoiceForm({
       });
 
       if (response.success) {
-        // Update local dropdown options
-        setDropdownOptions(prev => ({
-          ...prev,
-          [fieldName]: [...(prev[fieldName] || []), response.option]
-        }));
+        if (response.option) {
+          // Type-safe check for response.option before using it
+          const newOption = response.option;
+          
+          // Update local dropdown options
+          setDropdownOptions(prev => ({
+            ...prev,
+            [fieldName]: [...(prev[fieldName] || []), newOption]
+          }));
 
-        // Set the new value as selected
-        onFieldChange(fieldName as keyof GermanInvoiceFields, response.option.value);
+          // Set the new value as selected
+          onFieldChange(fieldName as keyof GermanInvoiceFields, newOption.value);
+        } else {
+          // Success but no option returned (e.g., duplicate detected)
+          console.warn(`Option added successfully but no option object returned for ${fieldName}: ${newValue}`);
+          onFieldChange(fieldName as keyof GermanInvoiceFields, newValue);
+        }
+      } else {
+        // If API call failed but we still want to allow the user to proceed
+        console.warn(`Failed to add option to ${fieldName}: ${response.message || 'Unknown error'}`);
+        onFieldChange(fieldName as keyof GermanInvoiceFields, newValue);
       }
     } catch (error) {
       console.error(`Failed to add new option for ${fieldName}:`, error);
