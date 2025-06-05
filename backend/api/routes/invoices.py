@@ -7,6 +7,65 @@ from supabase import Client
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+def _get_field_confidence_scores(invoice_data: Dict) -> Dict[str, float]:
+    """Extract field-specific confidence scores from OCR form fields"""
+    confidence_scores = {}
+    ocr_form_fields = invoice_data.get("ocr_form_fields", [])
+    ocr_entities = invoice_data.get("ocr_entities", [])
+    
+    # Default confidence based on overall OCR confidence
+    default_confidence = invoice_data.get("ocr_confidence", 0.8)
+    
+    # Mapping from OCR field names to German field names
+    field_mapping = {
+        # From form fields
+        "invoice_number": "rechnungsnummer",  # Not used in editor but good to know
+        "invoice_date": "rechnungseingang",
+        "total_amount": "rechnungsbetrag",
+        "due_date": "faelligkeit",
+        # From database fields  
+        "customer_name": "rechnungsempfaenger", 
+        "vendor_name": "rechnungssteller",
+        "po_number": "projekt",
+    }
+    
+    # Extract from form fields
+    for field in ocr_form_fields:
+        field_name = field.get("field_name", "")
+        confidence = field.get("confidence", default_confidence)
+        
+        if field_name in field_mapping:
+            confidence_scores[field_mapping[field_name]] = confidence
+    
+    # Extract from entities as fallback
+    for entity in ocr_entities:
+        entity_type = entity.get("type", "")
+        confidence = entity.get("confidence", default_confidence)
+        
+        if entity_type in field_mapping:
+            # Only use if not already set from form fields
+            if field_mapping[entity_type] not in confidence_scores:
+                confidence_scores[field_mapping[entity_type]] = confidence
+    
+    # Set default confidence for mapped fields that have actual data
+    if invoice_data.get("customer_name") and "rechnungsempfaenger" not in confidence_scores:
+        confidence_scores["rechnungsempfaenger"] = default_confidence
+    if invoice_data.get("vendor_name") and "rechnungssteller" not in confidence_scores:
+        confidence_scores["rechnungssteller"] = default_confidence
+    if invoice_data.get("po_number") and "projekt" not in confidence_scores:
+        confidence_scores["projekt"] = default_confidence
+    if invoice_data.get("total_amount") and "rechnungsbetrag" not in confidence_scores:
+        confidence_scores["rechnungsbetrag"] = default_confidence
+    if invoice_data.get("due_date") and "faelligkeit" not in confidence_scores:
+        confidence_scores["faelligkeit"] = default_confidence
+    if invoice_data.get("invoice_date") and "rechnungseingang" not in confidence_scores:
+        confidence_scores["rechnungseingang"] = default_confidence
+    
+    # Debug logging
+    logger.info(f"Confidence scores mapped: {confidence_scores}")
+    
+    return confidence_scores
+
 @router.get("/invoices")
 async def get_invoices():
     """Get all invoices"""
@@ -282,7 +341,7 @@ async def get_invoice_editor_data(invoice_id: str = Path(..., description="The i
                 "projekt": invoice_data.get("po_number", ""),
                 "gewerk": "",  # Map from structured data if available
                 "rechnungsbetrag": invoice_data.get("total_amount", 0),
-                "rechnungseingang": invoice_data.get("created_at", "").split("T")[0] if invoice_data.get("created_at") else "",
+                "rechnungseingang": invoice_data.get("invoice_date", ""),  # Use invoice_date, not created_at
                 "faelligkeit": invoice_data.get("due_date", ""),
                 "skonto_datum": "",
                 "skonto_prozent": 0,
@@ -292,13 +351,16 @@ async def get_invoice_editor_data(invoice_id: str = Path(..., description="The i
                 "weiter_berechnen_an": ""
             },
             "confidenceScores": {
-                # Default confidence scores based on OCR confidence
-                field: invoice_data.get("ocr_confidence", 0.8) for field in [
-                    "rechnungsempfaenger", "rechnungssteller", "projekt", "gewerk",
-                    "rechnungsbetrag", "rechnungseingang", "faelligkeit", "skonto_datum",
-                    "skonto_prozent", "rechnungsart", "kfw_anrechenbar", 
-                    "rechnungspruefung_email", "weiter_berechnen_an"
-                ]
+                # Map confidence scores from OCR form fields
+                **_get_field_confidence_scores(invoice_data),
+                # Add default scores for fields not in OCR data
+                "gewerk": 0.0,  # Not extracted by OCR
+                "skonto_datum": 0.0,  # Not extracted by OCR  
+                "skonto_prozent": 0.0,  # Not extracted by OCR
+                "rechnungsart": 0.0,  # Not extracted by OCR
+                "kfw_anrechenbar": 0.0,  # Not extracted by OCR
+                "rechnungspruefung_email": 0.0,  # Not extracted by OCR
+                "weiter_berechnen_an": 0.0,  # Not extracted by OCR
             },
             "filename": invoice_data.get("filename", f"Invoice {invoice_id}")
         }

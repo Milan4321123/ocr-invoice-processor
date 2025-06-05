@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 from typing import Optional
 
 # Route imports
-from api.routes import health, upload, invoices
+from api.routes import health, upload, invoices, ocr
 
 # OCR imports
 from ocr.workflow import ocr_workflow
@@ -70,7 +70,8 @@ else:
 app.include_router(health.router, tags=["health"])
 app.include_router(upload.router, tags=["upload"])
 app.include_router(invoices.router, tags=["invoices"])
+app.include_router(ocr.router, tags=["ocr"])
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8001)

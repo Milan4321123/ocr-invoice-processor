@@ -55,7 +55,8 @@ export default function DashboardPage() {
   const fetchInvoices = async () => {
     try {
       setLoading(true)
-      const response = await fetch('http://localhost:8000/invoices')
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+      const response = await fetch(`${apiUrl}/invoices`)
       
       if (!response.ok) {
         throw new Error('Failed to fetch invoices')
@@ -132,7 +133,8 @@ export default function DashboardPage() {
     }
 
     try {
-      const response = await fetch(`http://localhost:8000/invoices/${id}`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+      const response = await fetch(`${apiUrl}/invoices/${id}`, {
         method: 'DELETE'
       })
 
@@ -150,7 +152,8 @@ export default function DashboardPage() {
 
   const processInvoice = async (id: string) => {
     try {
-      const response = await fetch(`http://localhost:8000/ocr/process/${id}`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+      const response = await fetch(`${apiUrl}/ocr/process/${id}`, {
         method: 'POST'
       })
 
@@ -168,7 +171,8 @@ export default function DashboardPage() {
 
   const viewOcrData = async (invoice: Invoice) => {
     try {
-      const response = await fetch(`http://localhost:8000/invoices/${invoice.id}/ocr`)
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+      const response = await fetch(`${apiUrl}/invoices/${invoice.id}/ocr`)
       
       if (!response.ok) {
         throw new Error('Failed to fetch OCR data')

@@ -55,9 +55,10 @@ export default function InvoiceDetailPage({ params }: { params: { id: string } }
   const fetchInvoiceData = async () => {
     try {
       setLoading(true)
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
       
       // Fetch invoice details
-      const invoiceResponse = await fetch(`http://localhost:8000/invoices/${params.id}`)
+      const invoiceResponse = await fetch(`${apiUrl}/invoices/${params.id}`)
       if (!invoiceResponse.ok) {
         throw new Error('Failed to fetch invoice')
       }
@@ -65,7 +66,7 @@ export default function InvoiceDetailPage({ params }: { params: { id: string } }
       setInvoice(invoiceData.invoice)
       
       // Fetch OCR data
-      const ocrResponse = await fetch(`http://localhost:8000/invoices/${params.id}/ocr`)
+      const ocrResponse = await fetch(`${apiUrl}/invoices/${params.id}/ocr`)
       if (ocrResponse.ok) {
         const ocrResult = await ocrResponse.json()
         setOcrData(ocrResult.ocr_data)
@@ -82,7 +83,8 @@ export default function InvoiceDetailPage({ params }: { params: { id: string } }
 
   const processOcr = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/ocr/process/${params.id}`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+      const response = await fetch(`${apiUrl}/ocr/process/${params.id}`, {
         method: 'POST'
       })
 
