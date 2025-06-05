@@ -27,6 +27,11 @@ def _get_field_confidence_scores(invoice_data: Dict) -> Dict[str, float]:
         "customer_name": "rechnungsempfaenger", 
         "vendor_name": "rechnungssteller",
         "po_number": "projekt",
+        # From OCR entities - additional mappings
+        "receiver_name": "rechnungsempfaenger",  # Customer name from entities
+        "supplier_name": "rechnungssteller",     # Vendor name from entities  
+        "purchase_order": "projekt",             # PO number from entities
+        "invoice_id": "rechnungsnummer",         # Invoice number from entities
     }
     
     # Extract from form fields
@@ -65,6 +70,13 @@ def _get_field_confidence_scores(invoice_data: Dict) -> Dict[str, float]:
     logger.info(f"Confidence scores mapped: {confidence_scores}")
     
     return confidence_scores
+
+def _extract_entity_value(ocr_entities: List[Dict], entity_type: str) -> str:
+    """Extract value from OCR entities by type"""
+    for entity in ocr_entities:
+        if entity.get("type") == entity_type:
+            return entity.get("value", "") or entity.get("normalized_value", "")
+    return ""
 
 @router.get("/invoices")
 async def get_invoices():
@@ -332,13 +344,23 @@ async def get_invoice_editor_data(invoice_id: str = Path(..., description="The i
         
         invoice_data = response.data[0]
         
+        # Extract OCR entities for field values  
+        ocr_entities = invoice_data.get("ocr_entities", [])
+        
+        # Helper function to get value with fallback to OCR entities
+        def get_field_value(db_field: str, entity_type: str) -> str:
+            db_value = invoice_data.get(db_field, "")
+            if db_value:
+                return db_value
+            return _extract_entity_value(ocr_entities, entity_type)
+        
         # Format data for editor interface
         editor_data = {
             "pdfUrl": invoice_data.get("url", ""),
             "fields": {
-                "rechnungsempfaenger": invoice_data.get("customer_name", ""),
-                "rechnungssteller": invoice_data.get("vendor_name", ""),
-                "projekt": invoice_data.get("po_number", ""),
+                "rechnungsempfaenger": get_field_value("customer_name", "receiver_name"),
+                "rechnungssteller": get_field_value("vendor_name", "supplier_name"),
+                "projekt": get_field_value("po_number", "purchase_order"),
                 "gewerk": "",  # Map from structured data if available
                 "rechnungsbetrag": invoice_data.get("total_amount", 0),
                 "rechnungseingang": invoice_data.get("invoice_date", ""),  # Use invoice_date, not created_at
