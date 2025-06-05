@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Save, X, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { SearchableDropdown } from './SearchableDropdown';
+import { dropdownService, DropdownOption } from '@/services/dropdown';
 
 // German Invoice Fields Interface
 export interface GermanInvoiceFields {
@@ -63,7 +65,43 @@ const ConfidenceIndicator = ({ score }: { score?: number }) => {
   );
 };
 
-// Form field component with confidence indicator
+// Dropdown field with confidence indicator
+const DropdownWithConfidence = ({ 
+  label, 
+  value, 
+  options, 
+  onChange, 
+  onAddNew, 
+  confidence, 
+  placeholder,
+  disabled 
+}: {
+  label: string;
+  value: string;
+  options: DropdownOption[];
+  onChange: (value: string) => void;
+  onAddNew: (newValue: string) => void;
+  confidence?: number;
+  placeholder?: string;
+  disabled?: boolean;
+}) => (
+  <div className="space-y-1">
+    <div className="flex items-center justify-between">
+      <span className="text-sm font-medium text-gray-700">{label}</span>
+      {confidence !== undefined && <ConfidenceIndicator score={confidence} />}
+    </div>
+    <SearchableDropdown
+      label=""
+      value={value}
+      options={options}
+      onChange={onChange}
+      onAddNew={onAddNew}
+      placeholder={placeholder}
+      disabled={disabled}
+      className="mt-0"
+    />
+  </div>
+);
 const FormField = ({ 
   label, 
   value, 
@@ -147,6 +185,57 @@ export default function InvoiceForm({
   className = "" 
 }: InvoiceFormProps) {
   const [isSaving, setIsSaving] = useState(false);
+  const [dropdownOptions, setDropdownOptions] = useState<Record<string, DropdownOption[]>>({});
+  const [loadingDropdowns, setLoadingDropdowns] = useState(true);
+
+  // Load dropdown options on component mount
+  useEffect(() => {
+    const loadDropdownOptions = async () => {
+      try {
+        setLoadingDropdowns(true);
+        const response = await dropdownService.getAllDropdownOptions();
+        setDropdownOptions(response.dropdowns);
+      } catch (error) {
+        console.error('Failed to load dropdown options:', error);
+        // Set empty arrays as fallback
+        setDropdownOptions({
+          rechnungsempfaenger: [],
+          rechnungssteller: [],
+          projekt: [],
+          gewerk: []
+        });
+      } finally {
+        setLoadingDropdowns(false);
+      }
+    };
+
+    loadDropdownOptions();
+  }, []);
+
+  const handleAddNewOption = async (fieldName: string, newValue: string) => {
+    try {
+      const response = await dropdownService.addDropdownOption({
+        field_name: fieldName,
+        value: newValue,
+        label: newValue
+      });
+
+      if (response.success) {
+        // Update local dropdown options
+        setDropdownOptions(prev => ({
+          ...prev,
+          [fieldName]: [...(prev[fieldName] || []), response.option]
+        }));
+
+        // Set the new value as selected
+        onFieldChange(fieldName as keyof GermanInvoiceFields, response.option.value);
+      }
+    } catch (error) {
+      console.error(`Failed to add new option for ${fieldName}:`, error);
+      // Still set the value locally even if saving failed
+      onFieldChange(fieldName as keyof GermanInvoiceFields, newValue);
+    }
+  };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -173,7 +262,7 @@ export default function InvoiceForm({
     }
   };
 
-  // Mock options for dropdowns (in real app, these would come from SharePoint)
+  // Static options for dropdowns (these match the backend API)
   const rechnungsartOptions = [
     { value: 'rechnung', label: 'Rechnung' },
     { value: 'abschlagsrechnung', label: 'Abschlagsrechnung' },
@@ -224,22 +313,26 @@ export default function InvoiceForm({
           </h3>
           
           <div className="grid grid-cols-1 gap-4">
-            <FormField
+            <DropdownWithConfidence
               label="Rechnungsempfänger (Invoice Recipient)"
-              value={fields.rechnungsempfaenger}
+              value={fields.rechnungsempfaenger || ''}
+              options={dropdownOptions.rechnungsempfaenger || []}
               onChange={(value) => onFieldChange('rechnungsempfaenger', value)}
+              onAddNew={(newValue) => handleAddNewOption('rechnungsempfaenger', newValue)}
               confidence={confidenceScores.rechnungsempfaenger}
-              placeholder="Enter recipient name"
-              required
+              placeholder="Select or add recipient..."
+              disabled={loadingDropdowns}
             />
             
-            <FormField
+            <DropdownWithConfidence
               label="Rechnungssteller (Invoice Issuer)"
-              value={fields.rechnungssteller}
+              value={fields.rechnungssteller || ''}
+              options={dropdownOptions.rechnungssteller || []}
               onChange={(value) => onFieldChange('rechnungssteller', value)}
+              onAddNew={(newValue) => handleAddNewOption('rechnungssteller', newValue)}
               confidence={confidenceScores.rechnungssteller}
-              placeholder="Enter issuer name"
-              required
+              placeholder="Select or add issuer..."
+              disabled={loadingDropdowns}
             />
             
             <FormField
@@ -260,20 +353,26 @@ export default function InvoiceForm({
           </h3>
           
           <div className="grid grid-cols-1 gap-4">
-            <FormField
+            <DropdownWithConfidence
               label="Projekt (Project)"
-              value={fields.projekt}
+              value={fields.projekt || ''}
+              options={dropdownOptions.projekt || []}
               onChange={(value) => onFieldChange('projekt', value)}
+              onAddNew={(newValue) => handleAddNewOption('projekt', newValue)}
               confidence={confidenceScores.projekt}
-              placeholder="Enter project name"
+              placeholder="Select or add project..."
+              disabled={loadingDropdowns}
             />
             
-            <FormField
+            <DropdownWithConfidence
               label="Gewerk (Trade/Work Type)"
-              value={fields.gewerk}
+              value={fields.gewerk || ''}
+              options={dropdownOptions.gewerk || []}
               onChange={(value) => onFieldChange('gewerk', value)}
+              onAddNew={(newValue) => handleAddNewOption('gewerk', newValue)}
               confidence={confidenceScores.gewerk}
-              placeholder="Enter trade/work type"
+              placeholder="Select or add trade type..."
+              disabled={loadingDropdowns}
             />
           </div>
         </div>

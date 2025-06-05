@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 from typing import Optional
 
 # Route imports
-from api.routes import health, upload, invoices, ocr
+from api.routes import health, upload, invoices, ocr, dropdowns
 
 # OCR imports
 from ocr.workflow import ocr_workflow
@@ -22,7 +22,7 @@ from config.ocr_config import ocr_config
 load_dotenv()
 
 # Configure logging
-logging.basicConfig(
+logging.basicConfig(    
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
@@ -71,6 +71,7 @@ app.include_router(health.router, tags=["health"])
 app.include_router(upload.router, tags=["upload"])
 app.include_router(invoices.router, tags=["invoices"])
 app.include_router(ocr.router, tags=["ocr"])
+app.include_router(dropdowns.router, prefix="/api", tags=["dropdowns"])
 
 if __name__ == "__main__":
     import uvicorn

@@ -1,0 +1,167 @@
+/**
+ * Dropdown options service for German invoice fields
+ * Handles API communication for dropdown functionality
+ */
+
+export interface DropdownOption {
+  value: string;
+  label: string;
+  is_default: boolean;
+}
+
+export interface DropdownResponse {
+  field_name: string;
+  options: DropdownOption[];
+  total: number;
+}
+
+export interface AllDropdownsResponse {
+  dropdowns: Record<string, DropdownOption[]>;
+  field_names: string[];
+}
+
+export interface AddOptionRequest {
+  field_name: string;
+  value: string;
+  label?: string;
+}
+
+export interface PotentialDuplicate {
+  existing_option: DropdownOption;
+  similarity: number;
+  normalized_new: string;
+  normalized_existing: string;
+}
+
+export interface AddOptionResponse {
+  success: boolean;
+  message?: string;
+  duplicate_detected?: boolean;
+  existing_option?: DropdownOption;
+  potential_duplicates?: PotentialDuplicate[];
+  suggested_option?: DropdownOption;
+  option?: DropdownOption;
+}
+
+export interface SuggestionRequest {
+  extracted_values: Record<string, string>;
+}
+
+export interface DropdownSuggestion {
+  field_name: string;
+  suggested_value: string;
+  suggested_label: string;
+  is_new: boolean;
+}
+
+class DropdownService {
+  private baseUrl: string;
+
+  constructor() {
+    this.baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  }
+
+  /**
+   * Get dropdown options for a specific field
+   */
+  async getDropdownOptions(fieldName: string): Promise<DropdownResponse> {
+    const response = await fetch(`${this.baseUrl}/api/dropdowns/${fieldName}`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch dropdown options for ${fieldName}: ${response.statusText}`);
+    }
+    
+    return response.json();
+  }
+
+  /**
+   * Get all dropdown options for all fields
+   */
+  async getAllDropdownOptions(): Promise<AllDropdownsResponse> {
+    const response = await fetch(`${this.baseUrl}/api/dropdowns`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch all dropdown options: ${response.statusText}`);
+    }
+    
+    return response.json();
+  }
+
+  /**
+   * Add a new option to a dropdown field
+   */
+  async addDropdownOption(request: AddOptionRequest): Promise<AddOptionResponse> {
+    const response = await fetch(`${this.baseUrl}/api/dropdowns/add-option`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to add dropdown option');
+    }
+    
+    return response.json();
+  }
+
+  /**
+   * Get suggestions for new dropdown options based on OCR extracted values
+   */
+  async getSuggestionsFromOcr(extractedValues: Record<string, string>): Promise<{ suggestions: DropdownSuggestion[] }> {
+    const response = await fetch(`${this.baseUrl}/api/dropdowns/suggest-from-ocr`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ extracted_values: extractedValues }),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to get OCR suggestions: ${response.statusText}`);
+    }
+    
+    return response.json();
+  }
+
+  /**
+   * Delete a custom dropdown option (cannot delete default options)
+   */
+  async deleteDropdownOption(fieldName: string, optionValue: string): Promise<{ success: boolean }> {
+    const response = await fetch(`${this.baseUrl}/api/dropdowns/${fieldName}/${optionValue}`, {
+      method: 'DELETE',
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to delete dropdown option');
+    }
+    
+    return response.json();
+  }
+
+  /**
+   * Get German field labels for display
+   */
+  getFieldLabel(fieldName: string): string {
+    const labels: Record<string, string> = {
+      'rechnungsempfaenger': 'Rechnungsempfänger',
+      'rechnungssteller': 'Rechnungssteller',
+      'projekt': 'Projekt',
+      'gewerk': 'Gewerk'
+    };
+    
+    return labels[fieldName] || fieldName;
+  }
+
+  /**
+   * Get all supported German field names
+   */
+  getSupportedFields(): string[] {
+    return ['rechnungsempfaenger', 'rechnungssteller', 'projekt', 'gewerk'];
+  }
+}
+
+export const dropdownService = new DropdownService();
