@@ -1,29 +1,12 @@
-"""Database-backed dropdown options management with fallback to hardcoded options"""
+"""Simplified dropdown options management - hardcoded approach for existing invoices table"""
 from fastapi import APIRouter, HTTPException
 from typing import List, Dict, Any, Optional
 import logging
 from pydantic import BaseModel
 import difflib
-import os
-from supabase import create_client, Client
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-# Initialize Supabase client
-supabase_url = os.getenv("SUPABASE_URL")
-supabase_key = os.getenv("SUPABASE_ANON_KEY") 
-supabase: Optional[Client] = None
-
-if supabase_url and supabase_key:
-    try:
-        supabase = create_client(supabase_url, supabase_key)
-        logger.info("Supabase client initialized successfully")
-    except Exception as e:
-        logger.error(f"Failed to initialize Supabase client: {e}")
-        supabase = None
-else:
-    logger.warning("Supabase credentials not found, using fallback mode")
 
 class DropdownOption(BaseModel):
     """Model for dropdown option"""
@@ -41,9 +24,9 @@ class SuggestionRequest(BaseModel):
     """Model for OCR suggestion request"""
     extracted_values: Dict[str, str]
 
-# Fallback hardcoded options (used when database is unavailable)
-# These serve as both fallback data and initial migration data
-FALLBACK_DROPDOWN_OPTIONS = {
+# Hardcoded default options for German invoice fields
+# This simple approach works directly with existing invoices table
+DROPDOWN_OPTIONS = {
     "rechnungsempfaenger": [
         {"value": "acme_construction", "label": "ACME Construction GmbH", "is_default": True},
         {"value": "baumeister_gmbh", "label": "Baumeister GmbH", "is_default": True},
@@ -89,104 +72,6 @@ CUSTOM_OPTIONS: Dict[str, List[Dict[str, Any]]] = {
     "projekt": [],
     "gewerk": []
 }
-
-# Database helper functions
-def _get_dropdown_options_from_db(field_name: Optional[str] = None) -> Dict[str, List[Dict[str, Any]]]:
-    """Get dropdown options from database"""
-    if not supabase:
-        logger.warning("Database unavailable, using fallback options")
-        if field_name:
-            return {field_name: FALLBACK_DROPDOWN_OPTIONS.get(field_name, [])}
-        return FALLBACK_DROPDOWN_OPTIONS
-    
-    try:
-        query = supabase.table("dropdown_options").select("*")
-        if field_name:
-            query = query.eq("field_name", field_name)
-        
-        response = query.eq("is_active", True).order("field_name, label").execute()
-        
-        if not response.data:
-            logger.warning(f"No dropdown options found in database for field: {field_name or 'all fields'}")
-            if field_name:
-                return {field_name: FALLBACK_DROPDOWN_OPTIONS.get(field_name, [])}
-            return FALLBACK_DROPDOWN_OPTIONS
-        
-        # Group by field_name
-        grouped_options = {}
-        for row in response.data:
-            field = row["field_name"]
-            if field not in grouped_options:
-                grouped_options[field] = []
-            
-            option = {
-                "value": row["value"],
-                "label": row["label"],
-                "is_default": row["is_default"],
-                "id": row["id"],
-                "metadata": row.get("metadata", {})
-            }
-            grouped_options[field].append(option)
-        
-        return grouped_options
-        
-    except Exception as e:
-        logger.error(f"Database error when fetching dropdown options: {e}")
-        if field_name:
-            return {field_name: FALLBACK_DROPDOWN_OPTIONS.get(field_name, [])}
-        return FALLBACK_DROPDOWN_OPTIONS
-
-def _add_dropdown_option_to_db(field_name: str, value: str, label: str, is_default: bool = False, metadata: Dict = None) -> Dict[str, Any]:
-    """Add a new dropdown option to database"""
-    if not supabase:
-        logger.warning("Database unavailable, cannot persist new option")
-        return {"success": False, "error": "Database unavailable"}
-    
-    try:
-        new_option = {
-            "field_name": field_name,
-            "value": value,
-            "label": label,
-            "is_default": is_default,
-            "metadata": metadata or {}
-        }
-        
-        response = supabase.table("dropdown_options").insert(new_option).execute()
-        
-        if response.data:
-            logger.info(f"Successfully added option to database: {field_name} - {label}")
-            return {"success": True, "data": response.data[0]}
-        else:
-            logger.error(f"Failed to add option to database: {response}")
-            return {"success": False, "error": "Insert failed"}
-            
-    except Exception as e:
-        logger.error(f"Database error when adding dropdown option: {e}")
-        return {"success": False, "error": str(e)}
-
-def _delete_dropdown_option_from_db(field_name: str, value: str) -> Dict[str, Any]:
-    """Delete a dropdown option from database (soft delete - set is_active=false)"""
-    if not supabase:
-        logger.warning("Database unavailable, cannot delete option")
-        return {"success": False, "error": "Database unavailable"}
-    
-    try:
-        response = supabase.table("dropdown_options").update({"is_active": False}).eq("field_name", field_name).eq("value", value).execute()
-        
-        if response.data:
-            logger.info(f"Successfully deleted option from database: {field_name} - {value}")
-            return {"success": True, "data": response.data}
-        else:
-            logger.error(f"Failed to delete option from database: {response}")
-            return {"success": False, "error": "Delete failed"}
-            
-    except Exception as e:
-        logger.error(f"Database error when deleting dropdown option: {e}")
-        return {"success": False, "error": str(e)}
-
-def _get_valid_field_names() -> List[str]:
-    """Get list of valid field names (from fallback or database)"""
-    return list(FALLBACK_DROPDOWN_OPTIONS.keys())
 
 def _calculate_similarity(text1: str, text2: str) -> float:
     """Calculate text similarity for OCR suggestions and duplicate detection"""
@@ -245,15 +130,14 @@ def _find_potential_duplicates(new_label: str, existing_options: List[Dict[str, 
     return potential_duplicates
 
 def _get_all_options_for_field(field_name: str) -> List[Dict[str, Any]]:
-    """Get all options (database/fallback + custom) for a field"""
-    if field_name not in _get_valid_field_names():
+    """Get all options (hardcoded + custom) for a field"""
+    if field_name not in DROPDOWN_OPTIONS:
         return []
     
-    # Start with database/fallback options
-    db_options = _get_dropdown_options_from_db(field_name)
-    all_options = db_options.get(field_name, []).copy()
+    # Start with hardcoded options
+    all_options = DROPDOWN_OPTIONS[field_name].copy()
     
-    # Add custom in-memory options (these are temporary until next server restart)
+    # Add custom options
     if field_name in CUSTOM_OPTIONS:
         all_options.extend(CUSTOM_OPTIONS[field_name])
     
@@ -264,12 +148,9 @@ async def get_dropdown_stats():
     """Get statistics about dropdown options"""
     stats = {}
     total_options = 0
-    valid_field_names = _get_valid_field_names()
     
-    for field_name in valid_field_names:
-        # Get options from database/fallback
-        db_options = _get_dropdown_options_from_db(field_name)
-        default_count = len(db_options.get(field_name, []))
+    for field_name in DROPDOWN_OPTIONS.keys():
+        default_count = len(DROPDOWN_OPTIONS[field_name])
         custom_count = len(CUSTOM_OPTIONS.get(field_name, []))
         field_total = default_count + custom_count
         
@@ -283,13 +164,13 @@ async def get_dropdown_stats():
     return {
         "field_stats": stats,
         "total_options": total_options,
-        "total_fields": len(valid_field_names)
+        "total_fields": len(DROPDOWN_OPTIONS.keys())
     }
 
 @router.get("/dropdowns/{field_name}")
 async def get_dropdown_options(field_name: str):
     """Get all dropdown options for a specific field"""
-    if field_name not in _get_valid_field_names():
+    if field_name not in DROPDOWN_OPTIONS:
         raise HTTPException(status_code=400, detail=f"Invalid field name: {field_name}")
     
     all_options = _get_all_options_for_field(field_name)
@@ -304,20 +185,19 @@ async def get_dropdown_options(field_name: str):
 async def get_all_dropdown_options():
     """Get all dropdown options for all fields"""
     all_dropdowns = {}
-    valid_field_names = _get_valid_field_names()
     
-    for field_name in valid_field_names:
+    for field_name in DROPDOWN_OPTIONS.keys():
         all_dropdowns[field_name] = _get_all_options_for_field(field_name)
     
     return {
         "dropdowns": all_dropdowns,
-        "field_names": valid_field_names
+        "field_names": list(DROPDOWN_OPTIONS.keys())
     }
 
 @router.post("/dropdowns/add-option")
 async def add_dropdown_option(request: AddOptionRequest):
     """Add a new option to a dropdown field with enhanced duplicate detection"""
-    if request.field_name not in _get_valid_field_names():
+    if request.field_name not in DROPDOWN_OPTIONS:
         raise HTTPException(status_code=400, detail=f"Invalid field name: {request.field_name}")
     
     if not request.value or not request.value.strip():
@@ -380,22 +260,15 @@ async def add_dropdown_option(request: AddOptionRequest):
         "is_default": False
     }
     
-    # Try to persist to database first
-    db_result = _add_dropdown_option_to_db(request.field_name, safe_value, label, is_default=False)
+    CUSTOM_OPTIONS[request.field_name].append(new_option)
     
-    if not db_result.get("success"):
-        # Database failed, add to in-memory storage as fallback
-        CUSTOM_OPTIONS[request.field_name].append(new_option)
-        logger.warning(f"Database persist failed, added to memory: {request.field_name} - {label}")
-    else:
-        logger.info(f"Successfully added option to database: {request.field_name} - {label}")
+    logger.info(f"Added custom option to {request.field_name}: {label}")
     
     return {
         "success": True,
         "message": f"Option added to {request.field_name}",
         "duplicate_detected": False,
-        "option": new_option,
-        "persisted_to_db": db_result.get("success", False)
+        "option": new_option
     }
 
 @router.post("/dropdowns/suggest-from-ocr")
@@ -405,7 +278,7 @@ async def suggest_option_from_ocr(request_data: Dict[str, Any]):
     suggestions = []
     
     for field_name, value in extracted_values.items():
-        if field_name not in _get_valid_field_names():
+        if field_name not in DROPDOWN_OPTIONS:
             continue
             
         if not value or not value.strip():
@@ -456,12 +329,11 @@ async def suggest_option_from_ocr(request_data: Dict[str, Any]):
 @router.delete("/dropdowns/{field_name}/{option_value}")
 async def delete_dropdown_option(field_name: str, option_value: str):
     """Delete a custom dropdown option (cannot delete default options)"""
-    if field_name not in _get_valid_field_names():
+    if field_name not in DROPDOWN_OPTIONS:
         raise HTTPException(status_code=400, detail=f"Invalid field name: {field_name}")
     
-    # Check if it's a default option from database/fallback
-    db_options = _get_dropdown_options_from_db(field_name)
-    default_values = [opt["value"] for opt in db_options.get(field_name, [])]
+    # Check if it's a default option
+    default_values = [opt["value"] for opt in DROPDOWN_OPTIONS[field_name]]
     if option_value in default_values:
         raise HTTPException(status_code=400, detail="Cannot delete default options")
     
@@ -472,14 +344,10 @@ async def delete_dropdown_option(field_name: str, option_value: str):
             if opt["value"] != option_value
         ]
     
-    # Try to delete from database as well (soft delete)
-    db_result = _delete_dropdown_option_from_db(field_name, option_value)
-    
     logger.info(f"Deleted custom option from {field_name}: {option_value}")
     
     return {
         "success": True,
         "message": f"Option '{option_value}' deleted from {field_name}",
-        "deleted_option": option_value,
-        "deleted_from_db": db_result.get("success", False)
+        "deleted_option": option_value
     }
