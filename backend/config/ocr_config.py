@@ -23,7 +23,7 @@ class OCRConfig(BaseModel):
     
     # Authentication
     google_application_credentials: Optional[str] = Field(
-        default=None, 
+        default=None,
         env="GOOGLE_APPLICATION_CREDENTIALS"
     )
     
@@ -32,7 +32,7 @@ class OCRConfig(BaseModel):
     supported_mime_types: list = Field(
         default_factory=lambda: [
             "application/pdf",
-            "image/jpeg", 
+            "image/jpeg",
             "image/png",
             "image/tiff",
             "image/bmp",
