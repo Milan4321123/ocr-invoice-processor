@@ -8,6 +8,8 @@ type UploadStatus = "idle" | "uploading" | "success" | "error";
 
 interface DropzoneProps {
   onUploadComplete?: (data: any) => void;
+  onUploadStart?: () => void;
+  onUploadError?: (error: string) => void;
 }
 
 interface UploadResponse {
@@ -19,7 +21,7 @@ interface UploadResponse {
   message: string;
 }
 
-export default function Dropzone({ onUploadComplete }: DropzoneProps) {
+export default function Dropzone({ onUploadComplete, onUploadStart, onUploadError }: DropzoneProps) {
   const [status, setStatus] = useState<UploadStatus>("idle");
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [uploadProgress, setUploadProgress] = useState<number>(0);
@@ -50,21 +52,26 @@ export default function Dropzone({ onUploadComplete }: DropzoneProps) {
     
     // Validate file type
     if (pdf.type !== "application/pdf") {
-      setErrorMessage("Only PDF files are allowed");
+      const errorMsg = "Only PDF files are allowed";
+      setErrorMessage(errorMsg);
       setStatus("error");
-      toast.error("Only PDF files are allowed");
+      toast.error(errorMsg);
+      onUploadError?.(errorMsg);
       return;
     }
     
     // Validate filename format
     if (!validateFilename(pdf.name)) {
-      setErrorMessage("Filename must follow pattern: YYYYMMDD_IDENTIFIER_VENDOR_TYPE.pdf");
+      const errorMsg = "Filename must follow pattern: YYYYMMDD_IDENTIFIER_VENDOR_TYPE.pdf";
+      setErrorMessage(errorMsg);
       setStatus("error");
       toast.error("Invalid filename format");
+      onUploadError?.(errorMsg);
       return;
     }
     
     setStatus("uploading");
+    onUploadStart?.(); // Call the callback when upload starts
     
     try {
       const formData = new FormData();
@@ -104,12 +111,14 @@ export default function Dropzone({ onUploadComplete }: DropzoneProps) {
       }
     } catch (error) {
       console.error("Upload error:", error);
-      setErrorMessage(error instanceof Error ? error.message : "Upload failed");
+      const errorMsg = error instanceof Error ? error.message : "Upload failed";
+      setErrorMessage(errorMsg);
       setStatus("error");
       setUploadProgress(0);
-      toast.error(error instanceof Error ? error.message : "Upload failed");
+      toast.error(errorMsg);
+      onUploadError?.(errorMsg);
     }
-  }, [onUploadComplete]);
+  }, [onUploadComplete, onUploadStart, onUploadError]);
   
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ 
     onDrop,

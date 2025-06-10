@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const invoiceId = params.id;
+    const resolvedParams = await params;
+    const invoiceId = resolvedParams.id;
 
     // Basic validation
     if (!invoiceId || invoiceId.trim() === '') {
