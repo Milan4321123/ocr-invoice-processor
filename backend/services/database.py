@@ -102,6 +102,16 @@ class DatabaseService:
         if 'url' in mapped:
             del mapped['url']
         
+        # Handle new source tracking fields (only include if they're present)
+        # These fields will be ignored if the database doesn't have them yet
+        source_fields = ['source_type', 'source_metadata']
+        for field in source_fields:
+            if field not in mapped:
+                continue
+            # Keep as-is, database will ignore if column doesn't exist
+        if 'url' in mapped:
+            del mapped['url']
+        
         # Map English application fields to German database fields
         field_mappings = {
             'customer_name': 'rechnungsempfaenger',
