@@ -260,6 +260,21 @@ async def get_watcher_health():
             "errors": [str(e)]
         }
 
+@router.post("/process-pending")
+async def process_pending_files():
+    """Manually process any pending files that couldn't be processed automatically"""
+    try:
+        processed_count = await folder_watcher_service.process_pending_files()
+        
+        return {
+            "success": True,
+            "message": f"Processed {processed_count} pending files",
+            "files_processed": processed_count
+        }
+    except Exception as e:
+        logger.error(f"Error processing pending files: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to process pending files: {str(e)}")
+
 # Utility Functions
 
 def _format_uptime(seconds: int) -> str:

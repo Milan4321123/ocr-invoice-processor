@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Invoice</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; }
+        .details { margin: 20px 0; }
+        .amount { font-size: 18px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>RECHNUNG</h1>
+        <h2>Invoice #12345</h2>
+    </div>
+    
+    <div class="details">
+        <p><strong>Rechnungsdatum:</strong> 22.06.2025</p>
+        <p><strong>Fälligkeitsdatum:</strong> 22.07.2025</p>
+        <p><strong>Von:</strong> Test GmbH<br>
+        Musterstraße 123<br>
+        12345 Berlin</p>
+        
+        <p><strong>An:</strong> Kunde AG<br>
+        Kundenstraße 456<br>
+        54321 München</p>
+        
+        <hr>
+        
+        <table border="1" style="width: 100%; margin: 20px 0;">
+            <tr>
+                <th>Beschreibung</th>
+                <th>Menge</th>
+                <th>Preis</th>
+                <th>Gesamt</th>
+            </tr>
+            <tr>
+                <td>Beratungsleistung</td>
+                <td>10 Stunden</td>
+                <td>€120,00</td>
+                <td>€1.200,00</td>
+            </tr>
+        </table>
+        
+        <div class="amount">
+            <p>Zwischensumme: €1.200,00</p>
+            <p>MwSt. (19%): €228,00</p>
+            <p><strong>Gesamtbetrag: €1.428,00</strong></p>
+        </div>
+        
+        <p><strong>Zahlungsbedingungen:</strong> Zahlung innerhalb 30 Tagen</p>
+        <p><strong>Projektnummer:</strong> PROJ-2025-001</p>
+    </div>
+</body>
+</html>

@@ -103,25 +103,24 @@ class InvoiceFileHandler(FileSystemEventHandler):
             
             logger.info(f"Detected {event_type} event for PDF: {file_path}")
             
-            # Schedule async processing using thread-safe approach
+            # Use thread-safe approach to schedule processing
             try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # Schedule coroutine to run soon in the existing loop
-                    asyncio.run_coroutine_threadsafe(
-                        self._process_file_async(file_path), loop
+                # Get the event loop from the main thread
+                if hasattr(self.folder_watcher, '_event_loop') and self.folder_watcher._event_loop:
+                    # Schedule coroutine to run in the main event loop
+                    future = asyncio.run_coroutine_threadsafe(
+                        self._process_file_async(file_path), 
+                        self.folder_watcher._event_loop
                     )
+                    logger.info(f"Scheduled async processing for: {file_path}")
                 else:
-                    # No running loop, create task normally
-                    asyncio.create_task(self._process_file_async(file_path))
-            except RuntimeError:
-                # No event loop in current thread, schedule for later processing
-                logger.warning(f"No event loop available, queuing file for later processing: {file_path}")
-                # Add to a processing queue that can be handled by the main service
-                if hasattr(self.folder_watcher, '_pending_files'):
+                    # No event loop available, add to pending queue
+                    logger.warning(f"No event loop available, queuing file: {file_path}")
                     self.folder_watcher._pending_files.add(file_path)
-                else:
-                    self.folder_watcher._pending_files = {file_path}
+            except Exception as e:
+                logger.error(f"Error scheduling file processing: {e}")
+                # Fallback: add to pending queue
+                self.folder_watcher._pending_files.add(file_path)
             
         except Exception as e:
             logger.error(f"Error handling file event for {file_path}: {str(e)}")
@@ -202,6 +201,7 @@ class FolderWatcherService:
         self.start_time: Optional[float] = None
         self._lock = asyncio.Lock()
         self._pending_files: Set[str] = set()  # Files queued for processing
+        self._event_loop: Optional[asyncio.AbstractEventLoop] = None  # Main event loop reference
     
     async def add_watch_folder(self, folder_path: str, pattern: str = "*.pdf", 
                              recursive: bool = False, enabled: bool = True) -> Tuple[bool, str, Optional[str]]:
@@ -284,6 +284,14 @@ class FolderWatcherService:
                 
                 self.status = WatcherStatus.STARTING
                 self.start_time = time.time()
+                
+                # Store reference to current event loop for thread-safe async processing
+                try:
+                    self._event_loop = asyncio.get_running_loop()
+                    logger.info("Event loop reference stored for async processing")
+                except RuntimeError:
+                    logger.warning("No running event loop found")
+                    self._event_loop = None
                 
                 logger.info("Starting folder watcher service...")
                 
@@ -471,6 +479,34 @@ class FolderWatcherService:
         except Exception as e:
             logger.error(f"Error disabling watch folder {config_id}: {str(e)}")
             return False, str(e)
+
+    async def process_pending_files(self) -> int:
+        """Process any files that were queued due to async processing issues"""
+        if not self._pending_files:
+            return 0
+        
+        processed_count = 0
+        pending_copy = self._pending_files.copy()
+        self._pending_files.clear()
+        
+        for file_path in pending_copy:
+            try:
+                # Find the handler for this file based on its path
+                for config_id, handler in self.handlers.items():
+                    config = self.watch_configs[config_id]
+                    if file_path.startswith(config.folder_path):
+                        await handler._process_file_async(file_path)
+                        processed_count += 1
+                        break
+                else:
+                    logger.warning(f"No handler found for pending file: {file_path}")
+            except Exception as e:
+                logger.error(f"Error processing pending file {file_path}: {e}")
+        
+        if processed_count > 0:
+            logger.info(f"Processed {processed_count} pending files")
+        
+        return processed_count
 
 # Global instance
 folder_watcher_service = FolderWatcherService()

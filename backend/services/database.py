@@ -109,8 +109,6 @@ class DatabaseService:
             if field not in mapped:
                 continue
             # Keep as-is, database will ignore if column doesn't exist
-        if 'url' in mapped:
-            del mapped['url']
         
         # Map English application fields to German database fields
         field_mappings = {
