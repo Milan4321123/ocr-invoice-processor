@@ -4,12 +4,9 @@ This file now imports route handlers from separate modules for better maintainab
 """
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from supabase import create_client, Client
-import os
 import uuid
 import logging
 from dotenv import load_dotenv
-from typing import Optional
 
 # Route imports
 from api.routes import health, upload, invoices, ocr, dropdowns
@@ -17,6 +14,9 @@ from api.routes import health, upload, invoices, ocr, dropdowns
 # OCR imports
 from ocr.workflow import ocr_workflow
 from config.ocr_config import ocr_config
+
+# Initialize database service
+from services.database import db_service
 
 # Load environment variables
 load_dotenv()
@@ -30,6 +30,12 @@ logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(title="Invoice OCR API", version="0.1.0")
+
+# Log database service status
+if db_service.is_available:
+    logger.info("Database service initialized and connected successfully")
+else:
+    logger.warning("Database service unavailable - running in offline mode")
 
 # Add request ID middleware for better traceability
 @app.middleware("http")
@@ -48,23 +54,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Initialize Supabase client
-supabase: Optional[Client] = None
-
-# Supabase configuration - check both naming conventions
-SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("SUPA_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPA_KEY")
-
-if SUPABASE_URL and SUPABASE_KEY:
-    try:
-        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-        logger.info(f"Supabase client initialized successfully with URL: {SUPABASE_URL[:50]}...")
-    except Exception as e:
-        logger.error(f"Failed to initialize Supabase client: {e}")
-        supabase = None
-else:
-    logger.warning("Supabase configuration not found. Running in demo mode.")
 
 # Include route modules
 app.include_router(health.router, tags=["health"])

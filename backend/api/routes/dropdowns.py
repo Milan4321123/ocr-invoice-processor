@@ -4,26 +4,12 @@ from typing import List, Dict, Any, Optional
 import logging
 from pydantic import BaseModel
 import difflib
-import os
-from supabase import create_client, Client
+
+# Import centralized database service
+from services.database import db_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-# Initialize Supabase client
-supabase_url = os.getenv("SUPABASE_URL")
-supabase_key = os.getenv("SUPABASE_ANON_KEY") 
-supabase: Optional[Client] = None
-
-if supabase_url and supabase_key:
-    try:
-        supabase = create_client(supabase_url, supabase_key)
-        logger.info("Supabase client initialized successfully")
-    except Exception as e:
-        logger.error(f"Failed to initialize Supabase client: {e}")
-        supabase = None
-else:
-    logger.warning("Supabase credentials not found, using fallback mode")
 
 class DropdownOption(BaseModel):
     """Model for dropdown option"""
@@ -93,96 +79,23 @@ CUSTOM_OPTIONS: Dict[str, List[Dict[str, Any]]] = {
 # Database helper functions
 def _get_dropdown_options_from_db(field_name: Optional[str] = None) -> Dict[str, List[Dict[str, Any]]]:
     """Get dropdown options from database"""
-    if not supabase:
+    db_options = db_service.get_dropdown_options(field_name)
+    
+    if not db_options:
         logger.warning("Database unavailable, using fallback options")
         if field_name:
             return {field_name: FALLBACK_DROPDOWN_OPTIONS.get(field_name, [])}
         return FALLBACK_DROPDOWN_OPTIONS
     
-    try:
-        query = supabase.table("dropdown_options").select("*")
-        if field_name:
-            query = query.eq("field_name", field_name)
-        
-        response = query.eq("is_active", True).order("field_name, label").execute()
-        
-        if not response.data:
-            logger.warning(f"No dropdown options found in database for field: {field_name or 'all fields'}")
-            if field_name:
-                return {field_name: FALLBACK_DROPDOWN_OPTIONS.get(field_name, [])}
-            return FALLBACK_DROPDOWN_OPTIONS
-        
-        # Group by field_name
-        grouped_options = {}
-        for row in response.data:
-            field = row["field_name"]
-            if field not in grouped_options:
-                grouped_options[field] = []
-            
-            option = {
-                "value": row["value"],
-                "label": row["label"],
-                "is_default": row["is_default"],
-                "id": row["id"],
-                "metadata": row.get("metadata", {})
-            }
-            grouped_options[field].append(option)
-        
-        return grouped_options
-        
-    except Exception as e:
-        logger.error(f"Database error when fetching dropdown options: {e}")
-        if field_name:
-            return {field_name: FALLBACK_DROPDOWN_OPTIONS.get(field_name, [])}
-        return FALLBACK_DROPDOWN_OPTIONS
+    return db_options
 
 def _add_dropdown_option_to_db(field_name: str, value: str, label: str, is_default: bool = False, metadata: Dict = None) -> Dict[str, Any]:
     """Add a new dropdown option to database"""
-    if not supabase:
-        logger.warning("Database unavailable, cannot persist new option")
-        return {"success": False, "error": "Database unavailable"}
-    
-    try:
-        new_option = {
-            "field_name": field_name,
-            "value": value,
-            "label": label,
-            "is_default": is_default,
-            "metadata": metadata or {}
-        }
-        
-        response = supabase.table("dropdown_options").insert(new_option).execute()
-        
-        if response.data:
-            logger.info(f"Successfully added option to database: {field_name} - {label}")
-            return {"success": True, "data": response.data[0]}
-        else:
-            logger.error(f"Failed to add option to database: {response}")
-            return {"success": False, "error": "Insert failed"}
-            
-    except Exception as e:
-        logger.error(f"Database error when adding dropdown option: {e}")
-        return {"success": False, "error": str(e)}
+    return db_service.add_dropdown_option(field_name, value, label, is_default, metadata)
 
 def _delete_dropdown_option_from_db(field_name: str, value: str) -> Dict[str, Any]:
     """Delete a dropdown option from database (soft delete - set is_active=false)"""
-    if not supabase:
-        logger.warning("Database unavailable, cannot delete option")
-        return {"success": False, "error": "Database unavailable"}
-    
-    try:
-        response = supabase.table("dropdown_options").update({"is_active": False}).eq("field_name", field_name).eq("value", value).execute()
-        
-        if response.data:
-            logger.info(f"Successfully deleted option from database: {field_name} - {value}")
-            return {"success": True, "data": response.data}
-        else:
-            logger.error(f"Failed to delete option from database: {response}")
-            return {"success": False, "error": "Delete failed"}
-            
-    except Exception as e:
-        logger.error(f"Database error when deleting dropdown option: {e}")
-        return {"success": False, "error": str(e)}
+    return db_service.delete_dropdown_option(field_name, value)
 
 def _get_valid_field_names() -> List[str]:
     """Get list of valid field names (from fallback or database)"""

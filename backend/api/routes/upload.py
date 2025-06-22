@@ -7,11 +7,11 @@ import datetime
 import logging
 import os
 from typing import Dict, Any
-from supabase import Client
 
 # OCR imports
 from ocr.workflow import ocr_workflow
 from config.ocr_config import ocr_config
+from services.database import db_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -147,14 +147,10 @@ async def upload_file_mock(file: UploadFile) -> Dict[str, Any]:
 @router.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
     """Upload a PDF invoice file"""
-    # Import here to avoid circular imports
-    import main
-    supabase = main.supabase
-    
     # Sanitize filename for security
     safe_filename = sanitize_filename(file.filename)
     
-    if not supabase:
+    if not db_service.is_available:
         # For demo purposes, work without Supabase
         # Create a new UploadFile-like object with sanitized filename
         class SanitizedFile:
@@ -193,10 +189,10 @@ async def upload_file(file: UploadFile = File(...)):
         storage_path = safe_filename
         
         # Upload file to storage
-        supabase.storage.from_(bucket_name).upload(storage_path, content)
+        db_service.client.storage.from_(bucket_name).upload(storage_path, content)
         
         # Get public URL
-        public_url = supabase.storage.from_(bucket_name).get_public_url(storage_path)
+        public_url = db_service.client.storage.from_(bucket_name).get_public_url(storage_path)
         
         # Generate UUID for invoice record
         invoice_id = str(uuid.uuid4())
@@ -231,10 +227,11 @@ async def upload_file(file: UploadFile = File(...)):
         # Prepare database record with OCR data
         invoice_data = {
             "id": invoice_id,
-            "filename": safe_filename,
-            "url": public_url,
-            "status": "uploaded",
-            "file_size": len(content)
+            "filename": safe_filename,  # This will be mapped to file_name
+            "file_path": storage_path,
+            "file_size": len(content),
+            "mime_type": file.content_type,
+            "status": "uploaded"
         }
         
         # Add OCR data if available
@@ -279,9 +276,12 @@ async def upload_file(file: UploadFile = File(...)):
                 "ocr_confidence": 0.0,
                 "ocr_pages": 0,
                 "ocr_processing_time": 0.0
-            })
+                    })
         
-        supabase.table("invoices").insert(invoice_data).execute()
+        # Create invoice record in database
+        create_result = db_service.create_invoice(invoice_data)
+        if not create_result.get("success"):
+            logger.warning(f"Failed to save invoice to database: {create_result.get('error')}")
         
         # Prepare response
         response_data = {
