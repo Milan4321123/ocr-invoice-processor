@@ -19,6 +19,31 @@ const nextConfig = {
 
     return config;
   },
+  async rewrites() {
+    return [
+      // Proxy API calls to backend server
+      {
+        source: '/api/folder-watcher/:path*',
+        destination: 'http://localhost:8001/api/folder-watcher/:path*',
+      },
+      {
+        source: '/api/:path*',
+        destination: 'http://localhost:8001/api/:path*',
+      },
+      {
+        source: '/invoices/:path*',
+        destination: 'http://localhost:8001/invoices/:path*',
+      },
+      {
+        source: '/ocr/:path*',
+        destination: 'http://localhost:8001/ocr/:path*',
+      },
+      {
+        source: '/upload/:path*',
+        destination: 'http://localhost:8001/upload/:path*',
+      },
+    ];
+  },
 }
 
 module.exports = nextConfig
