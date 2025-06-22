@@ -41,8 +41,8 @@ export default function InvoiceEditorDashboard({
       setIsLoading(true);
       setError(null);
 
-      // TODO: Replace with actual API call
-      const response = await fetch(`/api/invoices/${invoiceId}/editor`);
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+      const response = await fetch(`${apiUrl}/invoices/${invoiceId}/editor`);
       if (!response.ok) {
         throw new Error(`Failed to load invoice: ${response.statusText}`);
       }
@@ -70,8 +70,8 @@ export default function InvoiceEditorDashboard({
 
   const handleSave = async (updatedFields: GermanInvoiceFields) => {
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch(`/api/invoices/${invoiceId}/editor`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+      const response = await fetch(`${apiUrl}/invoices/${invoiceId}/editor`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

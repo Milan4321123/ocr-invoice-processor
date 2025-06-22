@@ -25,7 +25,8 @@ export default function InvoiceEditorPage() {
 
       try {
         // Use the existing editor endpoint to validate and fetch invoice data
-        const response = await fetch(`/api/invoices/${invoiceId}/editor`);
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+        const response = await fetch(`${apiUrl}/invoices/${invoiceId}/editor`);
         
         if (response.ok) {
           setIsValid(true);
