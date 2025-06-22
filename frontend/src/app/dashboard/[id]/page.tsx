@@ -47,6 +47,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const [invoice, setInvoice] = useState<Invoice | null>(null)
   const [ocrData, setOcrData] = useState<OcrData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [processing, setProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [invoiceId, setInvoiceId] = useState<string | null>(null)
 
@@ -69,25 +70,57 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     
     try {
       setLoading(true)
+      setError(null)
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
       
+      // Add timeout for API requests
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 15000) // 15 second timeout
+      
       // Fetch invoice details
-      const invoiceResponse = await fetch(`${apiUrl}/invoices/${invoiceId}`)
+      const invoiceResponse = await fetch(`${apiUrl}/invoices/${invoiceId}`, {
+        signal: controller.signal
+      })
+      
       if (!invoiceResponse.ok) {
-        throw new Error('Failed to fetch invoice')
+        throw new Error(`Failed to fetch invoice: ${invoiceResponse.status} ${invoiceResponse.statusText}`)
       }
+      
       const invoiceData = await invoiceResponse.json()
       setInvoice(invoiceData.invoice)
       
-      // Fetch OCR data
-      const ocrResponse = await fetch(`${apiUrl}/invoices/${invoiceId}/ocr`)
-      if (ocrResponse.ok) {
-        const ocrResult = await ocrResponse.json()
-        setOcrData(ocrResult.ocr_data)
+      // Fetch OCR data (optional, may not exist)
+      try {
+        const ocrResponse = await fetch(`${apiUrl}/invoices/${invoiceId}/ocr`, {
+          signal: controller.signal
+        })
+        
+        if (ocrResponse.ok) {
+          const ocrResult = await ocrResponse.json()
+          setOcrData(ocrResult.ocr_data)
+        } else if (ocrResponse.status !== 404) {
+          // Only log non-404 errors (404 means no OCR data exists yet)
+          console.warn('Failed to fetch OCR data:', ocrResponse.status)
+        }
+      } catch (ocrError) {
+        console.warn('OCR data fetch error:', ocrError)
+        // Don't throw here - OCR data is optional
       }
       
+      clearTimeout(timeoutId)
+      
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load invoice data'
+      let errorMessage = 'Failed to load invoice data'
+      
+      if (err instanceof Error) {
+        if (err.name === 'AbortError') {
+          errorMessage = 'Request timed out. Please check your connection and try again.'
+        } else {
+          errorMessage = err.message
+        }
+      }
+      
+      console.error('Fetch error:', err)
       setError(errorMessage)
       toast.error(errorMessage)
     } finally {
@@ -96,23 +129,56 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   }
 
   const processOcr = async () => {
-    if (!invoiceId) return;
+    if (!invoiceId || processing) return;
+    
+    setProcessing(true)
     
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+      
+      // Add timeout and better error handling
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+      
       const response = await fetch(`${apiUrl}/ocr/process/${invoiceId}`, {
-        method: 'POST'
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal
       })
 
+      clearTimeout(timeoutId)
+
       if (!response.ok) {
-        throw new Error('Failed to process OCR')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`)
       }
 
-      toast.success('OCR processing started')
-      setTimeout(fetchInvoiceData, 2000) // Refresh after 2 seconds
+      const result = await response.json()
+      
+      toast.success('OCR processing started successfully')
+      
+      // Refresh the data after a short delay
+      setTimeout(() => {
+        fetchInvoiceData()
+      }, 2000)
+      
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to process OCR'
+      let errorMessage = 'Failed to process OCR'
+      
+      if (err instanceof Error) {
+        if (err.name === 'AbortError') {
+          errorMessage = 'OCR processing timed out. Please try again.'
+        } else {
+          errorMessage = err.message
+        }
+      }
+      
+      console.error('OCR processing error:', err)
       toast.error(errorMessage)
+    } finally {
+      setProcessing(false)
     }
   }
 
@@ -189,16 +255,44 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               href={invoice.url} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2"
+              onClick={(e) => {
+                // Check if URL is valid before opening
+                if (!invoice.url || invoice.url.trim() === '') {
+                  e.preventDefault()
+                  toast.error('PDF file is not available')
+                }
+              }}
             >
-              View PDF
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+              <span>View PDF</span>
             </a>
             {(!ocrData || ocrData.ocr_status !== 'completed') && (
               <button
                 onClick={processOcr}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                disabled={processing}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2 ${
+                  processing 
+                    ? 'bg-gray-400 cursor-not-allowed text-white' 
+                    : 'bg-purple-600 hover:bg-purple-700 text-white'
+                }`}
               >
-                Process OCR
+                {processing ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Processing...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                    <span>Process OCR</span>
+                  </>
+                )}
               </button>
             )}
           </div>
@@ -390,9 +484,27 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           <p className="text-gray-600 mb-6">This invoice hasn't been processed with OCR yet.</p>
           <button
             onClick={processOcr}
-            className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+            disabled={processing}
+            className={`px-6 py-3 rounded-lg font-medium transition-colors flex items-center space-x-2 ${
+              processing 
+                ? 'bg-gray-400 cursor-not-allowed text-white' 
+                : 'bg-purple-600 hover:bg-purple-700 text-white'
+            }`}
           >
-            Process with OCR
+            {processing ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                <span>Processing OCR...</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                <span>Process with OCR</span>
+              </>
+            )}
           </button>
         </div>
       )}
