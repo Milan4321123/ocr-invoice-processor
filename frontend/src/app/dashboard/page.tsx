@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { toast, Toaster } from 'react-hot-toast'
 import { toastConfig } from '@/lib/toast-config'
+import { OCRProcessingButton, BatchOCRProcessor } from '@/components/OCRProcessingComponents'
 
 interface Invoice {
   id: string
@@ -48,10 +49,28 @@ export default function DashboardPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [autoRefresh, setAutoRefresh] = useState(false)
 
   useEffect(() => {
     fetchInvoices()
   }, [])
+
+  // Auto-refresh when OCR processing is happening
+  useEffect(() => {
+    let interval: NodeJS.Timeout
+    if (autoRefresh) {
+      interval = setInterval(fetchInvoices, 3000) // Refresh every 3 seconds
+    }
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [autoRefresh])
+
+  // Check if any invoices are processing to enable auto-refresh
+  useEffect(() => {
+    const processingInvoices = invoices.some(inv => inv.ocr_status === 'processing')
+    setAutoRefresh(processingInvoices)
+  }, [invoices])
 
   const fetchInvoices = async () => {
     try {
@@ -114,9 +133,59 @@ export default function DashboardPage() {
       case 'failed':
         return 'bg-red-100 text-red-800 border-red-200'
       case 'processing':
+        return 'bg-blue-100 text-blue-800 border-blue-200'
+      case 'pending':
         return 'bg-yellow-100 text-yellow-800 border-yellow-200'
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200'
+    }
+  }
+
+  const getOcrStatusDisplay = (status: string | null | undefined) => {
+    switch (status) {
+      case 'completed':
+        return (
+          <div className="flex items-center space-x-1">
+            <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+            <span>Completed</span>
+          </div>
+        )
+      case 'failed':
+        return (
+          <div className="flex items-center space-x-1">
+            <svg className="w-3 h-3 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            <span>Failed</span>
+          </div>
+        )
+      case 'processing':
+        return (
+          <div className="flex items-center space-x-1">
+            <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            <span>Processing</span>
+          </div>
+        )
+      case 'pending':
+        return (
+          <div className="flex items-center space-x-1">
+            <svg className="w-3 h-3 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+            </svg>
+            <span>Pending</span>
+          </div>
+        )
+      default:
+        return (
+          <div className="flex items-center space-x-1">
+            <svg className="w-3 h-3 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            </svg>
+            <span>Not processed</span>
+          </div>
+        )
     }
   }
 
@@ -360,6 +429,14 @@ export default function DashboardPage() {
             </div>
           </div>
           
+          {/* Batch OCR Processor */}
+          <div className="mb-6">
+            <BatchOCRProcessor 
+              invoices={invoices} 
+              onRefresh={fetchInvoices}
+            />
+          </div>
+          
           {/* Table */}
           <div className="bg-white shadow-sm rounded-lg overflow-hidden border border-gray-100">
             <div className="overflow-x-auto">
@@ -410,12 +487,17 @@ export default function DashboardPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-col space-y-1">
-                        <span className={`px-2 py-1 text-xs font-medium rounded border ${getOcrStatusColor(invoice.ocr_status)}`}>
-                          {invoice.ocr_status || 'not processed'}
+                        <span className={`px-2 py-1 text-xs font-medium rounded border inline-flex items-center ${getOcrStatusColor(invoice.ocr_status)}`}>
+                          {getOcrStatusDisplay(invoice.ocr_status)}
                         </span>
                         {invoice.ocr_confidence !== undefined && invoice.ocr_confidence > 0 && (
                           <span className="text-xs text-gray-500">
                             {(invoice.ocr_confidence * 100).toFixed(1)}% confidence
+                          </span>
+                        )}
+                        {autoRefresh && invoice.ocr_status === 'processing' && (
+                          <span className="text-xs text-blue-600 animate-pulse">
+                            Auto-refreshing...
                           </span>
                         )}
                       </div>
@@ -466,37 +548,58 @@ export default function DashboardPage() {
                       {formatDate(invoice.created_at)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end space-x-2">
-                        <a href={invoice.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800">
-                          View PDF
+                      <div className="flex justify-end items-center space-x-2">
+                        <a 
+                          href={invoice.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50"
+                          title="View PDF"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
                         </a>
+                        
                         <Link 
                           href={`/invoice-editor/${invoice.id}`}
-                          className="text-indigo-600 hover:text-indigo-800"
+                          className="text-indigo-600 hover:text-indigo-800 px-2 py-1 rounded hover:bg-indigo-50"
+                          title="Edit Invoice"
                         >
-                          Edit
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
                         </Link>
-                        {invoice.ocr_status && (
+                        
+                        {invoice.ocr_status === 'completed' && (
                           <button 
                             onClick={() => viewOcrData(invoice)}
-                            className="text-green-600 hover:text-green-800"
+                            className="text-green-600 hover:text-green-800 px-2 py-1 rounded hover:bg-green-50"
+                            title="View OCR Data"
                           >
-                            OCR Data
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
                           </button>
                         )}
-                        {(!invoice.ocr_status || invoice.ocr_status === 'failed') && (
-                          <button 
-                            onClick={() => processInvoice(invoice.id)}
-                            className="text-purple-600 hover:text-purple-800"
-                          >
-                            Process OCR
-                          </button>
-                        )}
+                        
+                        <OCRProcessingButton
+                          invoiceId={invoice.id}
+                          invoiceFilename={invoice.filename}
+                          currentStatus={invoice.ocr_status}
+                          onStatusChange={fetchInvoices}
+                          disabled={invoice.ocr_status === 'processing'}
+                        />
+                        
                         <button 
                           onClick={() => deleteInvoice(invoice.id)}
-                          className="text-red-600 hover:text-red-800"
+                          className="text-red-600 hover:text-red-800 px-2 py-1 rounded hover:bg-red-50"
+                          title="Delete Invoice"
                         >
-                          Delete
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
                         </button>
                       </div>
                     </td>
