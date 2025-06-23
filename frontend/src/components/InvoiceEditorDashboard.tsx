@@ -76,18 +76,33 @@ export default function InvoiceEditorDashboard({
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ fields: updatedFields }),
+        body: JSON.stringify(updatedFields),
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to save: ${response.statusText}`);
+        // Try to get detailed error message from backend
+        let errorMessage = `Failed to save: ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          if (errorData.detail) {
+            errorMessage = `Failed to save: ${errorData.detail.message || errorData.detail}`;
+          }
+        } catch (parseError) {
+          // If we can't parse the error response, use the status text
+          console.warn('Could not parse error response:', parseError);
+        }
+        throw new Error(errorMessage);
       }
 
+      const result = await response.json();
+      console.log('Save successful:', result);
+      
       setFields(updatedFields);
       setHasUnsavedChanges(false);
       return true;
     } catch (err) {
       console.error('Error saving invoice:', err);
+      console.error('Fields being saved:', updatedFields);
       throw err;
     }
   };
