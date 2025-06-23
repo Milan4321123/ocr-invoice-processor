@@ -23,6 +23,12 @@ interface Invoice {
   ocr_error?: string
   ocr_processed_at?: string
   
+  // Manual Review Status
+  review_status?: 'pending' | 'in_progress' | 'completed' | 'needs_attention'
+  reviewed_by?: string
+  reviewed_at?: string
+  review_notes?: string
+  
   // Structured Invoice Data
   invoice_number?: string
   invoice_date?: string
@@ -37,6 +43,10 @@ interface Invoice {
   currency?: string
   payment_terms?: string
   po_number?: string
+  
+  // Data Quality Indicators
+  data_quality_score?: number
+  needs_manual_review?: boolean
   
   // Complex OCR Data
   entities?: any[]
@@ -138,6 +148,91 @@ export default function DashboardPage() {
         return 'bg-yellow-100 text-yellow-800 border-yellow-200'
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200'
+    }
+  }
+
+  const getReviewStatusColor = (status: string | null | undefined): string => {
+    switch (status) {
+      case 'completed':
+        return 'bg-emerald-100 text-emerald-800 border-emerald-200'
+      case 'in_progress':
+        return 'bg-blue-100 text-blue-800 border-blue-200'
+      case 'needs_attention':
+        return 'bg-red-100 text-red-800 border-red-200'
+      default:
+        return 'bg-orange-100 text-orange-800 border-orange-200'
+    }
+  }
+
+  const getReviewStatusDisplay = (status: string | null | undefined) => {
+    switch (status) {
+      case 'completed':
+        return (
+          <div className="flex items-center space-x-1">
+            <svg className="w-3 h-3 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+            <span>Reviewed</span>
+          </div>
+        )
+      case 'in_progress':
+        return (
+          <div className="flex items-center space-x-1">
+            <svg className="w-3 h-3 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+            </svg>
+            <span>In Review</span>
+          </div>
+        )
+      case 'needs_attention':
+        return (
+          <div className="flex items-center space-x-1">
+            <svg className="w-3 h-3 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            <span>Needs Attention</span>
+          </div>
+        )
+      default:
+        return (
+          <div className="flex items-center space-x-1">
+            <svg className="w-3 h-3 text-orange-600" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+            </svg>
+            <span>Pending Review</span>
+          </div>
+        )
+    }
+  }
+
+  const getDataQualityIcon = (invoice: Invoice) => {
+    const confidence = invoice.ocr_confidence || 0
+    const hasKeyData = !!(invoice.invoice_number && invoice.vendor_name && invoice.total_amount)
+    
+    if (confidence >= 0.8 && hasKeyData) {
+      return (
+        <div className="flex items-center space-x-1 text-green-600" title="High Quality Data">
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+          </svg>
+        </div>
+      )
+    } else if (confidence >= 0.6 || hasKeyData) {
+      return (
+        <div className="flex items-center space-x-1 text-yellow-600" title="Medium Quality - Review Recommended">
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+          </svg>
+        </div>
+      )
+    } else {
+      return (
+        <div className="flex items-center space-x-1 text-red-600" title="Low Quality - Manual Review Required">
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+        </div>
+      )
     }
   }
 
@@ -370,8 +465,54 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div>
+          {/* Quick Action Alert */}
+          {invoices.filter(i => (i.ocr_status === 'completed' || i.ocr_status === 'failed') && !i.review_status).length > 0 && (
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center">
+                <svg className="w-5 h-5 text-orange-400 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+                <div className="flex-1">
+                  <h3 className="text-sm font-medium text-orange-800">
+                    {invoices.filter(i => (i.ocr_status === 'completed' || i.ocr_status === 'failed') && !i.review_status).length} invoices need manual review
+                  </h3>
+                  <p className="text-sm text-orange-700 mt-1">
+                    OCR processing has completed. Click the prominent "Edit" buttons below to review and correct extracted data.
+                  </p>
+                </div>
+                <div className="ml-4">
+                  <Link
+                    href="/prufbericht"
+                    className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors"
+                  >
+                    📋 View Prüfbericht
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* High Priority Items Alert */}
+          {invoices.filter(i => i.review_status === 'needs_attention' || i.ocr_status === 'failed').length > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center">
+                <svg className="w-5 h-5 text-red-400 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                <div className="flex-1">
+                  <h3 className="text-sm font-medium text-red-800">
+                    {invoices.filter(i => i.review_status === 'needs_attention' || i.ocr_status === 'failed').length} invoices need immediate attention
+                  </h3>
+                  <p className="text-sm text-red-700 mt-1">
+                    These invoices have failed OCR processing or have been flagged during review.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
             <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
               <div className="flex items-center">
                 <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center mr-4">
@@ -402,31 +543,46 @@ export default function DashboardPage() {
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
               <div className="flex items-center">
-                <div className="w-10 h-10 bg-yellow-50 rounded-full flex items-center justify-center mr-4">
-                  <svg className="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <div className="w-10 h-10 bg-orange-50 rounded-full flex items-center justify-center mr-4">
+                  <svg className="w-6 h-6 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
                 </div>
                 <div>
                   <div className="text-2xl font-bold text-gray-900">
-                    {invoices.filter(i => i.ocr_status === 'failed').length}
+                    {invoices.filter(i => (i.ocr_status === 'completed' || i.ocr_status === 'failed') && !i.review_status).length}
                   </div>
-                  <div className="text-sm text-gray-500">OCR Failed</div>
+                  <div className="text-sm text-gray-500">Needs Review</div>
                 </div>
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
               <div className="flex items-center">
-                <div className="w-10 h-10 bg-purple-50 rounded-full flex items-center justify-center mr-4">
-                  <svg className="w-6 h-6 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7c-2 0-3 1-3 3z" />
+                <div className="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center mr-4">
+                  <svg className="w-6 h-6 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.586-4.586a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
                 </div>
                 <div>
                   <div className="text-2xl font-bold text-gray-900">
-                    {formatFileSize(invoices.reduce((acc, invoice) => acc + invoice.file_size, 0))}
+                    {invoices.filter(i => i.review_status === 'completed').length}
                   </div>
-                  <div className="text-sm text-gray-500">Total Size</div>
+                  <div className="text-sm text-gray-500">Reviewed</div>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+              <div className="flex items-center">
+                <div className="w-10 h-10 bg-red-50 rounded-full flex items-center justify-center mr-4">
+                  <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {invoices.filter(i => i.ocr_status === 'failed' || i.review_status === 'needs_attention').length}
+                  </div>
+                  <div className="text-sm text-gray-500">Needs Attention</div>
                 </div>
               </div>
             </div>
@@ -447,22 +603,22 @@ export default function DashboardPage() {
               <thead className="bg-gray-50">
                 <tr>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Filename
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
+                    Invoice Details
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     OCR Status
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Extracted Data
+                    Review Status
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Size
+                    Data Quality
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Uploaded At
+                    Key Information
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Uploaded
                   </th>
                   <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
@@ -472,24 +628,29 @@ export default function DashboardPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {invoices.map((invoice) => (
                   <tr key={invoice.id} className="hover:bg-gray-50">
+                    {/* Invoice Details */}
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <svg className="w-5 h-5 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
-                        <div className="text-sm font-medium text-gray-900 truncate max-w-xs">
-                          {invoice.filename}
-                          <div className="text-xs text-gray-500">{invoice.id.substring(0, 8)}...</div>
+                        <div>
+                          <div className="text-sm font-medium text-gray-900 max-w-xs truncate">
+                            {invoice.filename}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {formatFileSize(invoice.file_size)} • {invoice.id.substring(0, 8)}
+                          </div>
+                          <span className={`inline-flex mt-1 px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(invoice.status)}`}>
+                            {invoice.status}
+                          </span>
                         </div>
                       </div>
                     </td>
+
+                    {/* OCR Status */}
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(invoice.status)}`}>
-                        {invoice.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex flex-col space-y-1">
+                      <div className="flex flex-col space-y-2">
                         <span className={`px-2 py-1 text-xs font-medium rounded border inline-flex items-center ${getOcrStatusColor(invoice.ocr_status)}`}>
                           {getOcrStatusDisplay(invoice.ocr_status)}
                         </span>
@@ -505,13 +666,41 @@ export default function DashboardPage() {
                         )}
                       </div>
                     </td>
+
+                    {/* Review Status */}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex flex-col space-y-1">
+                        <span className={`px-2 py-1 text-xs font-medium rounded border inline-flex items-center ${getReviewStatusColor(invoice.review_status)}`}>
+                          {getReviewStatusDisplay(invoice.review_status)}
+                        </span>
+                        {invoice.reviewed_by && (
+                          <span className="text-xs text-gray-500">
+                            by {invoice.reviewed_by}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Data Quality */}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center space-x-2">
+                        {getDataQualityIcon(invoice)}
+                        <div className="text-xs text-gray-500">
+                          {invoice.ocr_confidence && (
+                            <div>{(invoice.ocr_confidence * 100).toFixed(0)}%</div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Key Information */}
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-900 max-w-xs">
                         {invoice.ocr_status === 'completed' ? (
                           <div className="space-y-1">
                             {invoice.invoice_number && (
                               <div className="text-xs">
-                                <span className="font-medium">Invoice:</span> {invoice.invoice_number}
+                                <span className="font-medium">№:</span> {invoice.invoice_number}
                               </div>
                             )}
                             {invoice.vendor_name && (
@@ -520,38 +709,56 @@ export default function DashboardPage() {
                               </div>
                             )}
                             {invoice.total_amount && (
-                              <div className="text-xs">
-                                <span className="font-medium">Total:</span> {formatCurrency(invoice.total_amount, invoice.currency)}
+                              <div className="text-xs font-medium">
+                                <span className="text-gray-600">Total:</span> {formatCurrency(invoice.total_amount, invoice.currency)}
                               </div>
                             )}
-                            {invoice.invoice_date && (
-                              <div className="text-xs">
-                                <span className="font-medium">Date:</span> {invoice.invoice_date}
+                            {invoice.due_date && (
+                              <div className="text-xs text-gray-500">
+                                <span className="font-medium">Due:</span> {invoice.due_date}
                               </div>
                             )}
                             {(!invoice.invoice_number && !invoice.vendor_name && !invoice.total_amount) && (
-                              <div className="text-xs text-gray-500">No key data extracted</div>
+                              <div className="text-xs text-orange-600 font-medium">⚠️ Incomplete data</div>
                             )}
                           </div>
                         ) : invoice.ocr_status === 'failed' ? (
-                          <div className="text-xs text-red-600">
-                            OCR processing failed
+                          <div className="text-xs text-red-600 font-medium">
+                            ❌ OCR processing failed
                           </div>
                         ) : (
                           <div className="text-xs text-gray-500">
-                            OCR not processed
+                            ⏳ Waiting for OCR processing
                           </div>
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatFileSize(invoice.file_size)}
-                    </td>
+
+                    {/* Uploaded */}
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatDate(invoice.created_at)}
                     </td>
+
+                    {/* Actions */}
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end items-center space-x-2">
+                        {/* PROMINENT EDIT BUTTON */}
+                        <Link 
+                          href={`/invoice-editor/${invoice.id}`}
+                          className={`px-3 py-2 rounded-lg font-medium text-sm transition-colors flex items-center gap-2 ${
+                            invoice.ocr_status === 'completed' && !invoice.review_status 
+                              ? 'bg-orange-100 text-orange-800 hover:bg-orange-200 border border-orange-200'
+                              : 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200 border border-indigo-200'
+                          }`}
+                          title="Manual Review & Edit"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          {invoice.review_status === 'completed' ? 'Review' : 'Edit'}
+                        </Link>
+                        
+                        {/* Secondary Actions */}
                         <a 
                           href={invoice.url} 
                           target="_blank" 
@@ -564,28 +771,6 @@ export default function DashboardPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                           </svg>
                         </a>
-                        
-                        <Link 
-                          href={`/invoice-editor/${invoice.id}`}
-                          className="text-indigo-600 hover:text-indigo-800 px-2 py-1 rounded hover:bg-indigo-50"
-                          title="Edit Invoice"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                        </Link>
-                        
-                        {invoice.ocr_status === 'completed' && (
-                          <button 
-                            onClick={() => viewOcrData(invoice)}
-                            className="text-green-600 hover:text-green-800 px-2 py-1 rounded hover:bg-green-50"
-                            title="View OCR Data"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                          </button>
-                        )}
                         
                         <OCRProcessingButton
                           invoiceId={invoice.id}
