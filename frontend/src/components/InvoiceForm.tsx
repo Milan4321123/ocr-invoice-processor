@@ -187,6 +187,14 @@ export default function InvoiceForm({
   const [isSaving, setIsSaving] = useState(false);
   const [dropdownOptions, setDropdownOptions] = useState<Record<string, DropdownOption[]>>({});
   const [loadingDropdowns, setLoadingDropdowns] = useState(true);
+  
+  // Keep track of current form state (controlled by parent but accessed locally)
+  const [currentFields, setCurrentFields] = useState<GermanInvoiceFields>(fields);
+  
+  // Update local state when props change
+  useEffect(() => {
+    setCurrentFields(fields);
+  }, [fields]);
 
   // Load dropdown options on component mount
   useEffect(() => {
@@ -250,10 +258,21 @@ export default function InvoiceForm({
     }
   };
 
+  const handleFieldChange = (field: keyof GermanInvoiceFields, value: any) => {
+    // Update local state
+    setCurrentFields(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    // Call parent's onChange
+    onFieldChange(field, value);
+  };
+
   const handleSave = async (reviewStatus?: 'under_review' | 'completed_review') => {
     setIsSaving(true);
     try {
-      const success = await onSave(fields, reviewStatus);
+      console.log('Saving current fields:', currentFields);
+      const success = await onSave(currentFields, reviewStatus);
       if (!success) {
         throw new Error('Save failed');
       }
@@ -345,9 +364,9 @@ export default function InvoiceForm({
           <div className="grid grid-cols-1 gap-4">
             <DropdownWithConfidence
               label="Rechnungsempfänger (Invoice Recipient)"
-              value={fields.rechnungsempfaenger || ''}
+              value={currentFields.rechnungsempfaenger || ''}
               options={dropdownOptions.rechnungsempfaenger || []}
-              onChange={(value) => onFieldChange('rechnungsempfaenger', value)}
+              onChange={(value) => handleFieldChange('rechnungsempfaenger', value)}
               onAddNew={(newValue) => handleAddNewOption('rechnungsempfaenger', newValue)}
               confidence={confidenceScores.rechnungsempfaenger}
               placeholder="Select or add recipient..."
@@ -356,9 +375,9 @@ export default function InvoiceForm({
             
             <DropdownWithConfidence
               label="Rechnungssteller (Invoice Issuer)"
-              value={fields.rechnungssteller || ''}
+              value={currentFields.rechnungssteller || ''}
               options={dropdownOptions.rechnungssteller || []}
-              onChange={(value) => onFieldChange('rechnungssteller', value)}
+              onChange={(value) => handleFieldChange('rechnungssteller', value)}
               onAddNew={(newValue) => handleAddNewOption('rechnungssteller', newValue)}
               confidence={confidenceScores.rechnungssteller}
               placeholder="Select or add issuer..."
@@ -367,8 +386,8 @@ export default function InvoiceForm({
             
             <FormField
               label="Rechnungsart (Invoice Type)"
-              value={fields.rechnungsart}
-              onChange={(value) => onFieldChange('rechnungsart', value)}
+              value={currentFields.rechnungsart}
+              onChange={(value) => handleFieldChange('rechnungsart', value)}
               confidence={confidenceScores.rechnungsart}
               type="select"
               options={rechnungsartOptions}
@@ -385,9 +404,9 @@ export default function InvoiceForm({
           <div className="grid grid-cols-1 gap-4">
             <DropdownWithConfidence
               label="Projekt (Project)"
-              value={fields.projekt || ''}
+              value={currentFields.projekt || ''}
               options={dropdownOptions.projekt || []}
-              onChange={(value) => onFieldChange('projekt', value)}
+              onChange={(value) => handleFieldChange('projekt', value)}
               onAddNew={(newValue) => handleAddNewOption('projekt', newValue)}
               confidence={confidenceScores.projekt}
               placeholder="Select or add project..."
@@ -396,9 +415,9 @@ export default function InvoiceForm({
             
             <DropdownWithConfidence
               label="Gewerk (Trade/Work Type)"
-              value={fields.gewerk || ''}
+              value={currentFields.gewerk || ''}
               options={dropdownOptions.gewerk || []}
-              onChange={(value) => onFieldChange('gewerk', value)}
+              onChange={(value) => handleFieldChange('gewerk', value)}
               onAddNew={(newValue) => handleAddNewOption('gewerk', newValue)}
               confidence={confidenceScores.gewerk}
               placeholder="Select or add trade type..."
@@ -416,8 +435,8 @@ export default function InvoiceForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               label="Rechnungsbetrag (Invoice Amount)"
-              value={fields.rechnungsbetrag}
-              onChange={(value) => onFieldChange('rechnungsbetrag', value)}
+              value={currentFields.rechnungsbetrag}
+              onChange={(value) => handleFieldChange('rechnungsbetrag', value)}
               confidence={confidenceScores.rechnungsbetrag}
               type="number"
               placeholder="0.00"
@@ -426,8 +445,8 @@ export default function InvoiceForm({
             
             <FormField
               label="Skonto Prozent (Early Payment Discount %)"
-              value={fields.skonto_prozent}
-              onChange={(value) => onFieldChange('skonto_prozent', value)}
+              value={currentFields.skonto_prozent}
+              onChange={(value) => handleFieldChange('skonto_prozent', value)}
               confidence={confidenceScores.skonto_prozent}
               type="number"
               placeholder="0.00"
@@ -444,24 +463,24 @@ export default function InvoiceForm({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <FormField
               label="Rechnungseingang (Receipt Date)"
-              value={fields.rechnungseingang}
-              onChange={(value) => onFieldChange('rechnungseingang', value)}
+              value={currentFields.rechnungseingang}
+              onChange={(value) => handleFieldChange('rechnungseingang', value)}
               confidence={confidenceScores.rechnungseingang}
               type="date"
             />
             
             <FormField
               label="Fälligkeit (Due Date)"
-              value={fields.faelligkeit}
-              onChange={(value) => onFieldChange('faelligkeit', value)}
+              value={currentFields.faelligkeit}
+              onChange={(value) => handleFieldChange('faelligkeit', value)}
               confidence={confidenceScores.faelligkeit}
               type="date"
             />
             
             <FormField
               label="Skonto Datum (Early Payment Date)"
-              value={fields.skonto_datum}
-              onChange={(value) => onFieldChange('skonto_datum', value)}
+              value={currentFields.skonto_datum}
+              onChange={(value) => handleFieldChange('skonto_datum', value)}
               confidence={confidenceScores.skonto_datum}
               type="date"
             />
@@ -477,24 +496,24 @@ export default function InvoiceForm({
           <div className="space-y-4">
             <FormField
               label="KfW Anrechenbar (KfW Eligible)"
-              value={fields.kfw_anrechenbar}
-              onChange={(value) => onFieldChange('kfw_anrechenbar', value)}
+              value={currentFields.kfw_anrechenbar}
+              onChange={(value) => handleFieldChange('kfw_anrechenbar', value)}
               type="checkbox"
               placeholder="This invoice contains KfW eligible costs"
             />
             
             <FormField
               label="Rechnungsprüfung E-Mail (Review Email)"
-              value={fields.rechnungspruefung_email}
-              onChange={(value) => onFieldChange('rechnungspruefung_email', value)}
+              value={currentFields.rechnungspruefung_email}
+              onChange={(value) => handleFieldChange('rechnungspruefung_email', value)}
               type="email"
               placeholder="review@company.com"
             />
             
             <FormField
               label="Weiter berechnen an (Forward billing to)"
-              value={fields.weiter_berechnen_an}
-              onChange={(value) => onFieldChange('weiter_berechnen_an', value)}
+              value={currentFields.weiter_berechnen_an}
+              onChange={(value) => handleFieldChange('weiter_berechnen_an', value)}
               placeholder="Enter billing forward recipient"
             />
           </div>

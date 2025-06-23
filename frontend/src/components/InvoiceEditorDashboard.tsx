@@ -82,6 +82,12 @@ export default function InvoiceEditorDashboard({
         })
       };
 
+      console.log('Save request details:');
+      console.log('- Invoice ID:', invoiceId);
+      console.log('- Updated fields:', updatedFields);
+      console.log('- Review status:', reviewStatus);
+      console.log('- Final payload:', payload);
+
       const response = await fetch(`${apiUrl}/invoices/${invoiceId}/editor`, {
         method: 'PUT',
         headers: {
