@@ -1,5 +1,5 @@
 """Invoice management route handlers"""
-from fastapi import APIRouter, HTTPException, Path
+from fastapi import APIRouter, HTTPException, Path, Body
 from typing import List, Dict, Any, Optional
 import logging
 
@@ -205,17 +205,17 @@ async def get_invoice_for_editor(invoice_id: str = Path(..., description="The in
             "fields": {
                 "rechnungsempfaenger": invoice_data.get("rechnungsempfaenger"),
                 "rechnungssteller": invoice_data.get("rechnungssteller"),
-                "projekt": invoice_data.get("projekt"),
+                "projekt": invoice_data.get("projekt"),  # ✅ Direct mapping (same field name)
                 "gewerk": invoice_data.get("gewerk"),
                 "rechnungsbetrag": invoice_data.get("brutto_betrag"),
                 "rechnungseingang": invoice_data.get("rechnungsdatum"),
-                "faelligkeit": None,  # Add if you have this field
-                "skonto_datum": None,  # Add if you have this field
-                "skonto_prozent": None,  # Add if you have this field
-                "rechnungsart": None,  # Add if you have this field
-                "kfw_anrechenbar": None,  # Add if you have this field
-                "rechnungspruefung_email": None,  # Add if you have this field
-                "weiter_berechnen_an": None  # Add if you have this field
+                "faelligkeit": invoice_data.get("due_date"),
+                "skonto_datum": invoice_data.get("skonto_datum"),
+                "skonto_prozent": invoice_data.get("skonto_prozent"),
+                "rechnungsart": invoice_data.get("rechnungsart"),
+                "kfw_anrechenbar": invoice_data.get("kfw_anrechenbar"),
+                "rechnungspruefung_email": invoice_data.get("rechnungspruefung_email"),
+                "weiter_berechnen_an": invoice_data.get("weiter_berechnen_an")
             },
             "confidenceScores": {
                 "rechnungsempfaenger": invoice_data.get("ocr_confidence", 0),
@@ -237,47 +237,216 @@ async def get_invoice_for_editor(invoice_id: str = Path(..., description="The in
 @router.put("/invoices/{invoice_id}/editor")
 async def update_invoice_from_editor(
     invoice_id: str = Path(..., description="The invoice ID"),
-    fields: dict = None
+    request_body: dict = Body(...)
 ):
-    """Update invoice with German field data from the editing form"""
-    if not db_service.is_available:
-        raise HTTPException(status_code=503, detail="Database service not available")
+    """Update invoice with comprehensive error handling and debugging"""
     
+    # Enhanced logging for better debugging
+    logger.info(f"🔄 INVOICE UPDATE REQUEST - ID: {invoice_id}")
+    logger.info(f"📊 Raw request body: {request_body}")
+    logger.info(f"📊 Request body type: {type(request_body)}")
+    logger.info(f"📊 Request body keys: {list(request_body.keys()) if request_body else 'None'}")
+    
+    # Validate database availability
+    if not db_service.is_available:
+        logger.error("❌ Database service not available")
+        raise HTTPException(
+            status_code=503, 
+            detail={
+                "error": "DATABASE_UNAVAILABLE",
+                "message": "Database service is not available",
+                "timestamp": "2025-06-23T11:40:00Z"
+            }
+        )
+    
+    # Validate request body
+    fields = request_body
     if not fields:
-        raise HTTPException(status_code=400, detail="No fields provided for update")
+        logger.error("❌ No fields provided in request body")
+        raise HTTPException(
+            status_code=400, 
+            detail={
+                "error": "NO_FIELDS_PROVIDED",
+                "message": "Request body is empty or invalid",
+                "received": request_body
+            }
+        )
+    
+    # Validate invoice exists before attempting update
+    try:
+        logger.info(f"🔍 Checking if invoice {invoice_id} exists...")
+        existing_invoice_result = db_service.client.table("invoices").select("id").eq("id", invoice_id).execute()
+        if not existing_invoice_result.data:
+            logger.error(f"❌ Invoice {invoice_id} not found in database")
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "error": "INVOICE_NOT_FOUND", 
+                    "message": f"Invoice with ID {invoice_id} does not exist",
+                    "invoice_id": invoice_id
+                }
+            )
+        logger.info(f"✅ Invoice {invoice_id} exists")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error checking invoice existence: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "DATABASE_CHECK_FAILED",
+                "message": f"Failed to verify invoice existence: {str(e)}"
+            }
+        )
     
     try:
-        # Convert form data to database field names  
+        # Initialize update data dictionary
         update_data = {}
         
-        # Map form fields to database columns
-        if "rechnungsempfaenger" in fields:
-            update_data["rechnungsempfaenger"] = fields["rechnungsempfaenger"]
-        if "rechnungssteller" in fields:
-            update_data["rechnungssteller"] = fields["rechnungssteller"]
-        if "projekt" in fields:
-            update_data["projekt"] = fields["projekt"]
-        if "gewerk" in fields:
-            update_data["gewerk"] = fields["gewerk"]
-        if "rechnungsbetrag" in fields:
-            update_data["brutto_betrag"] = fields["rechnungsbetrag"]
-        if "rechnungseingang" in fields:
-            update_data["rechnungsdatum"] = fields["rechnungseingang"]
+        # Enhanced field mapping with validation and logging
+        logger.info(f"🗺️ Starting field mapping from German to English...")
         
-        # Add timestamp for updates
-        update_data["updated_at"] = "NOW()"
+        # Define the complete field mapping
+        field_mapping = {
+            # Business fields (German -> Database)
+            "faelligkeit": "due_date",             # ✅ CRITICAL: Due date mapping
+            "rechnungseingang": "rechnungsdatum",   # Invoice receipt date  
+            "rechnungsbetrag": "brutto_betrag",     # Invoice amount
+            # Direct mappings (same in frontend and database)
+            "rechnungsempfaenger": "rechnungsempfaenger",
+            "rechnungssteller": "rechnungssteller", 
+            "projekt": "projekt",                   # ✅ Project field (German -> German)
+            "gewerk": "gewerk",
+            "skonto_datum": "skonto_datum",
+            "skonto_prozent": "skonto_prozent",
+            "rechnungsart": "rechnungsart",
+            "kfw_anrechenbar": "kfw_anrechenbar",
+            "rechnungspruefung_email": "rechnungspruefung_email",
+            "weiter_berechnen_an": "weiter_berechnen_an"
+        }
         
-        # Update using database service (but bypass field mapping since we want German names)
-        result = db_service.client.table("invoices").update(update_data).eq("id", invoice_id).execute()
+        mapped_count = 0
+        for frontend_field, db_field in field_mapping.items():
+            if frontend_field in fields:
+                value = fields[frontend_field]
+                update_data[db_field] = value
+                mapped_count += 1
+                logger.info(f"✅ Mapped '{frontend_field}' -> '{db_field}': {value}")
         
-        if result.data:
+        # Validate that we have something to update
+        if not update_data:
+            logger.warning(f"⚠️ No valid fields found for update")
+            logger.info(f"📊 Available mappings: {list(field_mapping.keys())}")
+            logger.info(f"📊 Received fields: {list(fields.keys())}")
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "NO_MAPPABLE_FIELDS",
+                    "message": "No valid fields provided for update",
+                    "received_fields": list(fields.keys()),
+                    "valid_fields": list(field_mapping.keys())
+                }
+            )
+        
+        logger.info(f"✅ Mapped {mapped_count} fields successfully")
+        logger.info(f"📊 Final update data: {update_data}")
+        
+        # Enhanced database update with comprehensive error handling
+        logger.info(f"💾 Attempting database update...")
+        
+        try:
+            result = db_service.client.table("invoices").update(update_data).eq("id", invoice_id).execute()
+            
+            # Enhanced result analysis
+            if hasattr(result, 'error') and result.error:
+                logger.error(f"❌ Supabase error: {result.error}")
+                raise HTTPException(
+                    status_code=500,
+                    detail={
+                        "error": "SUPABASE_UPDATE_ERROR",
+                        "message": f"Database update failed: {result.error}",
+                        "attempted_fields": list(update_data.keys())
+                    }
+                )
+            
+            if not result.data:
+                logger.error(f"❌ No data returned from update - invoice may not exist")
+                raise HTTPException(
+                    status_code=404,
+                    detail={
+                        "error": "UPDATE_NO_EFFECT", 
+                        "message": "Update had no effect - invoice may not exist",
+                        "invoice_id": invoice_id
+                    }
+                )
+            
+            # Success - log the result
+            updated_record = result.data[0]
+            logger.info(f"✅ Database update successful")
+            logger.info(f"📊 Updated record ID: {updated_record.get('id')}")
+            logger.info(f"📊 Updated timestamp: {updated_record.get('updated_at')}")
+            
+            # Verify critical field updates
+            verification_log = {}
+            for db_field, expected_value in update_data.items():
+                actual_value = updated_record.get(db_field)
+                verification_log[db_field] = {
+                    "expected": expected_value,
+                    "actual": actual_value,
+                    "match": str(expected_value) == str(actual_value)
+                }
+            
+            logger.info(f"🔍 Field verification: {verification_log}")
+            
+            # Check for any mismatches
+            mismatches = [field for field, check in verification_log.items() if not check["match"]]
+            if mismatches:
+                logger.warning(f"⚠️ Field value mismatches detected: {mismatches}")
+            
             return {
-                "status": "success",
+                "status": "success", 
                 "message": "Invoice updated successfully",
-                "invoice_id": invoice_id
+                "invoice_id": invoice_id,
+                "updated_fields": list(update_data.keys()),
+                "verification": verification_log
             }
-        else:
-            raise HTTPException(status_code=404, detail="Invoice not found")
+            
+        except HTTPException:
+            raise
+        except Exception as db_error:
+            logger.error(f"❌ Database update exception: {str(db_error)}")
+            logger.error(f"❌ Exception type: {type(db_error).__name__}")
+            logger.error(f"❌ Update data: {update_data}")
+            
+            # Check for specific error types
+            error_message = str(db_error).lower()
+            if "column" in error_message and "not found" in error_message:
+                raise HTTPException(
+                    status_code=500,
+                    detail={
+                        "error": "COLUMN_NOT_FOUND",
+                        "message": f"Database column missing: {str(db_error)}",
+                        "attempted_fields": list(update_data.keys()),
+                        "suggestion": "Database schema may need migration"
+                    }
+                )
+            elif "permission" in error_message or "access" in error_message:
+                raise HTTPException(
+                    status_code=500,
+                    detail={
+                        "error": "DATABASE_PERMISSION_ERROR", 
+                        "message": f"Database permission error: {str(db_error)}"
+                    }
+                )
+            else:
+                raise HTTPException(
+                    status_code=500,
+                    detail={
+                        "error": "DATABASE_UPDATE_FAILED",
+                        "message": f"Database update failed: {str(db_error)}",
+                        "exception_type": type(db_error).__name__
+                    }
+                )
         
     except HTTPException:
         raise

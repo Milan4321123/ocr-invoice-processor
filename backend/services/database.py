@@ -132,8 +132,9 @@ class DatabaseService:
                 del mapped[app_field]
         
         # Store complex OCR data in raw_ocr_data JSONB field
+        # Note: due_date is now stored as a proper column, not in raw_ocr_data
         ocr_fields = ['ocr_entities', 'ocr_form_fields', 'ocr_tables', 'line_items', 
-                      'vendor_address', 'customer_address', 'due_date', 'currency', 
+                      'vendor_address', 'customer_address', 'currency', 
                       'payment_terms', 'po_number', 'tax_amount', 'ocr_text', 
                       'ocr_status', 'ocr_pages', 'ocr_error', 'ocr_processed_at']
         
