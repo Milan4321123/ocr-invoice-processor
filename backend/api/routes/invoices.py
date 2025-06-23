@@ -191,7 +191,7 @@ async def get_invoice_for_editor(invoice_id: str = Path(..., description="The in
     
     try:
         # Get the raw invoice data from database without field mapping
-        query_result = db_service.client.table("invoices").select("*").eq("id", invoice_id).execute()
+        query_result = db_service.client.table("invoices_clean").select("*").eq("id", invoice_id).execute()
         
         if not query_result.data:
             raise HTTPException(status_code=404, detail="Invoice not found")
@@ -205,17 +205,16 @@ async def get_invoice_for_editor(invoice_id: str = Path(..., description="The in
             "fields": {
                 "rechnungsempfaenger": invoice_data.get("rechnungsempfaenger"),
                 "rechnungssteller": invoice_data.get("rechnungssteller"),
-                "projekt": invoice_data.get("projekt"),  # ✅ Direct German mapping
+                "projekt": invoice_data.get("projekt"),
                 "gewerk": invoice_data.get("gewerk"),
-                "rechnungsbetrag": invoice_data.get("brutto_betrag"),
-                "rechnungseingang": invoice_data.get("rechnungsdatum"),
-                # ✅ GERMAN STANDARDIZATION: Handle transition from due_date to faelligkeit
-                "faelligkeit": invoice_data.get("faelligkeit") or invoice_data.get("faelligkeit_new") or invoice_data.get("due_date"),
+                "rechnungsbetrag": invoice_data.get("rechnungsbetrag"),        # ✅ NEW: Clean schema field
+                "rechnungseingang": invoice_data.get("rechnungseingang"),      # ✅ NEW: Clean schema field
+                "faelligkeit": invoice_data.get("faelligkeit"),
                 "skonto_datum": invoice_data.get("skonto_datum"),
                 "skonto_prozent": invoice_data.get("skonto_prozent"),
                 "rechnungsart": invoice_data.get("rechnungsart"),
-                "kfw_anrechenbar": invoice_data.get("kfw_anrechenbar"),
-                "rechnungspruefung_email": invoice_data.get("rechnungspruefung_email"),
+                "kfw_anrechenbare_kosten": invoice_data.get("kfw_anrechenbare_kosten"),  # ✅ NEW: Clean schema field
+                "rechnungspruefung": invoice_data.get("rechnungspruefung"),              # ✅ NEW: Clean schema field
                 "weiter_berechnen_an": invoice_data.get("weiter_berechnen_an")
             },
             "confidenceScores": {
@@ -276,7 +275,7 @@ async def update_invoice_from_editor(
     # Validate invoice exists before attempting update
     try:
         logger.info(f"🔍 Checking if invoice {invoice_id} exists...")
-        existing_invoice_result = db_service.client.table("invoices").select("id").eq("id", invoice_id).execute()
+        existing_invoice_result = db_service.client.table("invoices_clean").select("id").eq("id", invoice_id).execute()
         if not existing_invoice_result.data:
             logger.error(f"❌ Invoice {invoice_id} not found in database")
             raise HTTPException(
@@ -307,69 +306,35 @@ async def update_invoice_from_editor(
         # Enhanced field mapping with validation and logging
         logger.info(f"🗺️ Starting field mapping from German to English...")
         
-        # Define the complete field mapping for German standardization
+        # Define the complete field mapping for clean schema
         field_mapping = {
-            # ✅ GERMAN STANDARDIZATION: Prioritize German field names
+            # ✅ CLEAN SCHEMA MAPPING: Direct German field names (no translation needed)
             # Critical business fields
-            "faelligkeit": "faelligkeit",           # ✅ NEW: German→German (preferred)
-            "rechnungseingang": "rechnungsdatum",   # ✅ German→German  
-            "rechnungsbetrag": "brutto_betrag",     # ✅ German→German
+            "faelligkeit": "faelligkeit",                       # ✅ German→German (direct)
+            "rechnungseingang": "rechnungseingang",             # ✅ NEW: German→German (direct) 
+            "rechnungsbetrag": "rechnungsbetrag",               # ✅ NEW: German→German (direct)
             # Direct German mappings (no change needed)
             "rechnungsempfaenger": "rechnungsempfaenger",
             "rechnungssteller": "rechnungssteller", 
-            "projekt": "projekt",                   # ✅ German→German
+            "projekt": "projekt",                               # ✅ German→German (direct)
             "gewerk": "gewerk",
             "skonto_datum": "skonto_datum",
             "skonto_prozent": "skonto_prozent",
             "rechnungsart": "rechnungsart",
-            "kfw_anrechenbar": "kfw_anrechenbar",
-            "rechnungspruefung_email": "rechnungspruefung_email",
+            "kfw_anrechenbare_kosten": "kfw_anrechenbare_kosten", # ✅ NEW: Clean field name
+            "rechnungspruefung": "rechnungspruefung",            # ✅ NEW: Clean field name
             "weiter_berechnen_an": "weiter_berechnen_an"
-        }
-        
-        # ✅ TRANSITION LOGIC: Handle both old and new field names during migration
-        transition_mapping = {
-            "faelligkeit": ["faelligkeit", "faelligkeit_new", "due_date"],  # Try German names first
         }
         
         mapped_count = 0
         for frontend_field, db_field in field_mapping.items():
             if frontend_field in fields:
                 value = fields[frontend_field]
-                
-                # ✅ TRANSITION LOGIC: Handle database column migration
-                if frontend_field in transition_mapping:
-                    # Try each possible database column until one works
-                    possible_columns = transition_mapping[frontend_field]
-                    column_mapped = False
-                    
-                    for column_name in possible_columns:
-                        try:
-                            # Test if column exists with a simple select
-                            test_query = db_service.client.table("invoices").select(column_name).limit(1).execute()
-                            # If no exception, column exists - use this one
-                            update_data[column_name] = value
-                            mapped_count += 1
-                            logger.info(f"✅ Mapped '{frontend_field}' -> '{column_name}': {value}")
-                            column_mapped = True
-                            break
-                        except Exception as e:
-                            error_msg = str(e).lower()
-                            if ("column" in error_msg and "not found" in error_msg) or ("column" in error_msg and "does not exist" in error_msg):
-                                logger.info(f"⚠️ Column '{column_name}' not found, trying next option...")
-                                continue  # Try next column
-                            else:
-                                # Other error, log and try next column
-                                logger.warning(f"⚠️ Error testing column '{column_name}': {e}")
-                                continue
-                    
-                    if not column_mapped:
-                        logger.warning(f"⚠️ Could not map '{frontend_field}' - no suitable database column found from {possible_columns}")
-                else:
-                    # Standard mapping
-                    update_data[db_field] = value
-                    mapped_count += 1
-                    logger.info(f"✅ Mapped '{frontend_field}' -> '{db_field}': {value}")
+                update_data[db_field] = value
+                mapped_count += 1
+                logger.info(f"✅ Mapped '{frontend_field}' -> '{db_field}': {value}")
+        
+        logger.info(f"✅ Mapped {mapped_count} fields successfully")
         
         # Validate that we have something to update
         if not update_data:
@@ -393,7 +358,7 @@ async def update_invoice_from_editor(
         logger.info(f"💾 Attempting database update...")
         
         try:
-            result = db_service.client.table("invoices").update(update_data).eq("id", invoice_id).execute()
+            result = db_service.client.table("invoices_clean").update(update_data).eq("id", invoice_id).execute()
             
             # Enhanced result analysis
             if hasattr(result, 'error') and result.error:

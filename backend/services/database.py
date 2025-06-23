@@ -63,71 +63,87 @@ class DatabaseService:
             # Construct the public URL for Supabase storage
             mapped['url'] = f"https://bdtcfypvadryfeabqnlc.supabase.co/storage/v1/object/public/invoices/{mapped['file_path']}"
         
-        # ✅ GERMAN FIELD STANDARDIZATION: Remove field transformations
-        # Keep original German field names from database - no more English conversions
-        # This eliminates the projekt→project, brutto_betrag→total_amount confusion
+        # ✅ DUAL FIELD MAPPING: Provide both German (for editor) AND English (for dashboard)
+        # This ensures both the German-standardized editor and English-based dashboard work
+        
+        # Map German fields to English equivalents for dashboard compatibility
+        field_mappings = {
+            'rechnungsnummer': 'invoice_number',
+            'rechnungssteller': 'vendor_name', 
+            'rechnungsempfaenger': 'customer_name',
+            'rechnungsbetrag': 'total_amount',  # Updated field name
+            'faelligkeit': 'due_date',
+            'rechnungseingang': 'invoice_date',  # Updated field name
+            'projekt': 'po_number',
+            'gewerk': 'trade_category',
+            'rechnungsart': 'invoice_type',
+            'weiter_berechnen_an': 'bill_to',
+            'kfw_anrechenbare_kosten': 'kfw_eligible',
+            'rechnungspruefung': 'review_email'
+        }
+        
+        # Add English field names while keeping German ones
+        for german_field, english_field in field_mappings.items():
+            if german_field in mapped and mapped[german_field] is not None:
+                mapped[english_field] = mapped[german_field]
         
         return mapped
     
-    @staticmethod
-    def _map_app_to_db(app_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Map application field names to database column names"""
-        if not app_data:
-            return app_data
+    def _map_app_to_db(self, data: dict) -> dict:
+        """Map to clean database schema"""
         
-        # Create a copy to avoid modifying the original
-        mapped = app_data.copy()
+        # Clean field mapping - only required business fields
+        field_mapping = {
+            # File fields
+            'filename': 'file_name',
+            'file_path': 'file_path', 
+            'file_size': 'file_size',
+            'mime_type': 'mime_type',
+            
+            # Business fields (German as per requirements)
+            'rechnungsempfaenger': 'rechnungsempfaenger',
+            'rechnungssteller': 'rechnungssteller',
+            'projekt': 'projekt',
+            'gewerk': 'gewerk',
+            'weiter_berechnen_an': 'weiter_berechnen_an',
+            
+            # Financial fields  
+            'rechnungsbetrag': 'rechnungsbetrag',
+            'total_amount': 'rechnungsbetrag',  # OCR output maps to this
+            'brutto_betrag': 'rechnungsbetrag', # Legacy field maps to this
+            'kfw_anrechenbare_kosten': 'kfw_anrechenbare_kosten',
+            
+            # Date fields
+            'rechnungseingang': 'rechnungseingang', 
+            'invoice_date': 'rechnungseingang',  # OCR output maps to this
+            'rechnungsdatum': 'rechnungseingang', # Legacy field maps to this
+            'faelligkeit': 'faelligkeit',
+            'due_date': 'faelligkeit',          # OCR output maps to this
+            'skonto_datum': 'skonto_datum',
+            'skonto_prozent': 'skonto_prozent',
+            
+            # Business process fields
+            'rechnungsart': 'rechnungsart',
+            'rechnungspruefung': 'rechnungspruefung',
+            
+            # System fields
+            'status': 'status',
+            'ocr_status': 'ocr_status',
+            'ocr_text': 'ocr_text',
+            'raw_ocr_data': 'raw_ocr_data'
+        }
         
-        # Map application fields to database fields
-        if 'filename' in mapped:
-            mapped['file_name'] = mapped['filename']
-            # Remove the application field to avoid conflicts
-            del mapped['filename']
-        
-        # Remove URL field as it's computed, not stored
-        if 'url' in mapped:
-            del mapped['url']
-        
-        # Handle new source tracking fields (only include if they're present)
-        # These fields will be ignored if the database doesn't have them yet
-        source_fields = ['source_type', 'source_metadata']
-        for field in source_fields:
-            if field not in mapped:
-                continue
-            # Keep as-is, database will ignore if column doesn't exist
-        
-        # ✅ GERMAN FIELD STANDARDIZATION: Remove reverse field transformations  
-        # Keep original field names - no more English→German conversions needed
-        # All endpoints now use consistent German field names
-        
-        # Store complex OCR data in raw_ocr_data JSONB field
-        # Note: faelligkeit is now the standard column name (was due_date)
-        ocr_fields = ['ocr_entities', 'ocr_form_fields', 'ocr_tables', 'line_items', 
-                      'vendor_address', 'customer_address', 'currency', 
-                      'payment_terms', 'po_number', 'tax_amount', 'ocr_text', 
-                      'ocr_status', 'ocr_pages', 'ocr_error', 'ocr_processed_at']
-        
-        raw_ocr_data = {}
-        for field in ocr_fields:
-            if field in mapped:
-                raw_ocr_data[field] = mapped[field]
-                del mapped[field]
-        
-        # Handle processing time conversion (seconds to milliseconds)
-        if 'ocr_processing_time' in mapped:
-            processing_time = mapped['ocr_processing_time']
-            if isinstance(processing_time, (int, float)):
-                # Convert seconds to milliseconds and ensure it's an integer
-                mapped['ocr_processing_time'] = int(processing_time * 1000)
-            else:
-                # Store in raw data if not a number
-                raw_ocr_data['ocr_processing_time'] = processing_time
-                del mapped['ocr_processing_time']
-        
-        if raw_ocr_data:
-            mapped['raw_ocr_data'] = raw_ocr_data
-        
-        return mapped
+        # Apply clean mapping
+        mapped_data = {}
+        for app_field, value in data.items():
+            if app_field in field_mapping:
+                db_column = field_mapping[app_field]
+                mapped_data[db_column] = value
+            elif app_field in ['created_at', 'updated_at', 'id']:
+                # Keep system fields as-is
+                mapped_data[app_field] = value
+                
+        return mapped_data
 
     # Dropdown Operations
     def get_dropdown_options(self, field_name: Optional[str] = None) -> Dict[str, List[Dict[str, Any]]]:
@@ -233,7 +249,7 @@ class DatabaseService:
             # Map application fields to database fields
             db_data = self._map_app_to_db(invoice_data)
             
-            response = self._client.table("invoices").insert(db_data).execute()
+            response = self._client.table("invoices_clean").insert(db_data).execute()
             
             if response.data:
                 # Map response back to application fields
@@ -255,7 +271,7 @@ class DatabaseService:
             return {"success": False, "error": "Database unavailable"}
         
         try:
-            response = (self._client.table("invoices")
+            response = (self._client.table("invoices_clean")
                        .select("*")
                        .eq("id", invoice_id)
                        .execute())
@@ -281,7 +297,7 @@ class DatabaseService:
             # Map application fields to database fields
             db_data = self._map_app_to_db(update_data)
             
-            response = (self._client.table("invoices")
+            response = (self._client.table("invoices_clean")
                        .update(db_data)
                        .eq("id", invoice_id)
                        .execute())
@@ -307,7 +323,7 @@ class DatabaseService:
             return {"success": False, "error": "Database unavailable"}
         
         try:
-            query = self._client.table("invoices").select("*")
+            query = self._client.table("invoices_clean").select("*")
             
             # Apply filters if provided
             if filters:
@@ -338,7 +354,7 @@ class DatabaseService:
             return {"success": False, "error": "Database unavailable"}
         
         try:
-            response = (self._client.table("invoices")
+            response = (self._client.table("invoices_clean")
                        .delete()
                        .eq("id", invoice_id)
                        .execute())
