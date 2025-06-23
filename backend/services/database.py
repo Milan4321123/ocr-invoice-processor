@@ -63,23 +63,9 @@ class DatabaseService:
             # Construct the public URL for Supabase storage
             mapped['url'] = f"https://bdtcfypvadryfeabqnlc.supabase.co/storage/v1/object/public/invoices/{mapped['file_path']}"
         
-        # Map German database fields to English application fields
-        field_mappings = {
-            'rechnungsempfaenger': 'customer_name',
-            'rechnungssteller': 'vendor_name', 
-            'rechnungsnummer': 'invoice_number',
-            'rechnungsdatum': 'invoice_date',
-            'netto_betrag': 'subtotal',
-            'brutto_betrag': 'total_amount',
-            'projekt': 'project',
-            'gewerk': 'trade'
-        }
-        
-        for db_field, app_field in field_mappings.items():
-            if db_field in mapped:
-                mapped[app_field] = mapped[db_field]
-                # Remove the German field name to avoid confusion
-                del mapped[db_field]
+        # ✅ GERMAN FIELD STANDARDIZATION: Remove field transformations
+        # Keep original German field names from database - no more English conversions
+        # This eliminates the projekt→project, brutto_betrag→total_amount confusion
         
         return mapped
     
@@ -110,29 +96,12 @@ class DatabaseService:
                 continue
             # Keep as-is, database will ignore if column doesn't exist
         
-        # Map English application fields to German database fields
-        field_mappings = {
-            'customer_name': 'rechnungsempfaenger',
-            'vendor_name': 'rechnungssteller',
-            'invoice_number': 'rechnungsnummer', 
-            'invoice_date': 'rechnungsdatum',
-            'subtotal': 'netto_betrag',
-            'total_amount': 'brutto_betrag',
-            'net_amount': 'netto_betrag',
-            'gross_amount': 'brutto_betrag',
-            'invoice_recipient': 'rechnungsempfaenger',
-            'invoice_issuer': 'rechnungssteller',
-            'project': 'projekt',
-            'trade': 'gewerk'
-        }
-        
-        for app_field, db_field in field_mappings.items():
-            if app_field in mapped:
-                mapped[db_field] = mapped[app_field]
-                del mapped[app_field]
+        # ✅ GERMAN FIELD STANDARDIZATION: Remove reverse field transformations  
+        # Keep original field names - no more English→German conversions needed
+        # All endpoints now use consistent German field names
         
         # Store complex OCR data in raw_ocr_data JSONB field
-        # Note: due_date is now stored as a proper column, not in raw_ocr_data
+        # Note: faelligkeit is now the standard column name (was due_date)
         ocr_fields = ['ocr_entities', 'ocr_form_fields', 'ocr_tables', 'line_items', 
                       'vendor_address', 'customer_address', 'currency', 
                       'payment_terms', 'po_number', 'tax_amount', 'ocr_text', 

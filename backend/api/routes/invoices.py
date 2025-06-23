@@ -205,11 +205,12 @@ async def get_invoice_for_editor(invoice_id: str = Path(..., description="The in
             "fields": {
                 "rechnungsempfaenger": invoice_data.get("rechnungsempfaenger"),
                 "rechnungssteller": invoice_data.get("rechnungssteller"),
-                "projekt": invoice_data.get("projekt"),  # ✅ Direct mapping (same field name)
+                "projekt": invoice_data.get("projekt"),  # ✅ Direct German mapping
                 "gewerk": invoice_data.get("gewerk"),
                 "rechnungsbetrag": invoice_data.get("brutto_betrag"),
                 "rechnungseingang": invoice_data.get("rechnungsdatum"),
-                "faelligkeit": invoice_data.get("due_date"),
+                # ✅ GERMAN STANDARDIZATION: Handle transition from due_date to faelligkeit
+                "faelligkeit": invoice_data.get("faelligkeit") or invoice_data.get("faelligkeit_new") or invoice_data.get("due_date"),
                 "skonto_datum": invoice_data.get("skonto_datum"),
                 "skonto_prozent": invoice_data.get("skonto_prozent"),
                 "rechnungsart": invoice_data.get("rechnungsart"),
@@ -306,16 +307,17 @@ async def update_invoice_from_editor(
         # Enhanced field mapping with validation and logging
         logger.info(f"🗺️ Starting field mapping from German to English...")
         
-        # Define the complete field mapping
+        # Define the complete field mapping for German standardization
         field_mapping = {
-            # Business fields (German -> Database)
-            "faelligkeit": "due_date",             # ✅ CRITICAL: Due date mapping
-            "rechnungseingang": "rechnungsdatum",   # Invoice receipt date  
-            "rechnungsbetrag": "brutto_betrag",     # Invoice amount
-            # Direct mappings (same in frontend and database)
+            # ✅ GERMAN STANDARDIZATION: Prioritize German field names
+            # Critical business fields
+            "faelligkeit": "faelligkeit",           # ✅ NEW: German→German (preferred)
+            "rechnungseingang": "rechnungsdatum",   # ✅ German→German  
+            "rechnungsbetrag": "brutto_betrag",     # ✅ German→German
+            # Direct German mappings (no change needed)
             "rechnungsempfaenger": "rechnungsempfaenger",
             "rechnungssteller": "rechnungssteller", 
-            "projekt": "projekt",                   # ✅ Project field (German -> German)
+            "projekt": "projekt",                   # ✅ German→German
             "gewerk": "gewerk",
             "skonto_datum": "skonto_datum",
             "skonto_prozent": "skonto_prozent",
@@ -325,13 +327,49 @@ async def update_invoice_from_editor(
             "weiter_berechnen_an": "weiter_berechnen_an"
         }
         
+        # ✅ TRANSITION LOGIC: Handle both old and new field names during migration
+        transition_mapping = {
+            "faelligkeit": ["faelligkeit", "faelligkeit_new", "due_date"],  # Try German names first
+        }
+        
         mapped_count = 0
         for frontend_field, db_field in field_mapping.items():
             if frontend_field in fields:
                 value = fields[frontend_field]
-                update_data[db_field] = value
-                mapped_count += 1
-                logger.info(f"✅ Mapped '{frontend_field}' -> '{db_field}': {value}")
+                
+                # ✅ TRANSITION LOGIC: Handle database column migration
+                if frontend_field in transition_mapping:
+                    # Try each possible database column until one works
+                    possible_columns = transition_mapping[frontend_field]
+                    column_mapped = False
+                    
+                    for column_name in possible_columns:
+                        try:
+                            # Test if column exists with a simple select
+                            test_query = db_service.client.table("invoices").select(column_name).limit(1).execute()
+                            # If no exception, column exists - use this one
+                            update_data[column_name] = value
+                            mapped_count += 1
+                            logger.info(f"✅ Mapped '{frontend_field}' -> '{column_name}': {value}")
+                            column_mapped = True
+                            break
+                        except Exception as e:
+                            error_msg = str(e).lower()
+                            if ("column" in error_msg and "not found" in error_msg) or ("column" in error_msg and "does not exist" in error_msg):
+                                logger.info(f"⚠️ Column '{column_name}' not found, trying next option...")
+                                continue  # Try next column
+                            else:
+                                # Other error, log and try next column
+                                logger.warning(f"⚠️ Error testing column '{column_name}': {e}")
+                                continue
+                    
+                    if not column_mapped:
+                        logger.warning(f"⚠️ Could not map '{frontend_field}' - no suitable database column found from {possible_columns}")
+                else:
+                    # Standard mapping
+                    update_data[db_field] = value
+                    mapped_count += 1
+                    logger.info(f"✅ Mapped '{frontend_field}' -> '{db_field}': {value}")
         
         # Validate that we have something to update
         if not update_data:
