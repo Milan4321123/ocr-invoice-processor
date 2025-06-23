@@ -13,18 +13,33 @@ export default function Home() {
           Transform paper invoices into structured data effortlessly.
         </p>
         
-        <div className="flex flex-col sm:flex-row justify-center gap-4 mb-16">
+        <div className="flex flex-col sm:flex-row justify-center gap-6 mb-16">
           <Link 
             href="/upload" 
-            className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-lg font-medium text-lg transition-colors"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-6 rounded-lg font-medium text-lg transition-colors flex items-center justify-center gap-3 shadow-lg"
           >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
             Upload Invoice
           </Link>
           <Link 
-            href="/dashboard" 
-            className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-8 py-4 rounded-lg font-medium text-lg transition-colors"
+            href="/folder-watcher" 
+            className="bg-green-600 hover:bg-green-700 text-white px-8 py-6 rounded-lg font-medium text-lg transition-colors flex items-center justify-center gap-3 shadow-lg"
           >
-            View Dashboard
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2v0a2 2 0 002-2h6l2 2h6a2 2 0 012 2z" />
+            </svg>
+            Folder Watcher
+          </Link>
+        </div>
+
+        <div className="flex justify-center mb-16">
+          <Link 
+            href="/dashboard" 
+            className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-6 py-3 rounded-lg font-medium transition-colors"
+          >
+            View Dashboard →
           </Link>
         </div>
 
@@ -36,28 +51,28 @@ export default function Home() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold mb-2">Easy Upload</h3>
-            <p className="text-gray-600">Drag and drop PDF invoices with automatic filename validation</p>
+            <h3 className="text-lg font-semibold mb-2">Manual Upload</h3>
+            <p className="text-gray-600">Drag and drop PDF invoices for instant processing and review</p>
           </div>
 
           <div className="bg-white p-6 rounded-lg shadow-sm">
             <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-4">
               <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2v0a2 2 0 002-2h6l2 2h6a2 2 0 012 2z" />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold mb-2">OCR Processing</h3>
-            <p className="text-gray-600">Automatic text extraction and data parsing from invoices</p>
+            <h3 className="text-lg font-semibold mb-2">Folder Watcher</h3>
+            <p className="text-gray-600">Automatic monitoring and processing of invoices from network folders</p>
           </div>
 
           <div className="bg-white p-6 rounded-lg shadow-sm">
             <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-4">
               <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold mb-2">Data Management</h3>
-            <p className="text-gray-600">Organize and track all processed invoices in one dashboard</p>
+            <h3 className="text-lg font-semibold mb-2">Approval Workflow</h3>
+            <p className="text-gray-600">Review, edit, and approve invoices with skonto tracking in Prüfbericht</p>
           </div>
         </div>
       </div>
