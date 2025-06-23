@@ -24,7 +24,7 @@ interface Invoice {
   ocr_processed_at?: string
   
   // Manual Review Status
-  review_status?: 'pending' | 'in_progress' | 'completed' | 'needs_attention'
+  review_status?: 'pending' | 'under_review' | 'completed_review' | 'needs_attention'
   reviewed_by?: string
   reviewed_at?: string
   review_notes?: string
@@ -153,9 +153,9 @@ export default function DashboardPage() {
 
   const getReviewStatusColor = (status: string | null | undefined): string => {
     switch (status) {
-      case 'completed':
+      case 'completed_review':
         return 'bg-emerald-100 text-emerald-800 border-emerald-200'
-      case 'in_progress':
+      case 'under_review':
         return 'bg-blue-100 text-blue-800 border-blue-200'
       case 'needs_attention':
         return 'bg-red-100 text-red-800 border-red-200'
@@ -166,22 +166,22 @@ export default function DashboardPage() {
 
   const getReviewStatusDisplay = (status: string | null | undefined) => {
     switch (status) {
-      case 'completed':
+      case 'completed_review':
         return (
           <div className="flex items-center space-x-1">
             <svg className="w-3 h-3 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
             </svg>
-            <span>Reviewed</span>
+            <span>Completed Review</span>
           </div>
         )
-      case 'in_progress':
+      case 'under_review':
         return (
           <div className="flex items-center space-x-1">
             <svg className="w-3 h-3 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
             </svg>
-            <span>In Review</span>
+            <span>Under Review</span>
           </div>
         )
       case 'needs_attention':
@@ -202,37 +202,6 @@ export default function DashboardPage() {
             <span>Pending Review</span>
           </div>
         )
-    }
-  }
-
-  const getDataQualityIcon = (invoice: Invoice) => {
-    const confidence = invoice.ocr_confidence || 0
-    const hasKeyData = !!(invoice.invoice_number && invoice.vendor_name && invoice.total_amount)
-    
-    if (confidence >= 0.8 && hasKeyData) {
-      return (
-        <div className="flex items-center space-x-1 text-green-600" title="High Quality Data">
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-          </svg>
-        </div>
-      )
-    } else if (confidence >= 0.6 || hasKeyData) {
-      return (
-        <div className="flex items-center space-x-1 text-yellow-600" title="Medium Quality - Review Recommended">
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-          </svg>
-        </div>
-      )
-    } else {
-      return (
-        <div className="flex items-center space-x-1 text-red-600" title="Low Quality - Manual Review Required">
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-          </svg>
-        </div>
-      )
     }
   }
 
@@ -565,7 +534,7 @@ export default function DashboardPage() {
                 </div>
                 <div>
                   <div className="text-2xl font-bold text-gray-900">
-                    {invoices.filter(i => i.review_status === 'completed').length}
+                    {invoices.filter(i => i.review_status === 'completed_review').length}
                   </div>
                   <div className="text-sm text-gray-500">Reviewed</div>
                 </div>
@@ -610,9 +579,6 @@ export default function DashboardPage() {
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Review Status
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Data Quality
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Key Information
@@ -681,18 +647,6 @@ export default function DashboardPage() {
                       </div>
                     </td>
 
-                    {/* Data Quality */}
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center space-x-2">
-                        {getDataQualityIcon(invoice)}
-                        <div className="text-xs text-gray-500">
-                          {invoice.ocr_confidence && (
-                            <div>{(invoice.ocr_confidence * 100).toFixed(0)}%</div>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-
                     {/* Key Information */}
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-900 max-w-xs">
@@ -755,7 +709,7 @@ export default function DashboardPage() {
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                           </svg>
-                          {invoice.review_status === 'completed' ? 'Review' : 'Edit'}
+                          {invoice.review_status === 'completed_review' ? 'Review' : 'Edit'}
                         </Link>
                         
                         {/* Secondary Actions */}

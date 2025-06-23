@@ -68,15 +68,26 @@ export default function InvoiceEditorDashboard({
     setHasUnsavedChanges(true);
   };
 
-  const handleSave = async (updatedFields: GermanInvoiceFields) => {
+  const handleSave = async (updatedFields: GermanInvoiceFields, reviewStatus?: 'under_review' | 'completed_review') => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+      
+      // Prepare the payload with review status and email
+      const payload = {
+        ...updatedFields,
+        ...(reviewStatus && {
+          review_status: reviewStatus,
+          reviewed_by: updatedFields.rechnungspruefung_email || 'system@example.com', // Use the review email from form or fallback
+          reviewed_at: new Date().toISOString()
+        })
+      };
+
       const response = await fetch(`${apiUrl}/invoices/${invoiceId}/editor`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(updatedFields),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {

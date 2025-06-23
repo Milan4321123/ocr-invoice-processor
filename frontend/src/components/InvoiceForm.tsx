@@ -34,7 +34,7 @@ interface InvoiceFormProps {
   fields: GermanInvoiceFields;
   confidenceScores: ConfidenceScores;
   onFieldChange: (field: keyof GermanInvoiceFields, value: any) => void;
-  onSave: (fields: GermanInvoiceFields) => Promise<boolean>;
+  onSave: (fields: GermanInvoiceFields, reviewStatus?: 'under_review' | 'completed_review') => Promise<boolean>;
   onCancel: () => void;
   isLoading?: boolean;
   hasUnsavedChanges?: boolean;
@@ -250,10 +250,10 @@ export default function InvoiceForm({
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = async (reviewStatus?: 'under_review' | 'completed_review') => {
     setIsSaving(true);
     try {
-      const success = await onSave(fields);
+      const success = await onSave(fields, reviewStatus);
       if (!success) {
         throw new Error('Save failed');
       }
@@ -306,12 +306,29 @@ export default function InvoiceForm({
           </button>
           
           <button
-            onClick={handleSave}
+            onClick={() => handleSave('under_review')}
             disabled={!hasUnsavedChanges || isSaving}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-1"
+            className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-1"
           >
-            <Save size={16} />
-            <span>{isSaving ? 'Saving...' : 'Save'}</span>
+            {isSaving ? (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            ) : (
+              <Save size={16} />
+            )}
+            <span>{isSaving ? 'Saving...' : 'Save as Under Review'}</span>
+          </button>
+
+          <button
+            onClick={() => handleSave('completed_review')}
+            disabled={!hasUnsavedChanges || isSaving}
+            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-1"
+          >
+            {isSaving ? (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            ) : (
+              <CheckCircle size={16} />
+            )}
+            <span>{isSaving ? 'Saving...' : 'Complete Review'}</span>
           </button>
         </div>
       </div>

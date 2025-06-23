@@ -323,7 +323,12 @@ async def update_invoice_from_editor(
             "rechnungsart": "rechnungsart",
             "kfw_anrechenbare_kosten": "kfw_anrechenbare_kosten", # ✅ NEW: Clean field name
             "rechnungspruefung": "rechnungspruefung",            # ✅ NEW: Clean field name
-            "weiter_berechnen_an": "weiter_berechnen_an"
+            "weiter_berechnen_an": "weiter_berechnen_an",
+            # Review status fields
+            "review_status": "review_status",
+            "reviewed_by": "reviewed_by", 
+            "reviewed_at": "reviewed_at",
+            "review_notes": "review_notes"
         }
         
         mapped_count = 0
