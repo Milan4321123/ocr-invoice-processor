@@ -9,8 +9,7 @@ import logging
 from dotenv import load_dotenv
 
 # Route imports
-from api.routes import health, upload, invoices, ocr, dropdowns, reports
-# from api.routes import folder_watcher  # Temporarily disabled
+from api.routes import health, upload, invoices, ocr, dropdowns, reports, folder_watcher
 
 # OCR imports
 from ocr.workflow import ocr_workflow
@@ -62,7 +61,7 @@ app.include_router(upload.router, tags=["upload"])
 app.include_router(invoices.router, tags=["invoices"])
 app.include_router(ocr.router, tags=["ocr"])
 app.include_router(dropdowns.router, prefix="/api", tags=["dropdowns"])
-# app.include_router(folder_watcher.router, prefix="/api/folder-watcher", tags=["folder-watcher"])  # Temporarily disabled
+app.include_router(folder_watcher.router, prefix="/api/folder-watcher", tags=["folder-watcher"])
 app.include_router(reports.router, prefix="/api", tags=["reports"])
 
 if __name__ == "__main__":
