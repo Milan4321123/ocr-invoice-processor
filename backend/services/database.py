@@ -7,6 +7,12 @@ from supabase import create_client, Client
 import os
 import logging
 from dotenv import load_dotenv
+from config.field_mappings import (
+    map_input_to_database, 
+    map_database_to_api, 
+    validate_database_fields,
+    DATABASE_FIELDS
+)
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -51,99 +57,30 @@ class DatabaseService:
         if not db_record:
             return db_record
         
-        # Create a copy to avoid modifying the original
-        mapped = db_record.copy()
-        
-        # Map database fields to application fields
-        if 'file_name' in mapped:
-            mapped['filename'] = mapped['file_name']
+        # ✅ Use centralized field mapping
+        mapped = map_database_to_api(db_record, include_english_aliases=True)
         
         # Add URL field based on file_path
         if 'file_path' in mapped and mapped['file_path']:
             # Construct the public URL for Supabase storage
             mapped['url'] = f"https://bdtcfypvadryfeabqnlc.supabase.co/storage/v1/object/public/invoices/{mapped['file_path']}"
         
-        # ✅ DUAL FIELD MAPPING: Provide both German (for editor) AND English (for dashboard)
-        # This ensures both the German-standardized editor and English-based dashboard work
-        
-        # Map German fields to English equivalents for dashboard compatibility
-        field_mappings = {
-            'rechnungsnummer': 'invoice_number',
-            'rechnungssteller': 'vendor_name', 
-            'rechnungsempfaenger': 'customer_name',
-            'rechnungsbetrag': 'total_amount',  # Updated field name
-            'faelligkeit': 'due_date',
-            'rechnungseingang': 'invoice_date',  # Updated field name
-            'projekt': 'po_number',
-            'gewerk': 'trade_category',
-            'rechnungsart': 'invoice_type',
-            'weiter_berechnen_an': 'bill_to',
-            'kfw_anrechenbare_kosten': 'kfw_eligible',
-            'rechnungspruefung': 'review_email'
-        }
-        
-        # Add English field names while keeping German ones
-        for german_field, english_field in field_mappings.items():
-            if german_field in mapped and mapped[german_field] is not None:
-                mapped[english_field] = mapped[german_field]
+        # Map file_name to filename for legacy compatibility
+        if 'file_name' in mapped:
+            mapped['filename'] = mapped['file_name']
         
         return mapped
     
     def _map_app_to_db(self, data: dict) -> dict:
-        """Map to clean database schema"""
+        """Map application data to database schema using centralized mapping"""
         
-        # Clean field mapping - only required business fields
-        field_mapping = {
-            # File fields
-            'filename': 'file_name',
-            'file_path': 'file_path', 
-            'file_size': 'file_size',
-            'mime_type': 'mime_type',
-            
-            # Business fields (German as per requirements)
-            'rechnungsempfaenger': 'rechnungsempfaenger',
-            'rechnungssteller': 'rechnungssteller',
-            'projekt': 'projekt',
-            'gewerk': 'gewerk',
-            'weiter_berechnen_an': 'weiter_berechnen_an',
-            
-            # Financial fields  
-            'rechnungsbetrag': 'rechnungsbetrag',
-            'total_amount': 'rechnungsbetrag',  # OCR output maps to this
-            'brutto_betrag': 'rechnungsbetrag', # Legacy field maps to this
-            'kfw_anrechenbare_kosten': 'kfw_anrechenbare_kosten',
-            
-            # Date fields
-            'rechnungseingang': 'rechnungseingang', 
-            'invoice_date': 'rechnungseingang',  # OCR output maps to this
-            'rechnungsdatum': 'rechnungseingang', # Legacy field maps to this
-            'faelligkeit': 'faelligkeit',
-            'due_date': 'faelligkeit',          # OCR output maps to this
-            'skonto_datum': 'skonto_datum',
-            'skonto_prozent': 'skonto_prozent',
-            
-            # Business process fields
-            'rechnungsart': 'rechnungsart',
-            'rechnungspruefung': 'rechnungspruefung',
-            
-            # System fields
-            'status': 'status',
-            'ocr_status': 'ocr_status',
-            'ocr_text': 'ocr_text',
-            'raw_ocr_data': 'raw_ocr_data'
-        }
+        # ✅ Use centralized field mapping
+        mapped_data = map_input_to_database(data)
         
-        # Apply clean mapping
-        mapped_data = {}
-        for app_field, value in data.items():
-            if app_field in field_mapping:
-                db_column = field_mapping[app_field]
-                mapped_data[db_column] = value
-            elif app_field in ['created_at', 'updated_at', 'id']:
-                # Keep system fields as-is
-                mapped_data[app_field] = value
+        # Validate that only database fields are included
+        validated_data = validate_database_fields(mapped_data)
                 
-        return mapped_data
+        return validated_data
 
     # Dropdown Operations
     def get_dropdown_options(self, field_name: Optional[str] = None) -> Dict[str, List[Dict[str, Any]]]:

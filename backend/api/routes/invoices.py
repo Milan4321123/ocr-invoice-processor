@@ -3,8 +3,9 @@ from fastapi import APIRouter, HTTPException, Path, Body
 from typing import List, Dict, Any, Optional
 import logging
 
-# Import database service
+# Import database service and centralized field mapping
 from services.database import db_service
+from config.field_mappings import map_input_to_database, OCR_TO_DATABASE
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -18,23 +19,8 @@ def _get_field_confidence_scores(invoice_data: Dict) -> Dict[str, float]:
     # Default confidence based on overall OCR confidence
     default_confidence = invoice_data.get("ocr_confidence", 0.8)
     
-    # Mapping from OCR field names to German field names
-    field_mapping = {
-        # From form fields
-        "invoice_number": "rechnungsnummer",  # Not used in editor but good to know
-        "invoice_date": "rechnungseingang",
-        "total_amount": "rechnungsbetrag",
-        "due_date": "faelligkeit",
-        # From database fields  
-        "customer_name": "rechnungsempfaenger", 
-        "vendor_name": "rechnungssteller",
-        "po_number": "projekt",
-        # From OCR entities - additional mappings
-        "receiver_name": "rechnungsempfaenger",  # Customer name from entities
-        "supplier_name": "rechnungssteller",     # Vendor name from entities  
-        "purchase_order": "projekt",             # PO number from entities
-        "invoice_id": "rechnungsnummer",         # Invoice number from entities
-    }
+    # ✅ Use centralized field mapping
+    field_mapping = OCR_TO_DATABASE
     
     # Extract from form fields
     for field in ocr_form_fields:
@@ -301,69 +287,35 @@ async def update_invoice_from_editor(
     
     try:
         # Initialize update data dictionary
-        update_data = {}
+        # ✅ Use centralized field mapping instead of local mapping
+        logger.info(f"🗺️ Starting field mapping using centralized mapping service...")
         
-        # Enhanced field mapping with validation and logging
-        logger.info(f"🗺️ Starting field mapping from German to English...")
+        # Map input fields to database fields using centralized mapping
+        mapped_fields = map_input_to_database(fields)
         
-        # Define the complete field mapping for clean schema
-        field_mapping = {
-            # ✅ CLEAN SCHEMA MAPPING: Direct German field names (no translation needed)
-            # Critical business fields
-            "faelligkeit": "faelligkeit",                       # ✅ German→German (direct)
-            "rechnungseingang": "rechnungseingang",             # ✅ NEW: German→German (direct) 
-            "rechnungsbetrag": "rechnungsbetrag",               # ✅ NEW: German→German (direct)
-            # Direct German mappings (no change needed)
-            "rechnungsempfaenger": "rechnungsempfaenger",
-            "rechnungssteller": "rechnungssteller", 
-            "projekt": "projekt",                               # ✅ German→German (direct)
-            "gewerk": "gewerk",
-            "skonto_datum": "skonto_datum",
-            "skonto_prozent": "skonto_prozent",
-            "rechnungsart": "rechnungsart",
-            "kfw_anrechenbare_kosten": "kfw_anrechenbare_kosten", # ✅ NEW: Clean field name
-            "rechnungspruefung": "rechnungspruefung",            # ✅ NEW: Clean field name
-            "weiter_berechnen_an": "weiter_berechnen_an",
-            # Review status fields
-            "review_status": "review_status",
-            "reviewed_by": "reviewed_by", 
-            "reviewed_at": "reviewed_at",
-            "review_notes": "review_notes"
-        }
-        
-        mapped_count = 0
-        for frontend_field, db_field in field_mapping.items():
-            if frontend_field in fields:
-                value = fields[frontend_field]
-                update_data[db_field] = value
-                mapped_count += 1
-                logger.info(f"✅ Mapped '{frontend_field}' -> '{db_field}': {value}")
-        
-        logger.info(f"✅ Mapped {mapped_count} fields successfully")
+        mapped_count = len(mapped_fields)
+        logger.info(f"✅ Mapped {mapped_count} fields successfully using centralized mapping")
         
         # Validate that we have something to update
-        if not update_data:
+        if not mapped_fields:
             logger.warning(f"⚠️ No valid fields found for update")
-            logger.info(f"📊 Available mappings: {list(field_mapping.keys())}")
             logger.info(f"📊 Received fields: {list(fields.keys())}")
             raise HTTPException(
                 status_code=400,
                 detail={
                     "error": "NO_MAPPABLE_FIELDS",
                     "message": "No valid fields provided for update",
-                    "received_fields": list(fields.keys()),
-                    "valid_fields": list(field_mapping.keys())
+                    "received_fields": list(fields.keys())
                 }
             )
         
-        logger.info(f"✅ Mapped {mapped_count} fields successfully")
-        logger.info(f"📊 Final update data: {update_data}")
+        logger.info(f"📊 Final update data: {mapped_fields}")
         
         # Enhanced database update with comprehensive error handling
         logger.info(f"💾 Attempting database update...")
         
         try:
-            result = db_service.client.table("invoices_clean").update(update_data).eq("id", invoice_id).execute()
+            result = db_service.client.table("invoices_clean").update(mapped_fields).eq("id", invoice_id).execute()
             
             # Enhanced result analysis
             if hasattr(result, 'error') and result.error:
@@ -373,7 +325,7 @@ async def update_invoice_from_editor(
                     detail={
                         "error": "SUPABASE_UPDATE_ERROR",
                         "message": f"Database update failed: {result.error}",
-                        "attempted_fields": list(update_data.keys())
+                        "attempted_fields": list(mapped_fields.keys())
                     }
                 )
             
@@ -396,7 +348,7 @@ async def update_invoice_from_editor(
             
             # Verify critical field updates
             verification_log = {}
-            for db_field, expected_value in update_data.items():
+            for db_field, expected_value in mapped_fields.items():
                 actual_value = updated_record.get(db_field)
                 verification_log[db_field] = {
                     "expected": expected_value,
@@ -415,7 +367,7 @@ async def update_invoice_from_editor(
                 "status": "success", 
                 "message": "Invoice updated successfully",
                 "invoice_id": invoice_id,
-                "updated_fields": list(update_data.keys()),
+                "updated_fields": list(mapped_fields.keys()),
                 "verification": verification_log
             }
             
@@ -424,7 +376,7 @@ async def update_invoice_from_editor(
         except Exception as db_error:
             logger.error(f"❌ Database update exception: {str(db_error)}")
             logger.error(f"❌ Exception type: {type(db_error).__name__}")
-            logger.error(f"❌ Update data: {update_data}")
+            logger.error(f"❌ Update data: {mapped_fields}")
             
             # Check for specific error types
             error_message = str(db_error).lower()
@@ -434,7 +386,7 @@ async def update_invoice_from_editor(
                     detail={
                         "error": "COLUMN_NOT_FOUND",
                         "message": f"Database column missing: {str(db_error)}",
-                        "attempted_fields": list(update_data.keys()),
+                        "attempted_fields": list(mapped_fields.keys()),
                         "suggestion": "Database schema may need migration"
                     }
                 )

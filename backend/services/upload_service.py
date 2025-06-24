@@ -153,23 +153,24 @@ class UploadService:
         Returns (success, error_message)
         """
         try:
-            # Prepare database record
+            # Prepare database record using correct field names for invoices_clean table
             invoice_data = {
                 "id": invoice_id,
-                "filename": file_data.filename,
+                "file_name": file_data.filename,  # ✅ Fixed: filename -> file_name
                 "file_path": storage_path,
                 "file_size": file_data.file_size,
                 "mime_type": file_data.content_type,
                 "status": "uploaded",
-                "source_type": file_data.source.value,
-                "source_metadata": file_data.source_metadata or {},
                 "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                 # OCR fields - initially empty, to be filled by manual OCR processing
                 "ocr_status": "pending",
                 "ocr_text": "",
-                "ocr_confidence": 0.0,
-                "ocr_pages": 0,
-                "ocr_processing_time": 0
+                # Remove fields that don't exist in invoices_clean schema
+                # "source_type": file_data.source.value,  # Not in clean schema
+                # "source_metadata": file_data.source_metadata or {},  # Not in clean schema
+                # "ocr_confidence": 0.0,  # Not in clean schema
+                # "ocr_pages": 0,  # Not in clean schema
+                # "ocr_processing_time": 0  # Not in clean schema
             }
             
             # Create invoice record in database

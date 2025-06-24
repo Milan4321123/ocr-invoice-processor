@@ -7,8 +7,9 @@ from typing import Dict, Any
 from ocr.workflow import ocr_workflow
 from config.ocr_config import ocr_config
 
-# Import database service
+# Import database service and centralized field mapping
 from services.database import db_service
+from config.field_mappings import map_input_to_database
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -112,7 +113,9 @@ async def process_invoice_ocr(invoice_id: str = Path(..., description="The invoi
             # Update invoice with OCR results
             if ocr_result.get("success"):
                 structured_data = ocr_result.get("structured_data") or {}
-                update_data = {
+                
+                # ✅ Use centralized field mapping for OCR results
+                ocr_structured_data = {
                     "ocr_status": "completed",
                     "status": "completed",
                     "ocr_processing_time": int(ocr_result.get("processing_time", 0) * 1000),  # Convert to milliseconds
@@ -120,16 +123,19 @@ async def process_invoice_ocr(invoice_id: str = Path(..., description="The invoi
                     "raw_ocr_data": ocr_result,  # Store full OCR result as JSONB
                     "ocr_confidence": ocr_result.get("confidence"),
                     "error_message": None,  # Clear any previous errors
-                    # Map OCR structured data to German database field names
-                    "rechnungsnummer": structured_data.get("invoice_number"),
-                    "rechnungsdatum": structured_data.get("invoice_date"),
-                    "rechnungsempfaenger": structured_data.get("customer_name") or structured_data.get("invoice_recipient"),
-                    "rechnungssteller": structured_data.get("vendor_name") or structured_data.get("invoice_issuer"),
-                    "projekt": structured_data.get("project"),
-                    "gewerk": structured_data.get("trade"),
-                    "netto_betrag": structured_data.get("net_amount") or structured_data.get("subtotal"),
-                    "brutto_betrag": structured_data.get("gross_amount") or structured_data.get("total_amount")
+                    # OCR results in English format (will be mapped to German)
+                    "invoice_number": structured_data.get("invoice_number"),
+                    "invoice_date": structured_data.get("invoice_date"),
+                    "customer_name": structured_data.get("customer_name") or structured_data.get("invoice_recipient"),
+                    "vendor_name": structured_data.get("vendor_name") or structured_data.get("invoice_issuer"),
+                    "po_number": structured_data.get("project"),
+                    "trade_category": structured_data.get("trade"),
+                    "subtotal": structured_data.get("net_amount") or structured_data.get("subtotal"),
+                    "total_amount": structured_data.get("gross_amount") or structured_data.get("total_amount")
                 }
+                
+                # Map OCR fields to database fields using centralized mapping
+                update_data = map_input_to_database(ocr_structured_data)
                 
                 logger.info(f"OCR processing completed successfully for invoice {invoice_id}")
                 
