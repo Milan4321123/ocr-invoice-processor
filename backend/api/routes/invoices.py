@@ -1,9 +1,7 @@
 """Invoice management route handlers"""
-from fastapi import APIRouter, HTTPException, Path, Body
+from fastapi import APIRouter, HTTPException, Path
 from typing import List, Dict, Any, Optional
 import logging
-
-# Import database service
 from services.database import db_service
 
 router = APIRouter()
@@ -82,41 +80,35 @@ def _extract_entity_value(ocr_entities: List[Dict], entity_type: str) -> str:
 
 @router.get("/invoices")
 async def get_invoices():
-    """Get all invoices"""
-    if not db_service.is_available:
-        # Mock response when database is not available
-        return {
-            "invoices": [],
-            "total": 0,
-            "message": "Demo mode - Database not configured"
-        }
-    
+    """Get all invoices using the centralized database service"""
     try:
-        # Fetch invoices from database
-        result = db_service.get_invoices(limit=100)
+        result = db_service.get_all_invoices()
         
         if result.get("success"):
             return {
                 "invoices": result.get("data", []),
-                "total": result.get("count", 0)
+                "total": result.get("total", 0)
             }
         else:
-            logger.error(f"Failed to fetch invoices: {result.get('error')}")
-            raise HTTPException(status_code=500, detail=f"Failed to fetch invoices: {result.get('error')}")
+            # Handle database unavailable case
+            if "unavailable" in result.get("error", "").lower():
+                return {
+                    "invoices": [],
+                    "total": 0,
+                    "message": "Demo mode - Database not configured"
+                }
+            raise HTTPException(status_code=500, detail=result.get("error", "Failed to fetch invoices"))
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to fetch invoices: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch invoices: {str(e)}")
 
 @router.get("/invoices/{invoice_id}")
 async def get_invoice(invoice_id: str = Path(..., description="The invoice ID")):
-    """Get a specific invoice by ID"""
-    if not db_service.is_available:
-        # Mock response when database is not available
-        raise HTTPException(status_code=404, detail="Invoice not found (Demo mode)")
-    
+    """Get a specific invoice by ID using the centralized database service"""
     try:
-        # Fetch specific invoice from database
         result = db_service.get_invoice(invoice_id)
         
         if result.get("success"):
@@ -125,7 +117,14 @@ async def get_invoice(invoice_id: str = Path(..., description="The invoice ID"))
                 "invoice": result.get("data")
             }
         else:
-            raise HTTPException(status_code=404, detail="Invoice not found")
+            # Handle specific error cases
+            error_msg = result.get("error", "")
+            if "not found" in error_msg.lower():
+                raise HTTPException(status_code=404, detail="Invoice not found")
+            elif "unavailable" in error_msg.lower():
+                raise HTTPException(status_code=404, detail="Invoice not found (Demo mode)")
+            else:
+                raise HTTPException(status_code=500, detail=error_msg)
         
     except HTTPException:
         raise
@@ -135,47 +134,28 @@ async def get_invoice(invoice_id: str = Path(..., description="The invoice ID"))
 
 @router.delete("/invoices/{invoice_id}")
 async def delete_invoice(invoice_id: str = Path(..., description="The invoice ID")):
-    """Delete an invoice by ID"""
-    if not db_service.is_available:
-        # Mock response when database is not available
-        return {
-            "message": "Invoice deleted (Demo mode)",
-            "invoice_id": invoice_id,
-            "status": "success"
-        }
-    
+    """Delete an invoice by ID using the centralized database service"""
     try:
-        # First, check if the invoice exists
-        result = db_service.get_invoice(invoice_id)
+        result = db_service.delete_invoice(invoice_id)
         
-        if not result.get("success"):
-            raise HTTPException(status_code=404, detail="Invoice not found")
-        
-        invoice = result.get("data")
-        
-        # Delete from storage if URL exists and it's not a mock URL
-        if invoice.get("url") and not invoice.get("url", "").startswith("http://localhost:8000/mock-storage/"):
-            try:
-                # Extract filename from URL or use filename field
-                filename = invoice.get("filename")
-                if filename and db_service.client:
-                    db_service.client.storage.from_("invoices").remove([filename])
-            except Exception as storage_error:
-                logger.warning(f"Failed to delete file from storage: {str(storage_error)}")
-                # Continue with database deletion even if storage deletion fails
-        
-        # Delete from database
-        delete_result = db_service.delete_invoice(invoice_id)
-        
-        if not delete_result.get("success"):
-            raise HTTPException(status_code=500, detail=f"Failed to delete invoice: {delete_result.get('error')}")
-        
-        return {
-            "message": "Invoice deleted successfully",
-            "invoice_id": invoice_id,
-            "filename": invoice.get("filename"),
-            "status": "success"
-        }
+        if result.get("success"):
+            return {
+                "message": "Invoice deleted successfully",
+                "invoice_id": invoice_id,
+                "status": "success"
+            }
+        else:
+            error_msg = result.get("error", "")
+            if "not found" in error_msg.lower():
+                raise HTTPException(status_code=404, detail="Invoice not found")
+            elif "unavailable" in error_msg.lower():
+                return {
+                    "message": "Invoice deleted (Demo mode)",
+                    "invoice_id": invoice_id,
+                    "status": "success"
+                }
+            else:
+                raise HTTPException(status_code=500, detail=error_msg)
         
     except HTTPException:
         raise
@@ -183,47 +163,194 @@ async def delete_invoice(invoice_id: str = Path(..., description="The invoice ID
         logger.error(f"Failed to delete invoice {invoice_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to delete invoice: {str(e)}")
 
-@router.get("/invoices/{invoice_id}/editor")
-async def get_invoice_for_editor(invoice_id: str = Path(..., description="The invoice ID")):
-    """Get invoice data in German field format for the editing form"""
-    if not db_service.is_available:
-        raise HTTPException(status_code=503, detail="Database service not available")
-    
+
+@router.get("/invoices/{invoice_id}/ocr")
+async def get_invoice_ocr(invoice_id: str = Path(..., description="The invoice ID")):
+    """Get OCR data for a specific invoice using the centralized database service"""
     try:
-        # Get the raw invoice data from database without field mapping
-        query_result = db_service.client.table("invoices_clean").select("*").eq("id", invoice_id).execute()
+        result = db_service.get_invoice(invoice_id)
         
-        if not query_result.data:
-            raise HTTPException(status_code=404, detail="Invoice not found")
+        if not result.get("success"):
+            error_msg = result.get("error", "")
+            if "not found" in error_msg.lower():
+                raise HTTPException(status_code=404, detail="Invoice not found")
+            elif "unavailable" in error_msg.lower():
+                raise HTTPException(status_code=404, detail="Invoice not found (Demo mode)")
+            else:
+                raise HTTPException(status_code=500, detail=error_msg)
         
-        invoice_data = query_result.data[0]
+        invoice_data = result.get("data")
         
-        # Create response with German field names for the form
+        # Structure the OCR response using the invoice data from database service
+        ocr_response = {
+            "id": invoice_data.get("id"),
+            "filename": invoice_data.get("file_name"),  # Use the correct field name from our schema
+            "ocr_status": invoice_data.get("ocr_status"),
+            "ocr_confidence": invoice_data.get("ocr_confidence", 0.0),
+            "ocr_pages": invoice_data.get("ocr_pages", 0),
+            "ocr_processing_time": invoice_data.get("ocr_processing_time", 0.0),
+            "ocr_error": invoice_data.get("ocr_error"),
+            "ocr_processed_at": invoice_data.get("ocr_processed_at"),
+            "raw_text": invoice_data.get("ocr_text", ""),
+            "structured_data": {
+                # Map from our German schema fields back to English OCR fields for API consistency
+                "invoice_number": invoice_data.get("rechnungsnummer"),
+                "invoice_date": invoice_data.get("rechnungseingang"),
+                "due_date": invoice_data.get("faelligkeit"),
+                "vendor_name": invoice_data.get("rechnungssteller"),
+                "vendor_address": invoice_data.get("vendor_address"),
+                "customer_name": invoice_data.get("rechnungsempfaenger"),
+                "customer_address": invoice_data.get("customer_address"),
+                "subtotal": invoice_data.get("subtotal"),
+                "tax_amount": invoice_data.get("tax_amount"),
+                "total_amount": invoice_data.get("rechnungsbetrag"),
+                "currency": invoice_data.get("currency"),
+                "payment_terms": invoice_data.get("payment_terms"),
+                "po_number": invoice_data.get("projekt"),
+                "line_items": invoice_data.get("line_items", [])
+            },
+            # Extract from raw_ocr_data if available
+            "entities": invoice_data.get("raw_ocr_data", {}).get("entities", []),
+            "form_fields": invoice_data.get("raw_ocr_data", {}).get("form_fields", []),
+            "tables": invoice_data.get("raw_ocr_data", {}).get("tables", [])
+        }
+        
+        return ocr_response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch OCR data for invoice {invoice_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch OCR data: {str(e)}")
+
+@router.get("/invoices/{invoice_id}/validate")
+async def validate_invoice(invoice_id: str = Path(..., description="The invoice ID")):
+    """Validate if an invoice exists and is accessible using the centralized database service"""
+    try:
+        result = db_service.get_invoice(invoice_id)
+        
+        if result.get("success"):
+            invoice_data = result.get("data")
+            return {
+                "valid": True,
+                "invoice_id": invoice_id,
+                "filename": invoice_data.get("file_name")
+            }
+        else:
+            error_msg = result.get("error", "")
+            if "not found" in error_msg.lower():
+                raise HTTPException(status_code=404, detail="Invoice not found")
+            elif "unavailable" in error_msg.lower():
+                # Mock validation for demo
+                if invoice_id == "test-123":
+                    return {"valid": True, "invoice_id": invoice_id}
+                else:
+                    raise HTTPException(status_code=404, detail="Invoice not found")
+            else:
+                raise HTTPException(status_code=500, detail=error_msg)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to validate invoice {invoice_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to validate invoice: {str(e)}")
+
+@router.get("/invoices/{invoice_id}/editor")
+async def get_invoice_editor_data(invoice_id: str = Path(..., description="The invoice ID")):
+    """Get invoice data formatted for the editor interface using the centralized database service"""
+    try:
+        result = db_service.get_invoice(invoice_id)
+        
+        if not result.get("success"):
+            error_msg = result.get("error", "")
+            if "not found" in error_msg.lower():
+                raise HTTPException(status_code=404, detail="Invoice not found")
+            elif "unavailable" in error_msg.lower():
+                # Mock data for demo
+                if invoice_id == "test-123":
+                    return {
+                        "pdfUrl": "/test_invoice_1748551760.pdf",
+                        "fields": {
+                            "rechnungsempfaenger": "ACME Construction GmbH",
+                            "rechnungssteller": "Demo Vendor Services",
+                            "projekt": "Residential Building Project",
+                            "gewerk": "Electrical Installation", 
+                            "rechnungsbetrag": 15750.50,
+                            "rechnungseingang": "2025-05-30",
+                            "faelligkeit": "2025-06-29",
+                            "skonto_datum": "2025-06-09",
+                            "skonto_prozent": 2.0,
+                            "rechnungsart": "rechnung",
+                            "kfw_anrechenbar": True,
+                            "rechnungspruefung_email": "review@acme-construction.de",
+                            "weiter_berechnen_an": "Client Invoice Department"
+                        },
+                        "confidenceScores": {
+                            "rechnungsempfaenger": 0.95,
+                            "rechnungssteller": 0.88,
+                            "projekt": 0.75,
+                            "gewerk": 0.82,
+                            "rechnungsbetrag": 0.98,
+                            "rechnungseingang": 0.92,
+                            "faelligkeit": 0.89,
+                            "skonto_datum": 0.76,
+                            "skonto_prozent": 0.85,
+                            "rechnungsart": 0.91,
+                            "kfw_anrechenbar": 0.68,
+                            "rechnungspruefung_email": 0.45,
+                            "weiter_berechnen_an": 0.52
+                        },
+                        "filename": "test_invoice_1748551760.pdf"
+                    }
+                else:
+                    raise HTTPException(status_code=404, detail="Invoice not found")
+            else:
+                raise HTTPException(status_code=500, detail=error_msg)
+        
+        invoice_data = result.get("data")
+        
+        # Extract OCR entities for field values from raw_ocr_data
+        raw_ocr_data = invoice_data.get("raw_ocr_data", {})
+        ocr_entities = raw_ocr_data.get("entities", [])
+        
+        # Helper function to get value with fallback to OCR entities
+        def get_field_value(db_field: str, entity_type: str) -> str:
+            db_value = invoice_data.get(db_field, "")
+            if db_value:
+                return str(db_value)
+            return _extract_entity_value(ocr_entities, entity_type)
+        
+        # Format data for editor interface using our German schema fields
         editor_data = {
-            "pdfUrl": f"https://bdtcfypvadryfeabqnlc.supabase.co/storage/v1/object/public/invoices/{invoice_data.get('file_path')}",
-            "filename": invoice_data.get("file_name"),
+            "pdfUrl": invoice_data.get("url", ""),
             "fields": {
-                "rechnungsempfaenger": invoice_data.get("rechnungsempfaenger"),
-                "rechnungssteller": invoice_data.get("rechnungssteller"),
-                "projekt": invoice_data.get("projekt"),
-                "gewerk": invoice_data.get("gewerk"),
-                "rechnungsbetrag": invoice_data.get("rechnungsbetrag"),        # ✅ NEW: Clean schema field
-                "rechnungseingang": invoice_data.get("rechnungseingang"),      # ✅ NEW: Clean schema field
-                "faelligkeit": invoice_data.get("faelligkeit"),
-                "skonto_datum": invoice_data.get("skonto_datum"),
-                "skonto_prozent": invoice_data.get("skonto_prozent"),
-                "rechnungsart": invoice_data.get("rechnungsart"),
-                "kfw_anrechenbare_kosten": invoice_data.get("kfw_anrechenbare_kosten"),  # ✅ NEW: Clean schema field
-                "rechnungspruefung": invoice_data.get("rechnungspruefung"),              # ✅ NEW: Clean schema field
-                "weiter_berechnen_an": invoice_data.get("weiter_berechnen_an")
+                "rechnungsempfaenger": invoice_data.get("rechnungsempfaenger", ""),
+                "rechnungssteller": invoice_data.get("rechnungssteller", ""),
+                "projekt": invoice_data.get("projekt", ""),
+                "gewerk": invoice_data.get("gewerk", ""),
+                "rechnungsbetrag": invoice_data.get("rechnungsbetrag", 0),
+                "rechnungseingang": invoice_data.get("rechnungseingang", ""),
+                "faelligkeit": invoice_data.get("faelligkeit", ""),
+                "skonto_datum": invoice_data.get("skonto_datum", ""),
+                "skonto_prozent": invoice_data.get("skonto_prozent", 0),
+                "rechnungsart": invoice_data.get("rechnungsart", "rechnung"),
+                "kfw_anrechenbar": invoice_data.get("kfw_anrechenbare_kosten", False),
+                "rechnungspruefung_email": invoice_data.get("rechnungspruefung", ""),
+                "weiter_berechnen_an": invoice_data.get("weiter_berechnen_an", "")
             },
             "confidenceScores": {
-                "rechnungsempfaenger": invoice_data.get("ocr_confidence", 0),
-                "rechnungssteller": invoice_data.get("ocr_confidence", 0),
-                "projekt": invoice_data.get("ocr_confidence", 0),
-                "gewerk": invoice_data.get("ocr_confidence", 0),
-                "rechnungsbetrag": invoice_data.get("ocr_confidence", 0)
-            }
+                # Map confidence scores from OCR form fields
+                **_get_field_confidence_scores(invoice_data),
+                # Add default scores for fields not in OCR data
+                "gewerk": 0.0,
+                "skonto_datum": 0.0,
+                "skonto_prozent": 0.0,
+                "rechnungsart": 0.0,
+                "kfw_anrechenbar": 0.0,
+                "rechnungspruefung_email": 0.0,
+                "weiter_berechnen_an": 0.0,
+            },
+            "filename": invoice_data.get("file_name", f"Invoice {invoice_id}")
         }
         
         return editor_data
@@ -231,233 +358,77 @@ async def get_invoice_for_editor(invoice_id: str = Path(..., description="The in
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get invoice for editor {invoice_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to get invoice for editor: {str(e)}")
+        logger.error(f"Failed to fetch editor data for invoice {invoice_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch editor data: {str(e)}")
 
 @router.put("/invoices/{invoice_id}/editor")
-async def update_invoice_from_editor(
+async def update_invoice_editor_data(
     invoice_id: str = Path(..., description="The invoice ID"),
-    request_body: dict = Body(...)
+    request_data: Dict[str, Any] = None
 ):
-    """Update invoice with comprehensive error handling and debugging"""
+    """Update invoice data from the editor interface using the centralized database service"""
+    if not request_data:
+        raise HTTPException(status_code=400, detail="No data provided")
     
-    # Enhanced logging for better debugging
-    logger.info(f"🔄 INVOICE UPDATE REQUEST - ID: {invoice_id}")
-    logger.info(f"📊 Raw request body: {request_body}")
-    logger.info(f"📊 Request body type: {type(request_body)}")
-    logger.info(f"📊 Request body keys: {list(request_body.keys()) if request_body else 'None'}")
-    
-    # Validate database availability
-    if not db_service.is_available:
-        logger.error("❌ Database service not available")
-        raise HTTPException(
-            status_code=503, 
-            detail={
-                "error": "DATABASE_UNAVAILABLE",
-                "message": "Database service is not available",
-                "timestamp": "2025-06-23T11:40:00Z"
-            }
-        )
-    
-    # Validate request body
-    fields = request_body
-    if not fields:
-        logger.error("❌ No fields provided in request body")
-        raise HTTPException(
-            status_code=400, 
-            detail={
-                "error": "NO_FIELDS_PROVIDED",
-                "message": "Request body is empty or invalid",
-                "received": request_body
-            }
-        )
-    
-    # Validate invoice exists before attempting update
-    try:
-        logger.info(f"🔍 Checking if invoice {invoice_id} exists...")
-        existing_invoice_result = db_service.client.table("invoices_clean").select("id").eq("id", invoice_id).execute()
-        if not existing_invoice_result.data:
-            logger.error(f"❌ Invoice {invoice_id} not found in database")
-            raise HTTPException(
-                status_code=404,
-                detail={
-                    "error": "INVOICE_NOT_FOUND", 
-                    "message": f"Invoice with ID {invoice_id} does not exist",
-                    "invoice_id": invoice_id
-                }
-            )
-        logger.info(f"✅ Invoice {invoice_id} exists")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Error checking invoice existence: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "error": "DATABASE_CHECK_FAILED",
-                "message": f"Failed to verify invoice existence: {str(e)}"
-            }
-        )
+    fields = request_data.get("fields", {})
     
     try:
-        # Initialize update data dictionary
-        update_data = {}
+        # Check if invoice exists first
+        result = db_service.get_invoice(invoice_id)
         
-        # Enhanced field mapping with validation and logging
-        logger.info(f"🗺️ Starting field mapping from German to English...")
+        if not result.get("success"):
+            error_msg = result.get("error", "")
+            if "not found" in error_msg.lower():
+                raise HTTPException(status_code=404, detail="Invoice not found")
+            elif "unavailable" in error_msg.lower():
+                # Mock success for demo
+                if invoice_id == "test-123":
+                    return {
+                        "success": True,
+                        "message": "Invoice updated successfully (demo mode)",
+                        "invoice_id": invoice_id,
+                        "updated_fields": fields
+                    }
+                else:
+                    raise HTTPException(status_code=404, detail="Invoice not found")
+            else:
+                raise HTTPException(status_code=500, detail=error_msg)
         
-        # Define the complete field mapping for clean schema
-        field_mapping = {
-            # ✅ CLEAN SCHEMA MAPPING: Direct German field names (no translation needed)
-            # Critical business fields
-            "faelligkeit": "faelligkeit",                       # ✅ German→German (direct)
-            "rechnungseingang": "rechnungseingang",             # ✅ NEW: German→German (direct) 
-            "rechnungsbetrag": "rechnungsbetrag",               # ✅ NEW: German→German (direct)
-            # Direct German mappings (no change needed)
-            "rechnungsempfaenger": "rechnungsempfaenger",
-            "rechnungssteller": "rechnungssteller", 
-            "projekt": "projekt",                               # ✅ German→German (direct)
-            "gewerk": "gewerk",
-            "skonto_datum": "skonto_datum",
-            "skonto_prozent": "skonto_prozent",
-            "rechnungsart": "rechnungsart",
-            "kfw_anrechenbare_kosten": "kfw_anrechenbare_kosten", # ✅ NEW: Clean field name
-            "rechnungspruefung": "rechnungspruefung",            # ✅ NEW: Clean field name
-            "weiter_berechnen_an": "weiter_berechnen_an",
-            # Review status fields
-            "review_status": "review_status",
-            "reviewed_by": "reviewed_by", 
-            "reviewed_at": "reviewed_at",
-            "review_notes": "review_notes"
+        # Map German editor fields directly to our database schema fields
+        update_data = {
+            "rechnungsempfaenger": fields.get("rechnungsempfaenger", ""),
+            "rechnungssteller": fields.get("rechnungssteller", ""),
+            "projekt": fields.get("projekt", ""),
+            "gewerk": fields.get("gewerk", ""),
+            "rechnungsbetrag": fields.get("rechnungsbetrag", 0),
+            "rechnungseingang": fields.get("rechnungseingang", ""),
+            "faelligkeit": fields.get("faelligkeit", ""),
+            "skonto_datum": fields.get("skonto_datum", ""),
+            "skonto_prozent": fields.get("skonto_prozent", 0),
+            "rechnungsart": fields.get("rechnungsart", ""),
+            "kfw_anrechenbare_kosten": fields.get("kfw_anrechenbar", False),
+            "rechnungspruefung": fields.get("rechnungspruefung_email", ""),
+            "weiter_berechnen_an": fields.get("weiter_berechnen_an", "")
         }
         
-        mapped_count = 0
-        for frontend_field, db_field in field_mapping.items():
-            if frontend_field in fields:
-                value = fields[frontend_field]
-                update_data[db_field] = value
-                mapped_count += 1
-                logger.info(f"✅ Mapped '{frontend_field}' -> '{db_field}': {value}")
+        # Remove empty string values but keep 0 and False
+        update_data = {k: v for k, v in update_data.items() if v is not None and v != ""}
         
-        logger.info(f"✅ Mapped {mapped_count} fields successfully")
+        if update_data:
+            update_result = db_service.update_invoice(invoice_id, update_data)
+            
+            if not update_result.get("success"):
+                raise HTTPException(status_code=500, detail=update_result.get("error", "Update failed"))
         
-        # Validate that we have something to update
-        if not update_data:
-            logger.warning(f"⚠️ No valid fields found for update")
-            logger.info(f"📊 Available mappings: {list(field_mapping.keys())}")
-            logger.info(f"📊 Received fields: {list(fields.keys())}")
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "error": "NO_MAPPABLE_FIELDS",
-                    "message": "No valid fields provided for update",
-                    "received_fields": list(fields.keys()),
-                    "valid_fields": list(field_mapping.keys())
-                }
-            )
-        
-        logger.info(f"✅ Mapped {mapped_count} fields successfully")
-        logger.info(f"📊 Final update data: {update_data}")
-        
-        # Enhanced database update with comprehensive error handling
-        logger.info(f"💾 Attempting database update...")
-        
-        try:
-            result = db_service.client.table("invoices_clean").update(update_data).eq("id", invoice_id).execute()
-            
-            # Enhanced result analysis
-            if hasattr(result, 'error') and result.error:
-                logger.error(f"❌ Supabase error: {result.error}")
-                raise HTTPException(
-                    status_code=500,
-                    detail={
-                        "error": "SUPABASE_UPDATE_ERROR",
-                        "message": f"Database update failed: {result.error}",
-                        "attempted_fields": list(update_data.keys())
-                    }
-                )
-            
-            if not result.data:
-                logger.error(f"❌ No data returned from update - invoice may not exist")
-                raise HTTPException(
-                    status_code=404,
-                    detail={
-                        "error": "UPDATE_NO_EFFECT", 
-                        "message": "Update had no effect - invoice may not exist",
-                        "invoice_id": invoice_id
-                    }
-                )
-            
-            # Success - log the result
-            updated_record = result.data[0]
-            logger.info(f"✅ Database update successful")
-            logger.info(f"📊 Updated record ID: {updated_record.get('id')}")
-            logger.info(f"📊 Updated timestamp: {updated_record.get('updated_at')}")
-            
-            # Verify critical field updates
-            verification_log = {}
-            for db_field, expected_value in update_data.items():
-                actual_value = updated_record.get(db_field)
-                verification_log[db_field] = {
-                    "expected": expected_value,
-                    "actual": actual_value,
-                    "match": str(expected_value) == str(actual_value)
-                }
-            
-            logger.info(f"🔍 Field verification: {verification_log}")
-            
-            # Check for any mismatches
-            mismatches = [field for field, check in verification_log.items() if not check["match"]]
-            if mismatches:
-                logger.warning(f"⚠️ Field value mismatches detected: {mismatches}")
-            
-            return {
-                "status": "success", 
-                "message": "Invoice updated successfully",
-                "invoice_id": invoice_id,
-                "updated_fields": list(update_data.keys()),
-                "verification": verification_log
-            }
-            
-        except HTTPException:
-            raise
-        except Exception as db_error:
-            logger.error(f"❌ Database update exception: {str(db_error)}")
-            logger.error(f"❌ Exception type: {type(db_error).__name__}")
-            logger.error(f"❌ Update data: {update_data}")
-            
-            # Check for specific error types
-            error_message = str(db_error).lower()
-            if "column" in error_message and "not found" in error_message:
-                raise HTTPException(
-                    status_code=500,
-                    detail={
-                        "error": "COLUMN_NOT_FOUND",
-                        "message": f"Database column missing: {str(db_error)}",
-                        "attempted_fields": list(update_data.keys()),
-                        "suggestion": "Database schema may need migration"
-                    }
-                )
-            elif "permission" in error_message or "access" in error_message:
-                raise HTTPException(
-                    status_code=500,
-                    detail={
-                        "error": "DATABASE_PERMISSION_ERROR", 
-                        "message": f"Database permission error: {str(db_error)}"
-                    }
-                )
-            else:
-                raise HTTPException(
-                    status_code=500,
-                    detail={
-                        "error": "DATABASE_UPDATE_FAILED",
-                        "message": f"Database update failed: {str(db_error)}",
-                        "exception_type": type(db_error).__name__
-                    }
-                )
+        return {
+            "success": True,
+            "message": "Invoice updated successfully",
+            "invoice_id": invoice_id,
+            "updated_fields": list(update_data.keys())
+        }
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to update invoice {invoice_id}: {str(e)}")
+        logger.error(f"Failed to update editor data for invoice {invoice_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to update invoice: {str(e)}")
