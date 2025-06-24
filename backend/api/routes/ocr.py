@@ -2,6 +2,7 @@
 from fastapi import APIRouter, HTTPException, Path
 import logging
 from typing import Dict, Any
+from datetime import datetime, timezone
 
 # OCR imports
 from ocr.workflow import ocr_workflow
@@ -62,17 +63,19 @@ async def process_invoice_ocr(invoice_id: str = Path(..., description="The invoi
         
         # Check if already completed
         if invoice.get("ocr_status") == "completed":
+            # Get confidence from raw_ocr_data if available
+            raw_data = invoice.get("raw_ocr_data", {})
+            confidence = raw_data.get("confidence", 0.0) if raw_data else 0.0
             return {
                 "status": "already_processed", 
                 "message": "OCR has already been processed for this invoice",
                 "invoice_id": invoice_id,
-                "ocr_confidence": invoice.get("ocr_confidence", 0.0)
+                "ocr_confidence": confidence
             }
         
         # Immediately set status to processing for real-time feedback
         db_service.update_invoice(invoice_id, {
-            "ocr_status": "processing",
-            "error_message": None
+            "ocr_status": "processing"
         })
         
         logger.info(f"Starting OCR processing for invoice {invoice_id}")
@@ -115,37 +118,34 @@ async def process_invoice_ocr(invoice_id: str = Path(..., description="The invoi
                 update_data = {
                     "ocr_status": "completed",
                     "status": "completed",
-                    "ocr_processing_time": int(ocr_result.get("processing_time", 0) * 1000),  # Convert to milliseconds
-                    "processed_at": "NOW()",
                     "raw_ocr_data": ocr_result,  # Store full OCR result as JSONB
-                    "ocr_confidence": ocr_result.get("confidence"),
-                    "error_message": None,  # Clear any previous errors
-                    # Map OCR structured data to German database field names
-                    "rechnungsnummer": structured_data.get("invoice_number"),
-                    "rechnungsdatum": structured_data.get("invoice_date"),
-                    "rechnungsempfaenger": structured_data.get("customer_name") or structured_data.get("invoice_recipient"),
-                    "rechnungssteller": structured_data.get("vendor_name") or structured_data.get("invoice_issuer"),
-                    "projekt": structured_data.get("project"),
-                    "gewerk": structured_data.get("trade"),
-                    "netto_betrag": structured_data.get("net_amount") or structured_data.get("subtotal"),
-                    "brutto_betrag": structured_data.get("gross_amount") or structured_data.get("total_amount")
+                    "ocr_text": ocr_result.get("raw_text", ""),
+                    # Map OCR structured data to our exact German database field names
+                    "rechnungsempfaenger": structured_data.get("customer_name"),
+                    "rechnungssteller": structured_data.get("vendor_name"),
+                    "rechnungsbetrag": structured_data.get("total_amount"),
+                    "rechnungseingang": structured_data.get("invoice_date"),
+                    "faelligkeit": structured_data.get("due_date"),
+                    "projekt": structured_data.get("po_number")
                 }
                 
                 logger.info(f"OCR processing completed successfully for invoice {invoice_id}")
+                logger.info(f"Mapped OCR fields: rechnungssteller={structured_data.get('vendor_name')}, rechnungsbetrag={structured_data.get('total_amount')}")
                 
             else:
                 # OCR failed
                 update_data = {
                     "ocr_status": "failed",
                     "status": "error",
-                    "error_message": ocr_result.get("error", "Unknown OCR error"),
-                    "processed_at": "NOW()",
                     "raw_ocr_data": ocr_result
                 }
                 
                 logger.warning(f"OCR processing failed for invoice {invoice_id}: {ocr_result.get('error')}")
             
-            db_service.update_invoice(invoice_id, update_data)
+            # Perform database update and log result
+            logger.info(f"Updating invoice {invoice_id} with data: {update_data}")
+            update_result = db_service.update_invoice(invoice_id, update_data)
+            logger.info(f"Database update result: {update_result}")
             
             return {
                 "status": "success",
@@ -169,10 +169,7 @@ async def process_invoice_ocr(invoice_id: str = Path(..., description="The invoi
             
             db_service.update_invoice(invoice_id, {
                 "ocr_status": "failed",
-                "status": "error",
-                "ocr_error": error_message,
-                "error_message": error_message,
-                "ocr_processed_at": "NOW()"
+                "status": "error"
             })
             
             raise HTTPException(status_code=500, detail=f"OCR processing failed: {error_message}")
@@ -220,23 +217,23 @@ async def get_invoice_ocr_status(invoice_id: str = Path(..., description="The in
         
         # Extract OCR-related data
         ocr_status = invoice.get("ocr_status", "pending")
-        ocr_confidence = invoice.get("ocr_confidence", 0.0)
-        ocr_processing_time = invoice.get("ocr_processing_time", 0)
-        ocr_error = invoice.get("ocr_error") or invoice.get("error_message")
-        ocr_processed_at = invoice.get("ocr_processed_at")
+        ocr_text = invoice.get("ocr_text", "")
         
         # Get structured data from raw_ocr_data if available
         raw_ocr_data = invoice.get("raw_ocr_data", {})
         structured_data = raw_ocr_data.get("structured_data", {}) if raw_ocr_data else {}
+        confidence = raw_ocr_data.get("confidence", 0.0) if raw_ocr_data else 0.0
+        processing_time = raw_ocr_data.get("processing_time", 0.0) if raw_ocr_data else 0.0
+        error_info = raw_ocr_data.get("error") if raw_ocr_data else None
         
         return {
             "invoice_id": invoice_id,
-            "filename": invoice.get("filename"),
+            "filename": invoice.get("file_name"),  # Use correct field name
             "ocr_status": ocr_status,
-            "ocr_confidence": ocr_confidence,
-            "ocr_processing_time": ocr_processing_time,
-            "ocr_error": ocr_error,
-            "ocr_processed_at": ocr_processed_at,
+            "ocr_confidence": confidence,
+            "ocr_processing_time": processing_time,
+            "ocr_error": error_info,
+            "ocr_processed_at": invoice.get("updated_at"),  # Use updated_at as processed time
             "has_structured_data": bool(structured_data),
             "extracted_data": {
                 "invoice_number": structured_data.get("invoice_number"),
