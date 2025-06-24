@@ -395,24 +395,45 @@ async def update_invoice_editor_data(
                 raise HTTPException(status_code=500, detail=error_msg)
         
         # Map German editor fields directly to our database schema fields
-        update_data = {
-            "rechnungsempfaenger": fields.get("rechnungsempfaenger", ""),
-            "rechnungssteller": fields.get("rechnungssteller", ""),
-            "projekt": fields.get("projekt", ""),
-            "gewerk": fields.get("gewerk", ""),
-            "rechnungsbetrag": fields.get("rechnungsbetrag", 0),
-            "rechnungseingang": fields.get("rechnungseingang", ""),
-            "faelligkeit": fields.get("faelligkeit", ""),
-            "skonto_datum": fields.get("skonto_datum", ""),
-            "skonto_prozent": fields.get("skonto_prozent", 0),
-            "rechnungsart": fields.get("rechnungsart", ""),
-            "kfw_anrechenbare_kosten": fields.get("kfw_anrechenbar", False),
-            "rechnungspruefung": fields.get("rechnungspruefung_email", ""),
-            "weiter_berechnen_an": fields.get("weiter_berechnen_an", "")
+        # Only include fields that are actually present in the request
+        update_data = {}
+        
+        field_mapping = {
+            "rechnungsempfaenger": "rechnungsempfaenger",
+            "rechnungssteller": "rechnungssteller", 
+            "projekt": "projekt",
+            "gewerk": "gewerk",
+            "rechnungsbetrag": "rechnungsbetrag",
+            "rechnungseingang": "rechnungseingang",
+            "faelligkeit": "faelligkeit",
+            "skonto_datum": "skonto_datum",
+            "skonto_prozent": "skonto_prozent",
+            "rechnungsart": "rechnungsart",
+            "kfw_anrechenbar": "kfw_anrechenbare_kosten",
+            "rechnungspruefung_email": "rechnungspruefung",
+            "weiter_berechnen_an": "weiter_berechnen_an"
         }
         
-        # Remove empty string values but keep 0 and False
-        update_data = {k: v for k, v in update_data.items() if v is not None and v != ""}
+        logger.info(f"Received fields to update: {list(fields.keys())}")
+        
+        # Only update fields that are explicitly provided in the request
+        for frontend_field, db_field in field_mapping.items():
+            if frontend_field in fields:
+                value = fields[frontend_field]
+                logger.info(f"Processing field {frontend_field} -> {db_field}: '{value}' (type: {type(value)})")
+                
+                # Handle all field types consistently
+                if db_field in ["rechnungsbetrag", "skonto_prozent"]:
+                    # Numeric fields
+                    update_data[db_field] = float(value) if value not in [None, ""] else 0.0
+                elif db_field == "kfw_anrechenbare_kosten":
+                    # Boolean field
+                    update_data[db_field] = bool(value) if value not in [None, ""] else False
+                else:
+                    # Text fields: explicitly allow empty strings to clear fields
+                    update_data[db_field] = str(value) if value is not None else ""
+        
+        logger.info(f"Final update_data being sent to database: {update_data}")
         
         if update_data:
             update_result = db_service.update_invoice(invoice_id, update_data)
