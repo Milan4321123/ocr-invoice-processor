@@ -72,12 +72,12 @@ export default function InvoiceEditorDashboard({
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
       
-      // Prepare the payload with review status and email
+      // Prepare the payload in the format expected by the backend
       const payload = {
-        ...updatedFields,
+        fields: updatedFields,
         ...(reviewStatus && {
           review_status: reviewStatus,
-          reviewed_by: updatedFields.rechnungspruefung_email || 'system@example.com', // Use the review email from form or fallback
+          reviewed_by: updatedFields.rechnungspruefung_email || 'system@example.com',
           reviewed_at: new Date().toISOString()
         })
       };
