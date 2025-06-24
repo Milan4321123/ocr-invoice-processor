@@ -41,7 +41,7 @@ export default function PrufberichtPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
   useEffect(() => {
     fetchPrufberichtData()
@@ -52,7 +52,7 @@ export default function PrufberichtPage() {
       setLoading(true)
       setError(null)
 
-      // Fetch only essential data for approval workflow
+      // Fetch data from our new Prüfbericht API endpoints
       const [
         invoiceSummaryResponse,
         criticalDatesResponse

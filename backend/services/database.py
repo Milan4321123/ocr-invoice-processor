@@ -147,6 +147,46 @@ class DatabaseService:
         except Exception as e:
             logger.error(f"❌ Database error fetching invoices: {e}")
             return {"success": False, "error": str(e)}
+
+    def get_invoices(self, limit: int = 100, offset: int = 0, filters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Get invoices with pagination and filtering support for reports"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            # Start with base query
+            query = self._client.table(self.table_name).select("*", count='exact')
+            
+            # Apply filters if provided
+            if filters:
+                for field, value in filters.items():
+                    if value is not None:
+                        query = query.eq(field, value)
+            
+            # Apply ordering, pagination
+            response = (query
+                       .order("created_at", desc=True)
+                       .range(offset, offset + limit - 1)
+                       .execute())
+            
+            if response.data is not None:
+                # Add URL field for each invoice (for file access)
+                for invoice in response.data:
+                    if invoice.get("file_path"):
+                        invoice["url"] = f"https://bdtcfypvadryfeabqnlc.supabase.co/storage/v1/object/public/invoices/{invoice['file_path']}"
+                
+                return {
+                    "success": True, 
+                    "data": response.data,
+                    "total": len(response.data),
+                    "count": response.count if hasattr(response, 'count') else len(response.data)
+                }
+            else:
+                return {"success": True, "data": [], "total": 0, "count": 0}
+                
+        except Exception as e:
+            logger.error(f"❌ Database error fetching filtered invoices: {e}")
+            return {"success": False, "error": str(e)}
     
     def update_invoice(self, invoice_id: str, update_data: Dict[str, Any]) -> Dict[str, Any]:
         """Update an invoice record in invoices_clean table"""

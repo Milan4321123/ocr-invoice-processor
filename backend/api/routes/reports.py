@@ -50,10 +50,16 @@ async def get_invoice_summary(
         for invoice in invoices:
             enhanced_invoice = invoice.copy()
             
-            # Calculate urgency for due dates
-            if invoice.get('due_date'):
+            # Calculate urgency for due dates (use German field name: faelligkeit)
+            if invoice.get('faelligkeit'):
                 try:
-                    due_date = datetime.fromisoformat(invoice['due_date'].replace('Z', '+00:00')).date()
+                    # Handle both date and datetime strings
+                    due_date_str = invoice['faelligkeit']
+                    if 'T' in due_date_str:
+                        due_date = datetime.fromisoformat(due_date_str.replace('Z', '+00:00')).date()
+                    else:
+                        due_date = datetime.strptime(due_date_str, '%Y-%m-%d').date()
+                    
                     today = datetime.now().date()
                     days_until_due = (due_date - today).days
                     
@@ -76,21 +82,12 @@ async def get_invoice_summary(
                 enhanced_invoice['urgency'] = 'no_due_date'
                 enhanced_invoice['days_until_due'] = None
             
-            # Add data quality indicators
+            # Add data quality indicators (use German field names)
             enhanced_invoice['has_missing_data'] = (
-                not invoice.get('due_date') or 
-                not invoice.get('total_amount') or 
-                not invoice.get('vendor_name')
+                not invoice.get('faelligkeit') or 
+                not invoice.get('rechnungsbetrag') or 
+                not invoice.get('rechnungssteller')
             )
-            
-            # OCR quality assessment
-            confidence = invoice.get('ocr_confidence', 0)
-            if confidence >= 0.8:
-                enhanced_invoice['ocr_quality'] = 'high'
-            elif confidence >= 0.6:
-                enhanced_invoice['ocr_quality'] = 'medium'
-            else:
-                enhanced_invoice['ocr_quality'] = 'low'
             
             enhanced_invoices.append(enhanced_invoice)
         
@@ -141,17 +138,29 @@ async def get_data_quality():
                 }
             }
         
-        # Calculate metrics
+        # Calculate metrics (use German field names)
         ocr_completed = sum(1 for inv in invoices if inv.get('ocr_status') == 'completed')
         ocr_pending = sum(1 for inv in invoices if inv.get('ocr_status') == 'pending')
         ocr_failed = sum(1 for inv in invoices if inv.get('ocr_status') == 'failed')
         
-        missing_due_dates = sum(1 for inv in invoices if not inv.get('due_date'))
-        missing_amounts = sum(1 for inv in invoices if not inv.get('total_amount'))
-        missing_vendors = sum(1 for inv in invoices if not inv.get('vendor_name'))
+        missing_due_dates = sum(1 for inv in invoices if not inv.get('faelligkeit'))
+        missing_amounts = sum(1 for inv in invoices if not inv.get('rechnungsbetrag'))
+        missing_vendors = sum(1 for inv in invoices if not inv.get('rechnungssteller'))
         
-        # Calculate average confidence
-        confidences = [inv.get('ocr_confidence', 0) for inv in invoices if inv.get('ocr_confidence') is not None]
+        # Calculate average confidence (from OCR data)
+        confidences = []
+        for inv in invoices:
+            # Try to get confidence from raw_ocr_data first, then fall back to ocr_confidence field
+            ocr_data = inv.get('raw_ocr_data', {})
+            if isinstance(ocr_data, dict):
+                confidence = ocr_data.get('confidence', 0)
+            else:
+                confidence = inv.get('ocr_confidence', 0)
+            
+            if confidence is not None:
+                confidences.append(float(confidence))
+            else:
+                confidences.append(0)
         avg_confidence = sum(confidences) / len(confidences) if confidences else 0
         
         # Calculate quality score (0-100)
@@ -230,12 +239,18 @@ async def get_critical_dates():
         }
         
         for invoice in invoices:
-            if not invoice.get('due_date'):
+            if not invoice.get('faelligkeit'):  # Use German field name
                 grouped_invoices["no_due_date"].append(invoice)
                 continue
             
             try:
-                due_date = datetime.fromisoformat(invoice['due_date'].replace('Z', '+00:00')).date()
+                due_date_str = invoice['faelligkeit']
+                # Handle both date and datetime strings
+                if 'T' in due_date_str:
+                    due_date = datetime.fromisoformat(due_date_str.replace('Z', '+00:00')).date()
+                else:
+                    due_date = datetime.strptime(due_date_str, '%Y-%m-%d').date()
+                
                 days_until_due = (due_date - today).days
                 
                 if days_until_due < 0:
@@ -249,12 +264,12 @@ async def get_critical_dates():
             except:
                 grouped_invoices["no_due_date"].append(invoice)
         
-        # Calculate totals for each group
+        # Calculate totals for each group (use German field name)
         summary = {}
         for category, invoices_list in grouped_invoices.items():
             total_amount = sum(
-                float(inv.get('total_amount', 0)) for inv in invoices_list 
-                if inv.get('total_amount')
+                float(inv.get('rechnungsbetrag', 0)) for inv in invoices_list 
+                if inv.get('rechnungsbetrag')
             )
             summary[category] = {
                 "count": len(invoices_list),
@@ -306,9 +321,15 @@ async def get_project_analysis():
         
         for invoice in invoices:
             project = invoice.get('projekt') or 'Unassigned'
-            vendor = invoice.get('vendor_name') or 'Unknown Vendor'
-            amount = float(invoice.get('total_amount', 0)) if invoice.get('total_amount') else 0
-            confidence = float(invoice.get('ocr_confidence', 0)) if invoice.get('ocr_confidence') else 0
+            vendor = invoice.get('rechnungssteller') or 'Unknown Vendor'  # Use German field name
+            amount = float(invoice.get('rechnungsbetrag', 0)) if invoice.get('rechnungsbetrag') else 0  # Use German field name
+            
+            # Get confidence from OCR data
+            ocr_data = invoice.get('raw_ocr_data', {})
+            if isinstance(ocr_data, dict):
+                confidence = float(ocr_data.get('confidence', 0))
+            else:
+                confidence = float(invoice.get('ocr_confidence', 0)) if invoice.get('ocr_confidence') else 0
             
             # Project analysis
             if project not in projects:
@@ -424,7 +445,7 @@ async def get_processing_status():
                     "invoices": []
                 }
             
-            amount = float(invoice.get('total_amount', 0)) if invoice.get('total_amount') else 0
+            amount = float(invoice.get('rechnungsbetrag', 0)) if invoice.get('rechnungsbetrag') else 0  # Use German field name
             status_groups[status]["count"] += 1
             status_groups[status]["total_amount"] += amount
             status_groups[status]["invoices"].append(invoice)
@@ -450,8 +471,8 @@ async def get_processing_status():
                 "summary": {
                     "total_invoices": len(invoices),
                     "total_amount": sum(
-                        float(inv.get('total_amount', 0)) for inv in invoices 
-                        if inv.get('total_amount')
+                        float(inv.get('rechnungsbetrag', 0)) for inv in invoices  # Use German field name
+                        if inv.get('rechnungsbetrag')
                     ),
                     "status_distribution": {
                         status: data["count"] for status, data in status_groups.items()
