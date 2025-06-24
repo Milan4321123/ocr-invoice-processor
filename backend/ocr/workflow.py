@@ -5,10 +5,11 @@ Coordinates the complete OCR processing pipeline from file upload to structured 
 
 import logging
 import asyncio
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Any
 from dataclasses import asdict
 import json
 import time
+from decimal import Decimal
 
 from ocr.document_ai_service import ocr_service, OCRResult
 from ocr.invoice_parser import invoice_parser, InvoiceData
@@ -16,6 +17,28 @@ from ocr.mock_service import mock_ocr_service
 from config.ocr_config import ocr_config
 
 logger = logging.getLogger(__name__)
+
+def serialize_invoice_data(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Convert Decimal objects to floats for JSON serialization"""
+    result = {}
+    for key, value in data.items():
+        if isinstance(value, Decimal):
+            result[key] = float(value)
+        elif isinstance(value, list):
+            # Handle lists (e.g., line_items)
+            result[key] = []
+            for item in value:
+                if isinstance(item, dict):
+                    result[key].append(serialize_invoice_data(item))
+                elif isinstance(item, Decimal):
+                    result[key].append(float(item))
+                else:
+                    result[key].append(item)
+        elif isinstance(value, dict):
+            result[key] = serialize_invoice_data(value)
+        else:
+            result[key] = value
+    return result
 
 class OCRWorkflow:
     """Orchestrates the complete OCR processing workflow"""
@@ -155,7 +178,8 @@ class OCRWorkflow:
             if document_type.lower() == "invoice":
                 self.logger.info(f"Parsing invoice data from {filename}")
                 invoice_data = invoice_parser.parse_invoice(ocr_result)
-                structured_data = asdict(invoice_data)
+                # Convert to dict and serialize Decimal objects for JSON compatibility
+                structured_data = serialize_invoice_data(asdict(invoice_data))
             
             # Step 4: Compile results
             workflow_time = time.time() - workflow_start
