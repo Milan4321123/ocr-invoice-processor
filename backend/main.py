@@ -9,7 +9,7 @@ import logging
 from dotenv import load_dotenv
 
 # Route imports
-from api.routes import health, upload, invoices, ocr, dropdowns, reports, folder_watcher
+from api.routes import health, upload, invoices, ocr, dropdowns, reports, folder_watcher, email_workflow
 
 # OCR imports
 from ocr.workflow import ocr_workflow
@@ -63,6 +63,7 @@ app.include_router(ocr.router, tags=["ocr"])
 app.include_router(dropdowns.router, prefix="/api", tags=["dropdowns"])
 app.include_router(folder_watcher.router, prefix="/api/folder-watcher", tags=["folder-watcher"])
 app.include_router(reports.router, prefix="/api", tags=["reports"])
+app.include_router(email_workflow.router, prefix="/api", tags=["email-workflow"])
 
 if __name__ == "__main__":
     import uvicorn

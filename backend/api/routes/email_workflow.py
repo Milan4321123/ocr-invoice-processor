@@ -1,0 +1,518 @@
+"""
+Email Workflow API Routes
+Handles editor notifications and Bau-Leiter approval workflow
+"""
+import logging
+import json
+from datetime import datetime
+from typing import Dict, Any, Optional, List
+from uuid import UUID
+import jwt
+from fastapi import APIRouter, HTTPException, Depends, Request, Query
+from pydantic import BaseModel, EmailStr, validator
+
+from services.database import db_service
+from services.email_service import email_service
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter()
+
+# Request/Response Models
+class EditorNotificationRequest(BaseModel):
+    invoice_id: str
+    editor_email: EmailStr
+    editor_name: str
+    changes_summary: Optional[List[Dict[str, Any]]] = None
+
+class BauleiterApprovalRequest(BaseModel):
+    invoice_id: str
+    bauleiter_email: EmailStr
+    editor_name: str
+    editor_email: EmailStr
+    changes_summary: Optional[List[Dict[str, Any]]] = None
+
+class EmailResponse(BaseModel):
+    success: bool
+    message: str
+    message_id: Optional[str] = None
+    timestamp: str
+
+@router.post("/email/editor-notification", response_model=EmailResponse)
+async def send_editor_notification(
+    request: EditorNotificationRequest,
+    http_request: Request
+):
+    """
+    Send professional HTML email notification to editor after invoice completion.
+    This endpoint:
+    1. Fetches invoice data
+    2. Sends professional HTML email with changes summary
+    3. Only marks invoice as 'edit_completed' after successful email send
+    4. Logs all activity for audit
+    """
+    try:
+        request_id = getattr(http_request.state, 'request_id', None)
+        
+        # Validate invoice exists and get data
+        invoice_data = await _get_invoice_data(request.invoice_id)
+        if not invoice_data:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+        
+        # Validate invoice is in correct state for editor notification
+        if invoice_data.get('status') not in ['edited', 'pending_email']:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invoice status '{invoice_data.get('status')}' is not eligible for editor notification"
+            )
+        
+        # Update invoice to pending_email state
+        await _update_invoice_status(request.invoice_id, 'pending_email')
+        
+        # Send editor notification
+        result = await email_service.send_editor_notification(
+            invoice_data=invoice_data,
+            editor_email=request.editor_email,
+            editor_name=request.editor_name,
+            changes_summary=request.changes_summary,
+            request_id=request_id
+        )
+        
+        if not result["success"]:
+            # Revert status on email failure
+            await _update_invoice_status(request.invoice_id, 'edited')
+            raise HTTPException(status_code=500, detail=f"Email send failed: {result.get('error')}")
+        
+        # Log security event
+        await _log_security_event(
+            event_type="editor_notification_sent",
+            ip_address=http_request.client.host,
+            user_email=request.editor_email,
+            invoice_id=request.invoice_id,
+            event_data={
+                "editor_name": request.editor_name,
+                "message_id": result.get("message_id"),
+                "changes_count": len(request.changes_summary) if request.changes_summary else 0
+            }
+        )
+        
+        logger.info(f"Editor notification sent successfully for invoice {request.invoice_id}")
+        
+        return EmailResponse(
+            success=True,
+            message="Editor notification sent successfully",
+            message_id=result.get("message_id"),
+            timestamp=datetime.now().isoformat()
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error sending editor notification: {str(e)}")
+        # Attempt to revert invoice status
+        try:
+            await _update_invoice_status(request.invoice_id, 'edited')
+        except:
+            pass
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+@router.post("/email/bauleiter-approval", response_model=EmailResponse)
+async def send_bauleiter_approval_request(
+    request: BauleiterApprovalRequest,
+    http_request: Request
+):
+    """
+    Send approval request to Bau-Leiter with secure approval/rejection links.
+    This endpoint:
+    1. Fetches invoice data
+    2. Generates secure approval tokens
+    3. Sends professional HTML email with approval links
+    4. Updates invoice status to 'in_review_by_bauleiter'
+    5. Logs all activity for audit
+    """
+    try:
+        request_id = getattr(http_request.state, 'request_id', None)
+        
+        # Validate invoice exists and get data
+        invoice_data = await _get_invoice_data(request.invoice_id)
+        if not invoice_data:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+        
+        # Validate invoice is in correct state for Bau-Leiter review
+        if invoice_data.get('status') != 'edit_completed':
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invoice status '{invoice_data.get('status')}' is not ready for Bau-Leiter review"
+            )
+        
+        # Send Bau-Leiter approval request
+        result = await email_service.send_bauleiter_approval_request(
+            invoice_data=invoice_data,
+            bauleiter_email=request.bauleiter_email,
+            editor_name=request.editor_name,
+            editor_email=request.editor_email,
+            changes_summary=request.changes_summary
+        )
+        
+        if not result["success"]:
+            raise HTTPException(status_code=500, detail=f"Email send failed: {result.get('error')}")
+        
+        # Log security event
+        await _log_security_event(
+            event_type="bauleiter_approval_sent",
+            ip_address=http_request.client.host,
+            user_email=request.editor_email,
+            invoice_id=request.invoice_id,
+            event_data={
+                "bauleiter_email": request.bauleiter_email,
+                "editor_name": request.editor_name,
+                "message_id": result.get("message_id"),
+                "changes_count": len(request.changes_summary) if request.changes_summary else 0
+            }
+        )
+        
+        logger.info(f"Bau-Leiter approval request sent for invoice {request.invoice_id}")
+        
+        return EmailResponse(
+            success=True,
+            message="Bau-Leiter approval request sent successfully",
+            message_id=result.get("message_id"),
+            timestamp=datetime.now().isoformat()
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error sending Bau-Leiter approval request: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+@router.get("/approval/{token}")
+async def process_approval_action(
+    token: str,
+    http_request: Request
+):
+    """
+    Process secure approval/rejection action from email link.
+    This endpoint:
+    1. Validates and decodes secure token
+    2. Checks token hasn't expired or been used
+    3. Updates invoice approval status
+    4. Marks token as used
+    5. Logs security event
+    6. Returns user-friendly HTML response
+    """
+    try:
+        ip_address = http_request.client.host
+        
+        # Decode and validate token
+        token_data = await _validate_approval_token(token, ip_address)
+        
+        if not token_data:
+            return _create_error_html("Invalid or expired approval token")
+        
+        invoice_id = token_data["invoice_id"]
+        action = token_data["action"]
+        user_email = token_data["user_email"]
+        
+        # Get invoice data
+        invoice_data = await _get_invoice_data(invoice_id)
+        if not invoice_data:
+            return _create_error_html("Invoice not found")
+        
+        # Validate invoice is still in review state
+        if invoice_data.get('status') != 'in_review_by_bauleiter':
+            return _create_error_html(f"Invoice is no longer in review state (current: {invoice_data.get('status')})")
+        
+        # Process approval/rejection
+        if action == "approve":
+            new_status = "approved_by_bauleiter"
+            approval_status = "approved"
+            action_text = "GENEHMIGT"
+            success_message = "Die Rechnung wurde erfolgreich genehmigt."
+        elif action == "reject":
+            new_status = "rejected_by_bauleiter"
+            approval_status = "rejected"
+            action_text = "ABGELEHNT"
+            success_message = "Die Rechnung wurde abgelehnt."
+        else:
+            return _create_error_html("Invalid action")
+        
+        # Update invoice status
+        await _update_invoice_approval_status(
+            invoice_id=invoice_id,
+            status=new_status,
+            approval_status=approval_status,
+            approval_method="email_link",
+            user_email=user_email
+        )
+        
+        # Mark token as used
+        await _mark_token_as_used(token, ip_address)
+        
+        # Log security event
+        await _log_security_event(
+            event_type=f"approval_{action}",
+            ip_address=ip_address,
+            user_email=user_email,
+            invoice_id=invoice_id,
+            event_data={
+                "action": action,
+                "invoice_number": invoice_data.get("rechnungsnummer"),
+                "supplier": invoice_data.get("lieferant"),
+                "amount": invoice_data.get("rechnungsbetrag")
+            }
+        )
+        
+        logger.info(f"Approval action '{action}' processed for invoice {invoice_id} by {user_email}")
+        
+        # Return success HTML response
+        return _create_success_html(
+            action_text=action_text,
+            message=success_message,
+            invoice_data=invoice_data
+        )
+        
+    except Exception as e:
+        logger.error(f"Error processing approval action: {str(e)}")
+        
+        # Log security event for failed approval attempt
+        await _log_security_event(
+            event_type="approval_attempt_failed",
+            ip_address=http_request.client.host,
+            event_data={"error": str(e), "token_preview": token[:10] + "..."},
+            risk_level="medium"
+        )
+        
+        return _create_error_html("Ein Fehler ist aufgetreten. Bitte kontaktieren Sie den Administrator.")
+
+@router.get("/email/audit/{invoice_id}")
+async def get_email_audit_log(
+    invoice_id: str,
+    limit: int = Query(default=10, ge=1, le=100)
+):
+    """
+    Get email audit log for specific invoice (admin/debug use).
+    """
+    try:
+        query = """
+        SELECT * FROM email_audit_log 
+        WHERE invoice_id = %s 
+        ORDER BY sent_at DESC 
+        LIMIT %s
+        """
+        
+        results = await db_service.fetch_all(query, (invoice_id, limit))
+        
+        return {
+            "invoice_id": invoice_id,
+            "email_logs": results,
+            "total_count": len(results)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching email audit log: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Helper Functions
+async def _get_invoice_data(invoice_id: str) -> Optional[Dict[str, Any]]:
+    """Fetch invoice data from database"""
+    try:
+        query = """
+        SELECT * FROM invoices_clean WHERE id = %s
+        """
+        result = await db_service.fetch_one(query, (invoice_id,))
+        return dict(result) if result else None
+    except Exception as e:
+        logger.error(f"Error fetching invoice data: {str(e)}")
+        return None
+
+async def _update_invoice_status(invoice_id: str, status: str):
+    """Update invoice status"""
+    try:
+        query = """
+        UPDATE invoices_clean 
+        SET status = %s, updated_at = NOW()
+        WHERE id = %s
+        """
+        await db_service.execute_query(query, (status, invoice_id))
+    except Exception as e:
+        logger.error(f"Error updating invoice status: {str(e)}")
+        raise e
+
+async def _update_invoice_approval_status(
+    invoice_id: str, 
+    status: str, 
+    approval_status: str, 
+    approval_method: str,
+    user_email: str
+):
+    """Update invoice approval status"""
+    try:
+        query = """
+        UPDATE invoices_clean 
+        SET 
+            status = %s,
+            approval_status = %s,
+            approved_at = NOW(),
+            approval_method = %s,
+            updated_at = NOW()
+        WHERE id = %s
+        """
+        await db_service.execute_query(query, (status, approval_status, approval_method, invoice_id))
+    except Exception as e:
+        logger.error(f"Error updating invoice approval status: {str(e)}")
+        raise e
+
+async def _validate_approval_token(token: str, ip_address: str) -> Optional[Dict[str, Any]]:
+    """Validate approval token and return decoded data"""
+    try:
+        # Decode JWT token
+        jwt_secret = email_service.jwt_secret
+        token_data = jwt.decode(token, jwt_secret, algorithms=["HS256"])
+        
+        # Hash token for database lookup
+        import hashlib
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        
+        # Check token in database
+        query = """
+        SELECT * FROM approval_tokens 
+        WHERE token_hash = %s 
+        AND expires_at > NOW() 
+        AND used_at IS NULL 
+        AND is_revoked = FALSE
+        """
+        
+        db_token = await db_service.fetch_one(query, (token_hash,))
+        
+        if not db_token:
+            await _log_security_event(
+                event_type="invalid_token_attempt",
+                ip_address=ip_address,
+                event_data={"token_hash": token_hash[:16] + "..."},
+                risk_level="high"
+            )
+            return None
+        
+        return token_data
+        
+    except jwt.InvalidTokenError as e:
+        await _log_security_event(
+            event_type="token_decode_failed",
+            ip_address=ip_address,
+            event_data={"error": str(e)},
+            risk_level="high"
+        )
+        return None
+    except Exception as e:
+        logger.error(f"Error validating approval token: {str(e)}")
+        return None
+
+async def _mark_token_as_used(token: str, ip_address: str):
+    """Mark approval token as used"""
+    try:
+        import hashlib
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        
+        query = """
+        UPDATE approval_tokens 
+        SET used_at = NOW(), used_by_ip = %s
+        WHERE token_hash = %s
+        """
+        await db_service.execute_query(query, (ip_address, token_hash))
+    except Exception as e:
+        logger.error(f"Error marking token as used: {str(e)}")
+        raise e
+
+async def _log_security_event(
+    event_type: str,
+    ip_address: str,
+    user_email: Optional[str] = None,
+    invoice_id: Optional[str] = None,
+    event_data: Optional[Dict[str, Any]] = None,
+    risk_level: str = "low"
+):
+    """Log security event"""
+    try:
+        query = """
+        INSERT INTO security_events 
+        (event_type, ip_address, user_email, invoice_id, event_data, risk_level)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        """
+        
+        await db_service.execute_query(
+            query,
+            (
+                event_type,
+                ip_address,
+                user_email,
+                invoice_id,
+                json.dumps(event_data) if event_data else None,
+                risk_level
+            )
+        )
+    except Exception as e:
+        logger.error(f"Error logging security event: {str(e)}")
+        # Don't raise - security logging shouldn't break main flow
+
+def _create_success_html(action_text: str, message: str, invoice_data: Dict[str, Any]) -> str:
+    """Create HTML success response for approval action"""
+    return f"""
+    <!DOCTYPE html>
+    <html lang="de">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Genehmigung erfolgreich</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }}
+            .success {{ background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 20px; border-radius: 5px; }}
+            .invoice-info {{ background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; }}
+            .action-badge {{ background: #28a745; color: white; padding: 5px 10px; border-radius: 3px; font-weight: bold; }}
+        </style>
+    </head>
+    <body>
+        <div class="success">
+            <h2>✅ Aktion erfolgreich</h2>
+            <p><span class="action-badge">{action_text}</span></p>
+            <p>{message}</p>
+        </div>
+        
+        <div class="invoice-info">
+            <h3>Rechnung Details</h3>
+            <p><strong>Rechnungsnummer:</strong> {invoice_data.get('rechnungsnummer', 'N/A')}</p>
+            <p><strong>Lieferant:</strong> {invoice_data.get('lieferant', 'N/A')}</p>
+            <p><strong>Betrag:</strong> {invoice_data.get('rechnungsbetrag', 'N/A')}</p>
+            <p><strong>Zeitstempel:</strong> {datetime.now().strftime('%d.%m.%Y um %H:%M')}</p>
+        </div>
+        
+        <p><small>Diese Seite kann geschlossen werden. Die Aktion wurde erfolgreich verarbeitet.</small></p>
+    </body>
+    </html>
+    """
+
+def _create_error_html(error_message: str) -> str:
+    """Create HTML error response"""
+    return f"""
+    <!DOCTYPE html>
+    <html lang="de">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Fehler</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }}
+            .error {{ background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 20px; border-radius: 5px; }}
+        </style>
+    </head>
+    <body>
+        <div class="error">
+            <h2>❌ Fehler</h2>
+            <p>{error_message}</p>
+            <p>Bitte kontaktieren Sie den Administrator oder versuchen Sie es später erneut.</p>
+        </div>
+        
+        <p><small>Zeitstempel: {datetime.now().strftime('%d.%m.%Y um %H:%M')}</small></p>
+    </body>
+    </html>
+    """
