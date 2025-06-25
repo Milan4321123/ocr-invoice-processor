@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Request, Depends
 from fastapi.responses import HTMLResponse
 import jwt
 import logging
+import time
 from datetime import datetime
 from typing import Dict, Any
 import os
@@ -66,8 +67,13 @@ async def validate_approval_token(token: str, request: Request) -> Dict[str, Any
 async def handle_approval_action(token: str, request: Request):
     """
     Handle approval or rejection action when Bau-Leiter clicks email link.
-    Validates token, updates invoice status, and returns confirmation page.
+    Validates token, updates invoice status, and sends email confirmation.
+    Returns minimal success page - main confirmation via email.
     """
+    invoice_id = None
+    action = None
+    user_email = None
+    
     try:
         # Validate the token
         token_data = await validate_approval_token(token, request)
@@ -77,12 +83,24 @@ async def handle_approval_action(token: str, request: Request):
         user_email = token_data["user_email"]
         client_ip = token_data["client_ip"]
         
-        # Get invoice details
-        invoice_result = db_service.get_invoice(invoice_id)
-        if not invoice_result.get("success"):
-            raise HTTPException(status_code=404, detail="Invoice not found")
+        logger.info(f"Processing {action} for invoice {invoice_id} by {user_email}")
         
-        invoice_data = invoice_result.get("data")
+        # Get invoice details with retry mechanism
+        invoice_data = None
+        for attempt in range(3):
+            try:
+                invoice_result = db_service.get_invoice(invoice_id)
+                if invoice_result.get("success"):
+                    invoice_data = invoice_result.get("data")
+                    break
+                else:
+                    logger.warning(f"Invoice fetch attempt {attempt + 1} failed: {invoice_result}")
+            except Exception as e:
+                logger.warning(f"Invoice fetch attempt {attempt + 1} error: {e}")
+                if attempt == 2:  # Last attempt
+                    raise HTTPException(status_code=404, detail="Invoice not found after retries")
+                time.sleep(1)  # Brief pause before retry
+        
         if not invoice_data:
             raise HTTPException(status_code=404, detail="Invoice data not available")
         
@@ -97,33 +115,248 @@ async def handle_approval_action(token: str, request: Request):
             "bauleiter_decision_ip": client_ip
         }
         
-        # Update the invoice
-        update_result = db_service.update_invoice(invoice_id, update_data)
+        # Update the invoice with retry mechanism
+        update_success = False
+        for attempt in range(3):
+            try:
+                update_result = db_service.update_invoice(invoice_id, update_data)
+                if update_result.get("success"):
+                    update_success = True
+                    logger.info(f"Invoice {invoice_id} {action}d by {user_email} from {client_ip}")
+                    break
+                else:
+                    logger.warning(f"Invoice update attempt {attempt + 1} failed: {update_result}")
+            except Exception as e:
+                logger.warning(f"Invoice update attempt {attempt + 1} error: {e}")
+                if attempt == 2:  # Last attempt
+                    raise HTTPException(status_code=500, detail="Failed to update invoice after retries")
+                time.sleep(1)  # Brief pause before retry
         
-        if update_result.get("success"):
-            # Log the approval action
-            logger.info(f"Invoice {invoice_id} {action}d by {user_email} from {client_ip}")
-            
-            # TODO: Send notification email to editor about the decision
-            # await email_service.send_decision_notification(invoice_data, action, user_email)
-            
-            # Return success page
-            return HTMLResponse(content=generate_success_page(
-                action=action,
-                invoice_data=invoice_data,
-                user_email=user_email
-            ))
-        else:
+        if not update_success:
             raise HTTPException(status_code=500, detail="Failed to update invoice status")
+        
+        # Send confirmation emails (with fallback handling)
+        try:
+            await send_approval_confirmation_emails(invoice_data, action, user_email, client_ip)
+        except Exception as e:
+            # Don't fail the approval if email fails - log it
+            logger.error(f"Failed to send confirmation emails: {e}")
+        
+        # Return simple success page (main confirmation is via email)
+        return HTMLResponse(content=generate_simple_success_page(action))
             
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Approval action failed: {e}")
+        logger.error(f"Approval action failed for invoice {invoice_id}: {e}")
+        # Try to send error notification if we have the details
+        if invoice_id and user_email:
+            try:
+                await send_approval_error_notification(invoice_id, action or "unknown", user_email, str(e))
+            except:
+                pass  # Don't fail if error notification fails
+                
         return HTMLResponse(
             content=generate_error_page(str(e)),
             status_code=500
         )
+
+async def send_approval_confirmation_emails(invoice_data: Dict, action: str, user_email: str, client_ip: str):
+    """
+    Send confirmation emails to both Bau-Leiter (who approved) and Editor.
+    Robust email sending with fallbacks.
+    """
+    from services.email_service import email_service
+    
+    action_text = "genehmigt" if action == "approve" else "abgelehnt"
+    action_icon = "✅" if action == "approve" else "❌"
+    
+    # Email to Bau-Leiter (confirming their action)
+    bauleiter_subject = f"Bestätigung: Rechnung {invoice_data.get('rechnungsnummer', invoice_data.get('invoice_number', 'N/A'))} {action_text}"
+    bauleiter_html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h2 style="color: #28a745; margin: 0;">{action_icon} Entscheidung bestätigt</h2>
+        </div>
+        
+        <p>Hallo,</p>
+        
+        <p>Ihre Entscheidung wurde erfolgreich erfasst:</p>
+        
+        <div style="background: #e9ecef; padding: 15px; border-radius: 5px; margin: 15px 0;">
+            <strong>Rechnung:</strong> {invoice_data.get('rechnungsnummer', invoice_data.get('invoice_number', 'N/A'))}<br>
+            <strong>Lieferant:</strong> {invoice_data.get('lieferant', invoice_data.get('vendor_name', 'N/A'))}<br>
+            <strong>Betrag:</strong> {invoice_data.get('rechnungsbetrag', invoice_data.get('total_amount', 'N/A'))}<br>
+            <strong>Status:</strong> <span style="color: #28a745; font-weight: bold;">{action_text.upper()}</span><br>
+            <strong>Zeitpunkt:</strong> {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}
+        </div>
+        
+        <p>Die Rechnung wurde entsprechend Ihrer Entscheidung bearbeitet.</p>
+        
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6; font-size: 0.9em; color: #6c757d;">
+            <p>Diese E-Mail wurde automatisch generiert. Bei Fragen wenden Sie sich bitte an den Administrator.</p>
+        </div>
+    </div>
+    """
+    
+    # Email to Editor (notification of decision)
+    editor_subject = f"Entscheidung: Rechnung {invoice_data.get('rechnungsnummer', invoice_data.get('invoice_number', 'N/A'))} wurde {action_text}"
+    editor_html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h2 style="color: #007bff; margin: 0;">{action_icon} Bau-Leiter Entscheidung</h2>
+        </div>
+        
+        <p>Hallo,</p>
+        
+        <p>Der Bau-Leiter hat eine Entscheidung zu folgender Rechnung getroffen:</p>
+        
+        <div style="background: #e9ecef; padding: 15px; border-radius: 5px; margin: 15px 0;">
+            <strong>Rechnung:</strong> {invoice_data.get('rechnungsnummer', invoice_data.get('invoice_number', 'N/A'))}<br>
+            <strong>Lieferant:</strong> {invoice_data.get('lieferant', invoice_data.get('vendor_name', 'N/A'))}<br>
+            <strong>Betrag:</strong> {invoice_data.get('rechnungsbetrag', invoice_data.get('total_amount', 'N/A'))}<br>
+            <strong>Entscheidung:</strong> <span style="color: #28a745; font-weight: bold;">{action_text.upper()}</span><br>
+            <strong>Von:</strong> {user_email}<br>
+            <strong>Zeitpunkt:</strong> {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}
+        </div>
+        
+        <p>Sie können mit der weiteren Bearbeitung der Rechnung fortfahren.</p>
+        
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6; font-size: 0.9em; color: #6c757d;">
+            <p>Diese E-Mail wurde automatisch generiert. Bei Fragen wenden Sie sich bitte an den Administrator.</p>
+        </div>
+    </div>
+    """
+    
+    # Send both emails with error handling
+    emails_sent = []
+    
+    # Send to Bau-Leiter
+    try:
+        bauleiter_result = await email_service.send_html_email(
+            to_email=user_email,
+            subject=bauleiter_subject,
+            html_content=bauleiter_html
+        )
+        if bauleiter_result.get("success"):
+            emails_sent.append("bauleiter")
+            logger.info(f"Confirmation email sent to Bau-Leiter: {user_email}")
+        else:
+            logger.error(f"Failed to send confirmation to Bau-Leiter: {bauleiter_result}")
+    except Exception as e:
+        logger.error(f"Error sending confirmation to Bau-Leiter: {e}")
+    
+    # Send to Editor (get editor email from invoice data or use default)
+    editor_email = invoice_data.get('editor_email', 'editor@company.com')
+    try:
+        editor_result = await email_service.send_html_email(
+            to_email=editor_email,
+            subject=editor_subject,
+            html_content=editor_html
+        )
+        if editor_result.get("success"):
+            emails_sent.append("editor")
+            logger.info(f"Decision notification sent to Editor: {editor_email}")
+        else:
+            logger.error(f"Failed to send notification to Editor: {editor_result}")
+    except Exception as e:
+        logger.error(f"Error sending notification to Editor: {e}")
+    
+    logger.info(f"Approval emails sent successfully to: {', '.join(emails_sent)}")
+
+async def send_approval_error_notification(invoice_id: str, action: str, user_email: str, error: str):
+    """Send error notification if approval processing fails."""
+    from services.email_service import email_service
+    
+    try:
+        subject = f"Fehler bei Rechnungsbearbeitung: {invoice_id}"
+        html_content = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: #dc3545; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <h2 style="margin: 0;">❌ Fehler bei Rechnungsbearbeitung</h2>
+            </div>
+            
+            <p>Hallo,</p>
+            
+            <p>Bei der Bearbeitung Ihrer Entscheidung ist ein Fehler aufgetreten:</p>
+            
+            <div style="background: #f8d7da; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                <strong>Rechnung:</strong> {invoice_id}<br>
+                <strong>Aktion:</strong> {action}<br>
+                <strong>Fehler:</strong> {error}<br>
+                <strong>Zeitpunkt:</strong> {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}
+            </div>
+            
+            <p>Bitte versuchen Sie es erneut oder wenden Sie sich an den Administrator.</p>
+        </div>
+        """
+        
+        await email_service.send_html_email(
+            to_email=user_email,
+            subject=subject,
+            html_content=html_content
+        )
+        logger.info(f"Error notification sent to {user_email}")
+    except Exception as e:
+        logger.error(f"Failed to send error notification: {e}")
+
+def generate_simple_success_page(action: str) -> str:
+    """Generate minimal success page - main confirmation is via email"""
+    action_text = "GENEHMIGT" if action == "approve" else "ABGELEHNT"
+    action_icon = "✅" if action == "approve" else "❌"
+    
+    return f"""
+    <!DOCTYPE html>
+    <html lang="de">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Entscheidung erfasst</title>
+        <style>
+            body {{ 
+                font-family: Arial, sans-serif; 
+                margin: 0; 
+                padding: 20px; 
+                background: #f5f5f5;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                min-height: 100vh;
+            }}
+            .container {{ 
+                background: white; 
+                padding: 30px; 
+                border-radius: 12px; 
+                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                max-width: 500px;
+                text-align: center;
+            }}
+            .icon {{ 
+                font-size: 4em; 
+                margin-bottom: 20px; 
+            }}
+            .message {{ 
+                font-size: 1.2em; 
+                margin-bottom: 15px; 
+            }}
+            .sub-message {{ 
+                color: #666; 
+                font-size: 0.9em; 
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="icon">{action_icon}</div>
+            <div class="message">Entscheidung erfasst!</div>
+            <div class="sub-message">
+                Eine Bestätigungs-E-Mail wurde an Sie gesendet.<br>
+                Sie können dieses Fenster schließen.
+            </div>
+        </div>
+    </body>
+    </html>
+    """
 
 def generate_success_page(action: str, invoice_data: Dict, user_email: str) -> str:
     """Generate HTML success page for approval action"""

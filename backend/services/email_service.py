@@ -354,6 +354,45 @@ class EmailService:
                 "message_id": None
             }
     
+    async def send_html_email(
+        self,
+        to_email: str,
+        subject: str,
+        html_content: str,
+        to_name: str = None,
+        invoice_id: Optional[UUID] = None,
+        email_type: str = "general"
+    ) -> Dict[str, Any]:
+        """
+        Send HTML email using the configured email providers.
+        Generic method for sending any HTML email with fallback support.
+        """
+        try:
+            # Use configured name if not provided
+            if not to_name:
+                to_name = to_email.split('@')[0].title()
+            
+            # Send email with retry and fallback
+            result = await self._send_email(
+                to_email=to_email,
+                to_name=to_name,
+                subject=subject,
+                html_content=html_content,
+                email_type=email_type,
+                invoice_id=invoice_id,
+                template_used="custom_html"
+            )
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Failed to send HTML email to {to_email}: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e),
+                "provider": "none"
+            }
+    
     async def _send_email(
         self,
         to_email: str,
