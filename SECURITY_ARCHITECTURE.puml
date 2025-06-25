@@ -1,0 +1,159 @@
+@startuml Security_Architecture_Diagram
+!theme aws-orange
+title Email Security Architecture & Token Management
+
+package "Security Layer" {
+    
+    class SecurityManager {
+        - jwt_secret: str
+        - algorithm: str = "HS256"
+        - token_expiry_days: int = 7
+        
+        + generate_approval_token(invoice_id, action, user_email) -> str
+        + validate_approval_token(token) -> Dict
+        + create_secure_url(base_url, token) -> str
+        + hash_email_address(email) -> str
+    }
+    
+    class TokenValidator {
+        + validate_token_structure(token) -> bool
+        + check_token_expiry(payload) -> bool
+        + verify_token_signature(token, secret) -> bool
+        + extract_token_payload(token) -> Dict
+    }
+    
+    class URLSecurityManager {
+        + generate_approval_url(invoice_id, action, user_email) -> str
+        + validate_approval_request(url, user_context) -> Dict
+        + check_url_tampering(url, expected_signature) -> bool
+        + log_security_event(event_type, details) -> None
+    }
+}
+
+package "Database Security" {
+    
+    class ApprovalTokens {
+        + id: UUID
+        + invoice_id: UUID
+        + token_hash: str
+        + action_type: str
+        + user_email: str
+        + created_at: datetime
+        + expires_at: datetime
+        + used_at: datetime
+        + is_valid: bool
+        + ip_address: str
+        + user_agent: str
+        
+        + create_token(token_data) -> UUID
+        + invalidate_token(token_id) -> bool
+        + cleanup_expired_tokens() -> int
+        + get_token_history(invoice_id) -> List
+    }
+    
+    class SecurityAuditLog {
+        + id: UUID
+        + event_type: str
+        + invoice_id: UUID
+        + user_email: str
+        + ip_address: str
+        + user_agent: str
+        + event_details: JSON
+        + severity: str
+        + created_at: datetime
+        
+        + log_token_generation(details) -> None
+        + log_token_usage(details) -> None
+        + log_security_violation(details) -> None
+        + get_security_events(filters) -> List
+    }
+}
+
+package "Email Security Features" {
+    
+    class EmailEncryption {
+        + encrypt_email_content(content, key) -> str
+        + decrypt_email_content(encrypted_content, key) -> str
+        + generate_email_signature(content, secret) -> str
+        + verify_email_signature(content, signature, secret) -> bool
+    }
+    
+    class AntiPhishingProtection {
+        + validate_sender_domain(from_email) -> bool
+        + check_link_safety(urls) -> Dict
+        + add_security_headers(email_content) -> str
+        + generate_security_notice() -> str
+    }
+}
+
+' Security Flow Diagram
+object "Security Flow" as SecFlow {
+    **1. Token Generation:**
+    - Create JWT with invoice_id, action, user_email
+    - Set expiration (7 days)
+    - Store token hash in database
+    - Log generation event
+    
+    **2. URL Creation:**
+    - Embed token in secure URL
+    - Add tamper-proof signature
+    - Include timestamp and nonce
+    
+    **3. Email Delivery:**
+    - Encrypt sensitive content
+    - Add security headers
+    - Include anti-phishing notice
+    - Log delivery attempt
+    
+    **4. Token Validation:**
+    - Verify JWT signature
+    - Check expiration
+    - Validate against database
+    - Ensure single-use
+    - Log usage event
+    
+    **5. Security Monitoring:**
+    - Track all token operations
+    - Monitor for suspicious patterns
+    - Alert on security violations
+    - Cleanup expired tokens
+}
+
+' Relationships
+SecurityManager --> TokenValidator : uses
+SecurityManager --> URLSecurityManager : uses
+URLSecurityManager --> ApprovalTokens : stores
+SecurityManager --> SecurityAuditLog : logs to
+
+EmailEncryption --> SecurityManager : uses keys from
+AntiPhishingProtection --> SecurityAuditLog : logs events
+
+note right of SecurityManager
+    **Token Security Features:**
+    - JWT with strong secret
+    - Time-limited validity (7 days)
+    - Single-use enforcement
+    - Tamper-proof signatures
+    - IP address tracking
+    - User agent validation
+end note
+
+note right of ApprovalTokens
+    **Database Security:**
+    - Tokens stored as hashes
+    - Automatic expiry cleanup
+    - Usage tracking
+    - IP/User-Agent logging
+    - Audit trail preservation
+end note
+
+note bottom of SecurityAuditLog
+    **Security Monitoring:**
+    - All token operations logged
+    - Suspicious activity detection
+    - Failed validation tracking
+    - Performance monitoring
+    - Compliance reporting
+end note
+
+@enduml

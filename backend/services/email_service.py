@@ -371,13 +371,48 @@ class EmailService:
         email_size = len(html_content.encode('utf-8'))
         
         try:
-            # Try SendGrid first, fall back to SMTP
+            # Try SendGrid first, fall back to SMTP on failure
+            result = None
+            last_error = None
+            
+            # Primary: Try SendGrid
             if self.sendgrid_api_key:
-                result = await self._send_via_sendgrid(to_email, to_name, subject, html_content)
-            elif self.smtp_host:
-                result = await self._send_via_smtp(to_email, to_name, subject, html_content)
-            else:
-                raise ValueError("No email provider configured")
+                try:
+                    result = await self._send_via_sendgrid(to_email, to_name, subject, html_content)
+                    if result["success"]:
+                        result["provider"] = "sendgrid"
+                        logger.info(f"Email sent successfully via SendGrid")
+                    else:
+                        raise Exception(f"SendGrid failed: {result.get('error', 'Unknown error')}")
+                except Exception as sg_error:
+                    logger.warning(f"SendGrid failed: {sg_error}")
+                    last_error = sg_error
+                    result = None
+            
+            # Fallback: Try SMTP if SendGrid failed or not configured
+            if not result or not result.get("success"):
+                if self.smtp_host:
+                    try:
+                        logger.info("Attempting SMTP fallback...")
+                        result = await self._send_via_smtp(to_email, to_name, subject, html_content)
+                        if result["success"]:
+                            result["provider"] = "smtp"
+                            logger.info(f"Email sent successfully via SMTP fallback")
+                        else:
+                            raise Exception(f"SMTP failed: {result.get('error', 'Unknown error')}")
+                    except Exception as smtp_error:
+                        logger.error(f"SMTP fallback also failed: {smtp_error}")
+                        last_error = smtp_error
+                        result = {"success": False, "error": str(smtp_error), "provider": "smtp"}
+                else:
+                    logger.error("No SMTP configuration available for fallback")
+            
+            # If both failed, return error
+            if not result or not result.get("success"):
+                if not self.sendgrid_api_key and not self.smtp_host:
+                    raise ValueError("No email provider configured")
+                else:
+                    raise Exception(f"All email providers failed. Last error: {last_error}")
             
             # Log email send attempt
             await self._log_email_send(

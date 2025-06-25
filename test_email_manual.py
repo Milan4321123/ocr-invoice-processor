@@ -9,7 +9,7 @@ import json
 # Test configuration
 BASE_URL = "http://localhost:8001"
 TEST_INVOICE_ID = "test-invoice-123"
-TEST_EMAIL = "test@company.com"
+TEST_EMAIL = "adhikarimilan4321@gmail.com"
 
 def test_editor_notification():
     """Test editor notification endpoint"""

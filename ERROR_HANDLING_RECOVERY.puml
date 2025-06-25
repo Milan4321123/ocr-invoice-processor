@@ -1,0 +1,212 @@
+@startuml Error_Handling_And_Recovery
+!theme aws-orange
+title Email System Error Handling & Recovery Architecture
+
+package "Error Handling Strategy" {
+    
+    class ErrorHandler {
+        + handle_email_error(error: EmailError) -> RecoveryAction
+        + classify_error(error: Exception) -> ErrorType
+        + determine_recovery_strategy(error_type: ErrorType) -> Strategy
+        + log_error_details(error, context) -> None
+    }
+    
+    enum ErrorType {
+        NETWORK_ERROR
+        AUTHENTICATION_ERROR
+        RATE_LIMIT_ERROR
+        INVALID_EMAIL_ERROR
+        PROVIDER_UNAVAILABLE
+        CONFIGURATION_ERROR
+        TEMPORARY_ERROR
+        PERMANENT_ERROR
+    }
+    
+    enum RecoveryAction {
+        RETRY_SAME_PROVIDER
+        SWITCH_TO_FALLBACK
+        WAIT_AND_RETRY
+        MANUAL_INTERVENTION
+        SKIP_EMAIL
+        ESCALATE_ERROR
+    }
+    
+    class RetryManager {
+        - retry_policies: Dict[ErrorType, RetryPolicy]
+        
+        + should_retry(error_type: ErrorType, attempt: int) -> bool
+        + get_retry_delay(error_type: ErrorType, attempt: int) -> float
+        + execute_with_retry(func, max_attempts: int) -> Result
+        + update_retry_policy(error_type: ErrorType, policy: RetryPolicy) -> None
+    }
+    
+    class FallbackManager {
+        - provider_priority: List[str]
+        - provider_health: Dict[str, HealthStatus]
+        
+        + get_next_provider(failed_provider: str) -> str
+        + mark_provider_unhealthy(provider: str, error: Error) -> None
+        + check_provider_recovery() -> None
+        + get_healthy_providers() -> List[str]
+    }
+}
+
+package "Recovery Mechanisms" {
+    
+    class EmailQueue {
+        - failed_emails: Queue
+        - retry_queue: Queue
+        - dead_letter_queue: Queue
+        
+        + enqueue_failed_email(email_data, error) -> None
+        + process_retry_queue() -> None
+        + move_to_dead_letter(email_data, final_error) -> None
+        + get_queue_stats() -> QueueStats
+    }
+    
+    class HealthMonitor {
+        - provider_metrics: Dict[str, Metrics]
+        - alert_thresholds: Dict[str, float]
+        
+        + monitor_provider_health() -> None
+        + check_error_rates() -> None
+        + trigger_alerts(provider: str, metric: str) -> None
+        + generate_health_report() -> HealthReport
+    }
+    
+    class AlertingSystem {
+        - alert_channels: List[AlertChannel]
+        - alert_rules: List[AlertRule]
+        
+        + send_alert(alert: Alert) -> None
+        + configure_alert_rules(rules: List[AlertRule]) -> None
+        + get_alert_history() -> List[Alert]
+    }
+}
+
+package "Error Recovery Flow" {
+    
+    object "Error Flow Process" as ErrorFlow {
+        **1. Error Detection:**
+        - Email send fails
+        - Error is caught and classified
+        - Context is captured
+        
+        **2. Error Analysis:**
+        - Determine error type
+        - Check if retryable
+        - Select recovery strategy
+        
+        **3. Recovery Execution:**
+        - Apply retry logic
+        - Switch providers if needed
+        - Update provider health
+        
+        **4. Escalation:**
+        - Move to dead letter queue
+        - Send alerts
+        - Log for manual review
+        
+        **5. Monitoring:**
+        - Track error patterns
+        - Update recovery policies
+        - Generate reports
+    }
+    
+    state EmailSending {
+        [*] --> Attempting
+        Attempting --> Success : Email sent
+        Attempting --> AnalyzeError : Send failed
+        
+        AnalyzeError --> RetryableFault : Temporary error
+        AnalyzeError --> NonRetryableFault : Permanent error
+        AnalyzeError --> ProviderFault : Provider issue
+        
+        RetryableFault --> WaitAndRetry : Within retry limit
+        RetryableFault --> TryFallback : Max retries reached
+        
+        ProviderFault --> TryFallback : Switch provider
+        
+        TryFallback --> Attempting : Fallback available
+        TryFallback --> DeadLetter : No fallbacks
+        
+        WaitAndRetry --> Attempting : After delay
+        
+        NonRetryableFault --> DeadLetter : Cannot retry
+        
+        Success --> [*]
+        DeadLetter --> ManualReview
+        ManualReview --> [*]
+    }
+}
+
+package "Specific Error Scenarios" {
+    
+    class NetworkErrorHandler {
+        + handle_timeout_error() -> RecoveryAction
+        + handle_connection_error() -> RecoveryAction
+        + handle_dns_error() -> RecoveryAction
+    }
+    
+    class AuthenticationErrorHandler {
+        + handle_invalid_api_key() -> RecoveryAction
+        + handle_expired_credentials() -> RecoveryAction
+        + handle_insufficient_permissions() -> RecoveryAction
+    }
+    
+    class RateLimitErrorHandler {
+        + handle_sendgrid_rate_limit() -> RecoveryAction
+        + handle_smtp_rate_limit() -> RecoveryAction
+        + calculate_backoff_delay(rate_limit_info) -> float
+    }
+    
+    class ProviderErrorHandler {
+        + handle_sendgrid_errors(error_code: str) -> RecoveryAction
+        + handle_smtp_errors(smtp_code: int) -> RecoveryAction
+        + handle_provider_maintenance() -> RecoveryAction
+    }
+}
+
+' Error handling relationships
+ErrorHandler --> ErrorType : classifies to
+ErrorHandler --> RecoveryAction : determines
+ErrorHandler --> RetryManager : uses
+ErrorHandler --> FallbackManager : uses
+
+RetryManager --> EmailQueue : manages
+FallbackManager --> HealthMonitor : updates
+HealthMonitor --> AlertingSystem : triggers
+
+ErrorHandler --> NetworkErrorHandler : delegates to
+ErrorHandler --> AuthenticationErrorHandler : delegates to
+ErrorHandler --> RateLimitErrorHandler : delegates to
+ErrorHandler --> ProviderErrorHandler : delegates to
+
+note right of ErrorHandler
+    **Error Classification:**
+    - Analyze exception type
+    - Check error codes
+    - Consider context
+    - Determine severity
+    - Select recovery strategy
+end note
+
+note right of EmailQueue
+    **Queue Management:**
+    - Failed emails for retry
+    - Retry queue with delays
+    - Dead letter for manual review
+    - Queue size monitoring
+    - Automatic cleanup
+end note
+
+note bottom of HealthMonitor
+    **Health Metrics:**
+    - Success/failure rates
+    - Response times
+    - Error patterns
+    - Provider availability
+    - Alert thresholds
+end note
+
+@enduml

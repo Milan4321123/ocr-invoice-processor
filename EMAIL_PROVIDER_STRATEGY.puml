@@ -1,0 +1,196 @@
+@startuml Email_Provider_Strategy_Pattern
+!theme aws-orange
+title Email Provider Architecture - Strategy Pattern with Fallback
+
+package "Email Provider Strategy" {
+    
+    interface EmailProvider {
+        + send_email(to_email, subject, content) -> EmailResult
+        + validate_connection() -> bool
+        + get_provider_info() -> ProviderInfo
+        + get_rate_limits() -> RateLimits
+    }
+    
+    class EmailProviderManager {
+        - primary_provider: EmailProvider
+        - fallback_providers: List[EmailProvider]
+        - retry_config: RetryConfig
+        - circuit_breaker: CircuitBreaker
+        
+        + send_email_with_fallback(email_data) -> EmailResult
+        + test_all_providers() -> List[ProviderStatus]
+        + switch_primary_provider(provider_name) -> bool
+        + get_provider_health() -> HealthStatus
+        + _attempt_send(provider, email_data) -> EmailResult
+        + _handle_provider_failure(provider, error) -> None
+    }
+    
+    class SendGridProvider {
+        - api_key: str
+        - client: SendGridAPIClient
+        - rate_limiter: RateLimiter
+        
+        + send_email(to_email, subject, content) -> EmailResult
+        + validate_connection() -> bool
+        + get_provider_info() -> ProviderInfo
+        + get_rate_limits() -> RateLimits
+        + _create_sendgrid_message(email_data) -> Mail
+        + _handle_sendgrid_error(error) -> EmailError
+    }
+    
+    class SMTPProvider {
+        - host: str
+        - port: int
+        - username: str
+        - password: str
+        - use_tls: bool
+        
+        + send_email(to_email, subject, content) -> EmailResult
+        + validate_connection() -> bool
+        + get_provider_info() -> ProviderInfo
+        + get_rate_limits() -> RateLimits
+        + _create_smtp_session() -> smtplib.SMTP
+        + _send_via_smtp(session, message) -> EmailResult
+    }
+    
+    class EmailResult {
+        + success: bool
+        + provider_used: str
+        + message_id: str
+        + delivery_time: float
+        + error: EmailError
+        + metadata: Dict
+        
+        + is_success() -> bool
+        + get_error_details() -> Dict
+        + to_dict() -> Dict
+    }
+    
+    class EmailError {
+        + error_type: str
+        + error_code: str
+        + error_message: str
+        + provider: str
+        + is_retryable: bool
+        + timestamp: datetime
+        
+        + to_dict() -> Dict
+        + __str__() -> str
+    }
+    
+    class RetryConfig {
+        + max_attempts: int = 3
+        + base_delay: float = 1.0
+        + backoff_multiplier: float = 2.0
+        + max_delay: float = 60.0
+        + retry_on_errors: List[str]
+        
+        + should_retry(attempt, error) -> bool
+        + get_delay(attempt) -> float
+    }
+    
+    class CircuitBreaker {
+        - failure_threshold: int = 5
+        - timeout: int = 60
+        - state: str = "CLOSED"
+        - failure_count: int = 0
+        - last_failure_time: datetime
+        
+        + call(func, *args, **kwargs) -> Any
+        + record_success() -> None
+        + record_failure() -> None
+        + is_open() -> bool
+        + reset() -> None
+    }
+}
+
+package "Provider Configuration" {
+    
+    class ProviderConfig {
+        + provider_name: str
+        + priority: int
+        + enabled: bool
+        + credentials: Dict
+        + settings: Dict
+        + health_check_url: str
+        
+        + load_from_env() -> ProviderConfig
+        + validate() -> bool
+        + get_client_config() -> Dict
+    }
+    
+    class ProviderFactory {
+        + create_provider(config: ProviderConfig) -> EmailProvider
+        + get_available_providers() -> List[str]
+        + validate_provider_config(config) -> bool
+    }
+}
+
+' Implementation relationships
+EmailProvider <|-- SendGridProvider : implements
+EmailProvider <|-- SMTPProvider : implements
+
+EmailProviderManager --> EmailProvider : manages
+EmailProviderManager --> RetryConfig : uses
+EmailProviderManager --> CircuitBreaker : uses
+
+SendGridProvider --> EmailResult : returns
+SMTPProvider --> EmailResult : returns
+
+EmailResult --> EmailError : contains
+
+ProviderFactory --> EmailProvider : creates
+ProviderFactory --> ProviderConfig : uses
+
+' Email sending flow
+object "Email Sending Flow" as Flow {
+    **1. Primary Provider Attempt:**
+    - Check circuit breaker state
+    - Try SendGrid first
+    - Apply rate limiting
+    - Handle response
+    
+    **2. Fallback on Failure:**
+    - Record failure in circuit breaker
+    - Switch to SMTP provider
+    - Retry with exponential backoff
+    - Log all attempts
+    
+    **3. Final Result:**
+    - Return EmailResult with details
+    - Log successful provider
+    - Update provider health metrics
+    - Trigger alerts if all fail
+}
+
+note right of EmailProviderManager
+    **Provider Management:**
+    - Automatic fallback
+    - Circuit breaker protection
+    - Retry with exponential backoff
+    - Health monitoring
+    - Provider switching
+    - Performance metrics
+end note
+
+note right of CircuitBreaker
+    **Circuit Breaker States:**
+    - CLOSED: Normal operation
+    - OPEN: Provider failing, skip
+    - HALF_OPEN: Testing recovery
+    
+    **Benefits:**
+    - Prevent cascade failures
+    - Faster error responses
+    - Automatic recovery testing
+end note
+
+note bottom of RetryConfig
+    **Retry Strategy:**
+    - Exponential backoff
+    - Configurable max attempts
+    - Error-specific retry logic
+    - Jitter to prevent thundering herd
+end note
+
+@enduml

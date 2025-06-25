@@ -14,7 +14,39 @@ ALTER TABLE invoices_clean ADD COLUMN IF NOT EXISTS approval_method VARCHAR(50);
 ALTER TABLE invoices_clean ADD COLUMN IF NOT EXISTS change_summary JSONB;
 ALTER TABLE invoices_clean ADD COLUMN IF NOT EXISTS email_logs JSONB;
 
--- Update status enum to include new workflow states
+-- First, fix any existing invalid status values before applying constraint
+-- Update NULL status values
+UPDATE invoices_clean SET status = 'uploaded' WHERE status IS NULL;
+
+-- Update common invalid status values to valid ones
+UPDATE invoices_clean SET status = 'completed' WHERE status = 'processed';
+UPDATE invoices_clean SET status = 'edited' WHERE status = 'updated';
+UPDATE invoices_clean SET status = 'error' WHERE status = 'failed';
+UPDATE invoices_clean SET status = 'pending' WHERE status = 'new';
+UPDATE invoices_clean SET status = 'uploaded' WHERE status = 'received';
+
+-- Check for any remaining invalid status values
+DO $$
+DECLARE
+    invalid_count INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO invalid_count
+    FROM invoices_clean 
+    WHERE status NOT IN (
+        'pending', 'uploaded', 'edited', 'pending_email', 
+        'edit_completed', 'in_review_by_bauleiter', 
+        'approved_by_bauleiter', 'rejected_by_bauleiter', 
+        'completed', 'error'
+    );
+    
+    IF invalid_count > 0 THEN
+        RAISE NOTICE 'Found % rows with invalid status values. Please check and update manually.', invalid_count;
+        -- Show the invalid values
+        RAISE NOTICE 'Invalid status values found:';
+    END IF;
+END $$;
+
+-- Now safely update status enum to include new workflow states
 ALTER TABLE invoices_clean DROP CONSTRAINT IF EXISTS check_status;
 ALTER TABLE invoices_clean ADD CONSTRAINT check_status 
 CHECK (status = ANY (ARRAY[
@@ -106,9 +138,10 @@ COMMENT ON TABLE email_audit_log IS 'Audit trail for all emails sent by the syst
 COMMENT ON TABLE approval_tokens IS 'Secure tokens for email approval links';
 COMMENT ON TABLE security_events IS 'Security monitoring and threat detection';
 
--- Insert some test email settings (optional)
-INSERT INTO dropdown_options (field_name, option_value, option_label, is_active, created_at) 
-VALUES 
-('email_templates', 'editor_notification', 'Editor Notification Template', true, NOW()),
-('email_templates', 'bauleiter_approval', 'Bau-Leiter Approval Template', true, NOW())
-ON CONFLICT (field_name, option_value) DO NOTHING;
+-- Note: Skipping dropdown_options inserts as the table has a constraint 
+-- that only allows specific field names (rechnungsempfaenger, rechnungssteller, etc.)
+-- and 'email_templates' is not in the allowed list.
+-- Email templates will be handled directly in the application code.
+
+-- Email workflow schema application completed successfully!
+SELECT 'Email workflow schema applied successfully! All tables and columns created.' as result;
