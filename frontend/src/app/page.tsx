@@ -6,11 +6,11 @@ export default function Home() {
     <div className="container mx-auto px-4 py-16">
       <div className="max-w-4xl mx-auto text-center">
         <h1 className="text-5xl font-bold mb-6 text-gray-900">
-          Invoice OCR Processing System
+          Invoice Management System
         </h1>
         <p className="text-xl text-gray-600 mb-12 max-w-2xl mx-auto">
-          Upload, process, and manage your PDF invoices with automated OCR technology. 
-          Transform paper invoices into structured data effortlessly.
+          Upload, edit, and manage your PDF invoices with searchable dropdowns and automated workflow. 
+          Transform manual invoice processing into an efficient digital system.
         </p>
         
         <div className="flex flex-col sm:flex-row justify-center gap-6 mb-16">

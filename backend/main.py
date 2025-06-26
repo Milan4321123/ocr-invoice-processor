@@ -1,6 +1,6 @@
 """
-Refactored Invoice OCR API main application.
-This file now imports route handlers from separate modules for better maintainability.
+Clean Invoice Management API
+Handles upload, storage, editing, and workflow without OCR dependencies.
 """
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,64 +8,71 @@ import uuid
 import logging
 from dotenv import load_dotenv
 
-# Route imports
-from api.routes import health, upload, invoices, ocr, dropdowns, reports, folder_watcher, email_workflow, approval
-
-# OCR imports
-from ocr.workflow import ocr_workflow
-from config.ocr_config import ocr_config
-
-# Initialize database service
-from services.database import db_service
-
 # Load environment variables
 load_dotenv()
 
 # Configure logging
-logging.basicConfig(    
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize FastAPI app
-app = FastAPI(title="Invoice OCR API", version="0.1.0")
-
-# Log database service status
-if db_service.is_available:
-    logger.info("Database service initialized and connected successfully")
-else:
-    logger.warning("Database service unavailable - running in offline mode")
-
-# Add request ID middleware for better traceability
-@app.middleware("http")
-async def add_request_id(request: Request, call_next):
-    request_id = str(uuid.uuid4())
-    request.state.request_id = request_id
-    response = await call_next(request)
-    response.headers["X-Request-ID"] = request_id
-    return response
+app = FastAPI(
+    title="Invoice Management API",
+    description="Clean invoice processing without OCR dependencies",
+    version="2.0.0"
+)
 
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:3003"],  # Next.js ports
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include route modules
-app.include_router(health.router, tags=["health"])
-app.include_router(upload.router, tags=["upload"])
-app.include_router(invoices.router, tags=["invoices"])
-app.include_router(ocr.router, tags=["ocr"])
+# Add request ID middleware
+@app.middleware("http")
+async def add_request_id(request: Request, call_next):
+    request_id = str(uuid.uuid4())
+    request.state.request_id = request_id
+    
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+    return response
+
+# Import routes
+from api.routes import (
+    health, 
+    upload, 
+    invoices, 
+    dropdowns, 
+    approval, 
+    approval_workflow,
+    email_workflow,
+    reports,
+    folder_watcher
+)
+
+# Register routes
+app.include_router(health.router, prefix="/api", tags=["health"])
+app.include_router(upload.router, prefix="/api", tags=["upload"])
+app.include_router(invoices.router, prefix="/api", tags=["invoices"])
 app.include_router(dropdowns.router, prefix="/api", tags=["dropdowns"])
-app.include_router(folder_watcher.router, prefix="/api/folder-watcher", tags=["folder-watcher"])
+app.include_router(approval.router, prefix="/api", tags=["approval"])
+app.include_router(approval_workflow.router, prefix="/api", tags=["workflow"])
+app.include_router(email_workflow.router, prefix="/api", tags=["email"])
 app.include_router(reports.router, prefix="/api", tags=["reports"])
-app.include_router(email_workflow.router, prefix="/api", tags=["email-workflow"])
-app.include_router(approval.router, prefix="/api/approval", tags=["approval"])
+app.include_router(folder_watcher.router, prefix="/api", tags=["folder-watcher"])
+
+@app.get("/")
+async def root():
+    return {
+        "message": "Invoice Management API",
+        "version": "2.0.0",
+        "status": "running",
+        "features": ["manual_entry", "searchable_dropdowns", "workflow", "email"]
+    }
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

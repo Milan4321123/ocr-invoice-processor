@@ -1,5 +1,5 @@
 """
-Centralized database service layer for OCR Invoice Processor.
+Centralized database service layer for Invoice Management System.
 Handles ALL Supabase database operations in one place.
 Single source of truth for database communication.
 """
@@ -145,8 +145,7 @@ class DatabaseService:
             })
             
             # Set defaults if not provided
-            invoice_data.setdefault("status", "pending")
-            invoice_data.setdefault("ocr_status", "pending")
+            invoice_data.setdefault("status", "uploaded")
             invoice_data.setdefault("kfw_anrechenbare_kosten", False)
             
             response = self._client.table(self.table_name).insert(invoice_data).execute()

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import PDFViewer from './PDFViewer';
 import CleanInvoiceForm, { GermanInvoiceFields } from './CleanInvoiceForm';
-import { FileText, Eye, Edit3, AlertTriangle, Monitor, FileInput } from 'lucide-react';
+import { FileText, Eye, Edit3, AlertTriangle, CheckCircle, Monitor, FileInput } from 'lucide-react';
 
 interface InvoiceEditorDashboardProps {
   invoiceId: string;
@@ -39,8 +39,8 @@ export default function InvoiceEditorDashboard({
       setIsLoading(true);
       setError(null);
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
-      const response = await fetch(`${apiUrl}/invoices/${invoiceId}/editor`);
+      // TODO: Replace with actual API call
+      const response = await fetch(`/api/invoices/${invoiceId}/editor`);
       if (!response.ok) {
         throw new Error(`Failed to load invoice: ${response.statusText}`);
       }
@@ -65,58 +65,26 @@ export default function InvoiceEditorDashboard({
     setHasUnsavedChanges(true);
   };
 
-  const handleSave = async (updatedFields: GermanInvoiceFields, submitForReview?: boolean) => {
+  const handleSave = async (updatedFields: GermanInvoiceFields) => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
-      
-      // Prepare the payload in the format expected by the backend
-      const payload = {
-        fields: updatedFields,
-        ...(submitForReview && {
-          review_status: 'under_review',
-          reviewed_by: updatedFields.rechnungspruefung_email || 'system@example.com',
-          reviewed_at: new Date().toISOString()
-        })
-      };
-
-      console.log('Save request details:');
-      console.log('- Invoice ID:', invoiceId);
-      console.log('- Updated fields:', updatedFields);
-      console.log('- Submit for review:', submitForReview);
-      console.log('- Final payload:', payload);
-
-      const response = await fetch(`${apiUrl}/invoices/${invoiceId}/editor`, {
+      // TODO: Replace with actual API call
+      const response = await fetch(`/api/invoices/${invoiceId}/editor`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ fields: updatedFields }),
       });
 
       if (!response.ok) {
-        // Try to get detailed error message from backend
-        let errorMessage = `Failed to save: ${response.statusText}`;
-        try {
-          const errorData = await response.json();
-          if (errorData.detail) {
-            errorMessage = `Failed to save: ${errorData.detail.message || errorData.detail}`;
-          }
-        } catch (parseError) {
-          // If we can't parse the error response, use the status text
-          console.warn('Could not parse error response:', parseError);
-        }
-        throw new Error(errorMessage);
+        throw new Error(`Failed to save: ${response.statusText}`);
       }
 
-      const result = await response.json();
-      console.log('Save successful:', result);
-      
       setFields(updatedFields);
       setHasUnsavedChanges(false);
       return true;
     } catch (err) {
       console.error('Error saving invoice:', err);
-      console.error('Fields being saved:', updatedFields);
       throw err;
     }
   };
@@ -258,11 +226,9 @@ export default function InvoiceEditorDashboard({
         }`}>
           <CleanInvoiceForm
             fields={fields}
-            onFieldChange={handleFieldChange}
-            onSave={handleSave}
-            onCancel={handleCancel}
-            isLoading={isLoading}
-            hasUnsavedChanges={hasUnsavedChanges}
+            onFieldChange={(fieldName: string, value: any) => handleFieldChange(fieldName as keyof GermanInvoiceFields, value)}
+            onSave={() => handleSave(fields)}
+            isSaving={isLoading}
             className="h-full"
           />
         </div>

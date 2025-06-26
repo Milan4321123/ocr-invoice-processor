@@ -71,7 +71,7 @@ export default function UploadPage() {
           
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Upload Invoice</h1>
           <p className="text-gray-600">
-            Upload your PDF invoice for OCR processing and data extraction.
+            Upload your PDF invoice for storage and manual editing with searchable dropdowns.
           </p>
         </div>
 

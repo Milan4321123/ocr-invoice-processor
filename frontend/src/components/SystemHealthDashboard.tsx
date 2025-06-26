@@ -12,7 +12,7 @@ interface HealthComponent {
   available_endpoints?: string[];
   write_access?: boolean;
   bucket?: string;
-  // OCR-specific properties
+  // Service-specific properties
   service?: string;
   timestamp?: number;
   checks?: Record<string, {
@@ -30,7 +30,6 @@ interface SystemHealth {
     environment?: HealthComponent;
     api_endpoints?: HealthComponent;
     filesystem?: HealthComponent;
-    ocr?: HealthComponent;
   };
 }
 
@@ -85,16 +84,11 @@ export default function SystemHealthDashboard() {
   }, []);
 
   const renderComponent = (name: string, component: HealthComponent) => {
-    const isOcrComponent = name === 'ocr';
-    const borderColor = isOcrComponent ? 'border-l-4 border-blue-400' : 'border-l-4 border-gray-200';
-    
     return (
-      <div key={name} className={`bg-white rounded-lg shadow-md p-6 ${borderColor}`}>
+      <div key={name} className="bg-white rounded-lg shadow-md p-6 border-l-4 border-gray-200">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900 capitalize flex items-center gap-2">
-            {isOcrComponent && <span className="text-xl">🔍</span>}
             {name.replace('_', ' ')}
-            {isOcrComponent && <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded">OCR</span>}
           </h3>
           <span className={`px-3 py-1 rounded-full text-sm font-medium border ${statusColors[component.status]}`}>
             {statusIcons[component.status]} {component.status.toUpperCase()}

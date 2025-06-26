@@ -311,61 +311,6 @@ async def add_dropdown_option(request: AddOptionRequest):
         "persisted_to_db": db_result.get("success", False)
     }
 
-@router.post("/dropdowns/suggest-from-ocr")
-async def suggest_option_from_ocr(request_data: Dict[str, Any]):
-    """Suggest adding OCR-extracted values as new dropdown options"""
-    extracted_values = request_data.get("extracted_values", {})
-    suggestions = []
-    
-    for field_name, value in extracted_values.items():
-        if field_name not in _get_valid_field_names():
-            continue
-            
-        if not value or not value.strip():
-            continue
-        
-        # Check if value already exists
-        existing_options = _get_all_options_for_field(field_name)
-        existing_labels = [opt["label"].lower() for opt in existing_options]
-        
-        # Find best match using similarity
-        best_match_score = 0.0
-        best_match_label = ""
-        
-        for label in existing_labels:
-            similarity = _calculate_similarity(value, label)
-            if similarity > best_match_score:
-                best_match_score = similarity
-                best_match_label = label
-        
-        # If similarity is below threshold (0.7), suggest as new option
-        if best_match_score < 0.7:
-            suggestions.append({
-                "field_name": field_name,
-                "suggested_value": value,
-                "suggested_label": value,
-                "is_new": True,
-                "confidence": 1.0 - best_match_score,  # Higher confidence for more different values
-                "closest_match": best_match_label if best_match_score > 0.3 else None,
-                "similarity_score": best_match_score
-            })
-        else:
-            # Suggest the closest existing match
-            suggestions.append({
-                "field_name": field_name,
-                "suggested_value": value,
-                "suggested_label": best_match_label,
-                "is_new": False,
-                "confidence": best_match_score,
-                "closest_match": best_match_label,
-                "similarity_score": best_match_score
-            })
-    
-    return {
-        "suggestions": suggestions,
-        "total_suggestions": len(suggestions)
-    }
-
 @router.delete("/dropdowns/{field_name}/{option_value}")
 async def delete_dropdown_option(field_name: str, option_value: str):
     """Delete a custom dropdown option (cannot delete default options)"""

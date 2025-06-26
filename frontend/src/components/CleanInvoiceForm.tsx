@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Save, X, AlertCircle, CheckCircle } from 'lucide-react';
+import React from 'react';
+import { SearchableDropdown } from './SearchableDropdown';
 
-// German Invoice Fields Interface - Clean Version
+// German invoice field types
 export interface GermanInvoiceFields {
   rechnungsempfaenger?: string;
   rechnungssteller?: string;
@@ -22,288 +22,209 @@ export interface GermanInvoiceFields {
 
 interface CleanInvoiceFormProps {
   fields: GermanInvoiceFields;
-  onFieldChange: (field: keyof GermanInvoiceFields, value: any) => void;
-  onSave: (fields: GermanInvoiceFields, submitForReview?: boolean) => Promise<boolean>;
-  onCancel: () => void;
-  isLoading?: boolean;
-  hasUnsavedChanges?: boolean;
+  onFieldChange: (fieldName: string, value: any) => void;
+  onSave: () => void;
+  isSaving?: boolean;
   className?: string;
 }
 
-export default function CleanInvoiceForm({
+const CleanInvoiceForm: React.FC<CleanInvoiceFormProps> = ({
   fields,
   onFieldChange,
   onSave,
-  onCancel,
-  isLoading = false,
-  hasUnsavedChanges = false,
-  className = ''
-}: CleanInvoiceFormProps) {
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
-
-  const handleSave = async (submitForReview = false) => {
-    setIsSaving(true);
-    setSaveStatus('saving');
-    
-    try {
-      const success = await onSave(fields, submitForReview);
-      if (success) {
-        setSaveStatus('success');
-        setTimeout(() => setSaveStatus('idle'), 2000);
-      } else {
-        setSaveStatus('error');
-        setTimeout(() => setSaveStatus('idle'), 3000);
-      }
-    } catch (error) {
-      setSaveStatus('error');
-      setTimeout(() => setSaveStatus('idle'), 3000);
-    } finally {
-      setIsSaving(false);
-    }
+  isSaving = false,
+  className = ""
+}) => {
+  // Dummy dropdown options - in real app these would come from API
+  const dropdownOptions = {
+    rechnungsempfaenger: [
+      { value: 'acme-construction', label: 'ACME Construction GmbH', is_default: true },
+      { value: 'bauleiter-office', label: 'Bauleiter Office', is_default: true }
+    ],
+    rechnungssteller: [
+      { value: 'elektro-wagner', label: 'Elektro Wagner GmbH', is_default: true },
+      { value: 'sanitaer-mueller', label: 'Sanitär Müller', is_default: true }
+    ],
+    projekt: [
+      { value: 'projekt-alpha', label: 'Projekt Alpha - Bürogebäude', is_default: true },
+      { value: 'projekt-beta', label: 'Projekt Beta - Wohnkomplex', is_default: true }
+    ],
+    gewerk: [
+      { value: 'elektroinstallation', label: 'Elektroinstallation', is_default: true },
+      { value: 'sanitaer', label: 'Sanitär', is_default: true }
+    ]
   };
 
   return (
-    <div className={`bg-white rounded-lg shadow-lg p-6 ${className}`}>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
-        <h2 className="text-xl font-semibold text-gray-900">Invoice Editor</h2>
-        <div className="flex items-center space-x-2">
-          {saveStatus === 'success' && (
-            <div className="flex items-center text-green-600">
-              <CheckCircle className="h-4 w-4 mr-1" />
-              <span className="text-sm">Saved</span>
-            </div>
-          )}
-          {saveStatus === 'error' && (
-            <div className="flex items-center text-red-600">
-              <AlertCircle className="h-4 w-4 mr-1" />
-              <span className="text-sm">Save failed</span>
-            </div>
-          )}
-          {hasUnsavedChanges && (
-            <span className="text-sm text-orange-600">Unsaved changes</span>
-          )}
-        </div>
-      </div>
-
-      {/* Form Fields */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Rechnungsempfänger */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Rechnungsempfänger
-          </label>
-          <input
-            type="text"
+    <div className={`space-y-6 ${className}`}>
+      <div className="bg-white p-6 rounded-lg shadow">
+        <h3 className="text-lg font-semibold mb-4 text-gray-900">Invoice Details</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Dropdown fields */}
+          <SearchableDropdown
+            label="Rechnungsempfänger"
             value={fields.rechnungsempfaenger || ''}
-            onChange={(e) => onFieldChange('rechnungsempfaenger', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Enter customer name"
+            options={dropdownOptions.rechnungsempfaenger}
+            onChange={(value) => onFieldChange('rechnungsempfaenger', value)}
+            placeholder="Select recipient..."
           />
-        </div>
-
-        {/* Rechnungssteller */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Rechnungssteller
-          </label>
-          <input
-            type="text"
+          
+          <SearchableDropdown
+            label="Rechnungssteller"
             value={fields.rechnungssteller || ''}
-            onChange={(e) => onFieldChange('rechnungssteller', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Enter vendor name"
+            options={dropdownOptions.rechnungssteller}
+            onChange={(value) => onFieldChange('rechnungssteller', value)}
+            placeholder="Select vendor..."
           />
-        </div>
-
-        {/* Projekt */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Projekt
-          </label>
-          <input
-            type="text"
+          
+          <SearchableDropdown
+            label="Projekt"
             value={fields.projekt || ''}
-            onChange={(e) => onFieldChange('projekt', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Enter project name"
+            options={dropdownOptions.projekt}
+            onChange={(value) => onFieldChange('projekt', value)}
+            placeholder="Select project..."
           />
-        </div>
-
-        {/* Gewerk */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Gewerk
-          </label>
-          <input
-            type="text"
+          
+          <SearchableDropdown
+            label="Gewerk"
             value={fields.gewerk || ''}
-            onChange={(e) => onFieldChange('gewerk', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Enter trade/craft"
+            options={dropdownOptions.gewerk}
+            onChange={(value) => onFieldChange('gewerk', value)}
+            placeholder="Select trade..."
           />
-        </div>
 
-        {/* Rechnungsbetrag */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Rechnungsbetrag (€)
-          </label>
-          <input
-            type="number"
-            step="0.01"
-            value={fields.rechnungsbetrag || ''}
-            onChange={(e) => onFieldChange('rechnungsbetrag', parseFloat(e.target.value) || 0)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="0.00"
-          />
-        </div>
+          {/* Text/Number inputs */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Rechnungsbetrag
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              value={fields.rechnungsbetrag || ''}
+              onChange={(e) => onFieldChange('rechnungsbetrag', parseFloat(e.target.value) || 0)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              placeholder="0.00"
+            />
+          </div>
 
-        {/* Rechnungseingang */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Rechnungseingang
-          </label>
-          <input
-            type="date"
-            value={fields.rechnungseingang || ''}
-            onChange={(e) => onFieldChange('rechnungseingang', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
-        </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Rechnungseingang
+            </label>
+            <input
+              type="date"
+              value={fields.rechnungseingang || ''}
+              onChange={(e) => onFieldChange('rechnungseingang', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            />
+          </div>
 
-        {/* Fälligkeit */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Fälligkeit
-          </label>
-          <input
-            type="date"
-            value={fields.faelligkeit || ''}
-            onChange={(e) => onFieldChange('faelligkeit', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
-        </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Fälligkeit
+            </label>
+            <input
+              type="date"
+              value={fields.faelligkeit || ''}
+              onChange={(e) => onFieldChange('faelligkeit', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            />
+          </div>
 
-        {/* Skonto Datum */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Skonto Datum
-          </label>
-          <input
-            type="date"
-            value={fields.skonto_datum || ''}
-            onChange={(e) => onFieldChange('skonto_datum', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
-        </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Skonto Datum
+            </label>
+            <input
+              type="date"
+              value={fields.skonto_datum || ''}
+              onChange={(e) => onFieldChange('skonto_datum', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            />
+          </div>
 
-        {/* Skonto Prozent */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Skonto Prozent (%)
-          </label>
-          <input
-            type="number"
-            step="0.1"
-            value={fields.skonto_prozent || ''}
-            onChange={(e) => onFieldChange('skonto_prozent', parseFloat(e.target.value) || 0)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="0.0"
-          />
-        </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Skonto Prozent
+            </label>
+            <input
+              type="number"
+              step="0.1"
+              value={fields.skonto_prozent || ''}
+              onChange={(e) => onFieldChange('skonto_prozent', parseFloat(e.target.value) || 0)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              placeholder="0.0"
+            />
+          </div>
 
-        {/* Rechnungsart */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Rechnungsart
-          </label>
-          <select
-            value={fields.rechnungsart || 'rechnung'}
-            onChange={(e) => onFieldChange('rechnungsart', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="rechnung">Rechnung</option>
-            <option value="gutschrift">Gutschrift</option>
-            <option value="mahnung">Mahnung</option>
-            <option value="angebot">Angebot</option>
-          </select>
-        </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Rechnungsart
+            </label>
+            <select
+              value={fields.rechnungsart || 'rechnung'}
+              onChange={(e) => onFieldChange('rechnungsart', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            >
+              <option value="rechnung">Rechnung</option>
+              <option value="gutschrift">Gutschrift</option>
+              <option value="mahnung">Mahnung</option>
+            </select>
+          </div>
 
-        {/* Rechnungsprüfung Email */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Rechnungsprüfung Email
-          </label>
-          <input
-            type="email"
-            value={fields.rechnungspruefung_email || ''}
-            onChange={(e) => onFieldChange('rechnungspruefung_email', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="email@example.com"
-          />
-        </div>
-
-        {/* Weiter berechnen an */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Weiter berechnen an
-          </label>
-          <input
-            type="text"
-            value={fields.weiter_berechnen_an || ''}
-            onChange={(e) => onFieldChange('weiter_berechnen_an', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Enter billing forwarding info"
-          />
-        </div>
-
-        {/* KfW Anrechenbar */}
-        <div className="md:col-span-2">
-          <label className="flex items-center space-x-2">
+          <div className="flex items-center">
             <input
               type="checkbox"
               checked={fields.kfw_anrechenbar || false}
               onChange={(e) => onFieldChange('kfw_anrechenbar', e.target.checked)}
-              className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              className="h-4 w-4 text-blue-600 border-gray-300 rounded"
             />
-            <span className="text-sm font-medium text-gray-700">KfW Anrechenbar</span>
-          </label>
-        </div>
-      </div>
+            <label className="ml-2 block text-sm text-gray-700">
+              KfW anrechenbar
+            </label>
+          </div>
 
-      {/* Action Buttons */}
-      <div className="flex items-center justify-between pt-6 mt-6 border-t border-gray-200">
-        <button
-          onClick={onCancel}
-          disabled={isSaving}
-          className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50 flex items-center"
-        >
-          <X className="h-4 w-4 mr-2" />
-          Cancel
-        </button>
-        
-        <div className="flex space-x-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Rechnungsprüfung Email
+            </label>
+            <input
+              type="email"
+              value={fields.rechnungspruefung_email || ''}
+              onChange={(e) => onFieldChange('rechnungspruefung_email', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              placeholder="email@example.com"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Weiter berechnen an
+            </label>
+            <input
+              type="text"
+              value={fields.weiter_berechnen_an || ''}
+              onChange={(e) => onFieldChange('weiter_berechnen_an', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              placeholder="Department or contact"
+            />
+          </div>
+        </div>
+
+        <div className="mt-6 flex justify-end">
           <button
-            onClick={() => handleSave(false)}
+            onClick={onSave}
             disabled={isSaving}
-            className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 flex items-center"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-medium disabled:bg-gray-400"
           >
-            <Save className="h-4 w-4 mr-2" />
-            {isSaving ? 'Saving...' : 'Save'}
-          </button>
-          
-          <button
-            onClick={() => handleSave(true)}
-            disabled={isSaving}
-            className="px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50 flex items-center"
-          >
-            <CheckCircle className="h-4 w-4 mr-2" />
-            {isSaving ? 'Submitting...' : 'Submit for Review'}
+            {isSaving ? 'Saving...' : 'Save Changes'}
           </button>
         </div>
       </div>
     </div>
   );
-}
+};
+
+export default CleanInvoiceForm;

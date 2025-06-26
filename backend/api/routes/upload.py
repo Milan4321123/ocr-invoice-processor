@@ -10,7 +10,6 @@ from typing import Dict, Any
 
 # Import upload service instead of direct database calls
 from services.upload_service import upload_service, UploadSource, FileData
-from config.ocr_config import ocr_config
 from services.database import db_service
 
 router = APIRouter()
@@ -129,8 +128,7 @@ async def upload_file(file: UploadFile = File(...)):
             "url": result.url,
             "id": result.invoice_id,
             "file_size": result.file_size,
-            "source": result.source.value,
-            "ocr_enabled": ocr_config.enable_ocr
+            "source": result.source.value
         }
         
     except HTTPException:

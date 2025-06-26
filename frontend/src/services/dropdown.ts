@@ -43,16 +43,7 @@ export interface AddOptionResponse {
   option?: DropdownOption;
 }
 
-export interface SuggestionRequest {
-  extracted_values: Record<string, string>;
-}
 
-export interface DropdownSuggestion {
-  field_name: string;
-  suggested_value: string;
-  suggested_label: string;
-  is_new: boolean;
-}
 
 class DropdownService {
   private baseUrl: string;
@@ -107,24 +98,7 @@ class DropdownService {
     return response.json();
   }
 
-  /**
-   * Get suggestions for new dropdown options based on OCR extracted values
-   */
-  async getSuggestionsFromOcr(extractedValues: Record<string, string>): Promise<{ suggestions: DropdownSuggestion[] }> {
-    const response = await fetch(`${this.baseUrl}/api/dropdowns/suggest-from-ocr`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ extracted_values: extractedValues }),
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Failed to get OCR suggestions: ${response.statusText}`);
-    }
-    
-    return response.json();
-  }
+
 
   /**
    * Delete a custom dropdown option (cannot delete default options)

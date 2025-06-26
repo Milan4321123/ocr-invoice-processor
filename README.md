@@ -1,239 +1,152 @@
-# OCR Invoice Processor
+# Invoice Management System
 
-A modern invoice processing system that handles PDF uploads, OCR extraction, and data management using Next.js and FastAPI.
+A manual invoice processing system with searchable dropdowns and workflow management.
 
-## 🚀 Quick Start
+## Overview
 
-```bash
-# Clone and start the application
-git clone <your-repo-url>
-cd ocr-invoice-processor
-docker-compose up
-```
+This system provides a complete invoice management workflow:
 
-**URLs:**
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
-- API Docs: http://localhost:8000/docs
+1. **PDF Upload** - Upload invoices via web interface or folder watching
+2. **Supabase Storage** - Secure storage of invoice PDFs
+3. **Manual Editing** - Dashboard with searchable dropdowns for data entry
+4. **Database Storage** - Save invoice data to Supabase
+5. **Review Workflow** - Approval process with email notifications
+6. **Prüfbericht Generation** - Final report generation
 
-## 📋 Features
+## Features
 
-### Sprint 1: Upload UI + File Service ✅
-- [x] Drag & drop PDF upload interface
-- [x] Filename validation (YYYYMMDD_IDENTIFIER_VENDOR_TYPE.pdf)
-- [x] Supabase storage integration
-- [x] Invoice metadata tracking
-- [x] Dashboard for uploaded files
+- Manual invoice data entry with searchable dropdowns
+- PDF viewing and editing interface
+- Folder watching for automatic upload detection
+- Multi-step approval workflow
+- Email notifications
+- Prüfbericht (audit report) generation
+- Multi-language support (German/English)
 
-### Sprint 2: OCR Processing (Planned)
-- [ ] PDF text extraction
-- [ ] Invoice field parsing
-- [ ] Data validation
-- [ ] Error handling
+## Technology Stack
 
-### Sprint 3: Advanced Features (Planned)
-- [ ] User authentication
-- [ ] Batch processing
-- [ ] Export functionality
-- [ ] Analytics dashboard
+- **Backend**: FastAPI (Python)
+- **Frontend**: Next.js (React/TypeScript)
+- **Database**: Supabase (PostgreSQL)
+- **Storage**: Supabase Storage
+- **Email**: SendGrid
+- **Deployment**: Docker
 
-## 🏗️ Tech Stack
-
-| Layer | Technology | Purpose |
-|-------|------------|---------|
-| **Frontend** | Next.js 14, React, TypeScript, Tailwind CSS | User interface and file upload |
-| **Backend** | FastAPI, Python 3.11, Uvicorn | API server and file processing |
-| **Storage** | Supabase Storage, PostgreSQL | File storage and metadata |
-| **DevOps** | Docker, Docker Compose | Local development environment |
-
-## 📁 Project Structure
-
-```
-ocr-invoice-processor/
-├── .github/workflows/    # CI/CD pipelines
-├── frontend/            # Next.js application
-│   ├── src/
-│   │   ├── app/
-│   │   │   ├── upload/page.tsx
-│   │   │   └── dashboard/page.tsx
-│   │   ├── components/Dropzone.tsx
-│   │   └── lib/supabaseClient.ts
-│   └── package.json
-├── backend/             # FastAPI service
-│   ├── main.py         # FastAPI application
-│   ├── services/       # Business logic
-│   └── requirements.txt
-├── docker-compose.yml   # Local development setup
-└── README.md
-```
-
-## 🔧 Development Setup
+## Quick Start
 
 ### Prerequisites
-- Docker & Docker Compose
-- Node.js 18+ (for local development)
-- Python 3.11+ (for local development)
 
-### Environment Variables
+- Docker and Docker Compose
+- Supabase account
+- SendGrid account (for email functionality)
 
-#### Frontend (.env.local)
+### Environment Setup
+
+1. Copy environment files:
+   ```bash
+   cp .env.example .env
+   cp backend/.env.example backend/.env
+   cp frontend/.env.example frontend/.env
+   ```
+
+2. Configure your environment variables:
+   - Supabase URL and API keys
+   - SendGrid API key
+   - Database connection details
+
+### Run with Docker
+
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-NEXT_PUBLIC_API_URL=http://localhost:8000
+docker-compose up --build
 ```
 
-#### Backend (.env)
+This will start:
+- Backend API on http://localhost:8000
+- Frontend on http://localhost:3000
+
+### Development Setup
+
+#### Backend
 ```bash
-SUPA_URL=your_supabase_url
-SUPA_KEY=your_supabase_service_key
-DEBUG=True
-```
-
-### Local Development
-
-```bash
-# Using Docker (Recommended)
-docker-compose up
-
-# Manual setup
-# Frontend
-cd frontend
-npm install
-npm run dev
-
-# Backend
 cd backend
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+python main.py
 ```
 
-## 🌿 Git Branching Strategy
-
-- **`main`**: Production-ready code
-- **`develop`**: Integration branch for features
-- **`feature/*`**: Individual feature development
-
-### Workflow
+#### Frontend
 ```bash
-# Create feature branch
-git checkout develop
-git checkout -b feature/your-feature-name
-
-# Work on feature
-git add .
-git commit -m "feat(component): description"
-
-# Push and create PR
-git push -u origin feature/your-feature-name
-# Create PR to develop branch
-```
-
-## 📝 API Documentation
-
-### Upload Endpoint
-```http
-POST /upload
-Content-Type: multipart/form-data
-
-file: <PDF file>
-```
-
-**Response:**
-```json
-{
-  "url": "https://storage.url/filename.pdf",
-  "status": "uploaded",
-  "filename": "20250528_INV001_ACME_SERVICE.pdf",
-  "id": "uuid"
-}
-```
-
-### List Invoices
-```http
-GET /invoices
-```
-
-**Response:**
-```json
-{
-  "invoices": [
-    {
-      "id": "uuid",
-      "filename": "20250528_INV001_ACME_SERVICE.pdf",
-      "url": "https://storage.url/filename.pdf",
-      "status": "uploaded",
-      "created_at": "2025-05-28T10:30:00Z"
-    }
-  ]
-}
-```
-
-## 🧪 Testing
-
-```bash
-# Run backend tests
-cd backend
-pytest
-
-# Run frontend tests
 cd frontend
-npm test
-
-# Run all tests via Docker
-docker-compose -f docker-compose.test.yml up
+npm install
+npm run dev
 ```
 
-## 📦 Deployment
+## API Endpoints
 
-### Production Build
-```bash
-# Build all services
-docker-compose -f docker-compose.prod.yml build
+### Core Endpoints
+- `POST /api/upload` - Upload invoice PDF
+- `GET /api/invoices` - List invoices
+- `GET /api/invoices/{id}` - Get invoice details
+- `PUT /api/invoices/{id}` - Update invoice
+- `POST /api/approval/submit` - Submit for approval
+- `GET /api/dropdowns/{field}` - Get dropdown options
 
-# Deploy
-docker-compose -f docker-compose.prod.yml up -d
+### Workflow Endpoints
+- `POST /api/approval/bauleiter` - Bauleiter approval
+- `POST /api/approval/buero` - Büro approval
+- `GET /api/reports/prufbericht/{id}` - Generate Prüfbericht
+
+## Database Schema
+
+The system uses the following main tables:
+- `invoices` - Invoice data and metadata
+- `dropdown_options` - Searchable dropdown values
+- `approval_workflow` - Approval process tracking
+- `email_workflow` - Email notification tracking
+
+## Project Structure
+
+```
+.
+├── backend/              # FastAPI backend
+│   ├── api/
+│   │   └── routes/      # API route handlers
+│   ├── services/        # Business logic services
+│   ├── config/          # Configuration
+│   └── main.py          # Application entry point
+├── frontend/            # Next.js frontend
+│   └── src/
+│       ├── app/         # Next.js app directory
+│       ├── components/  # React components
+│       └── services/    # API services
+├── docker-compose.yml   # Docker configuration
+└── README.md           # This file
 ```
 
-### CI/CD
-GitHub Actions automatically:
-- Runs tests on PR creation
-- Builds Docker images
-- Deploys to staging/production
+## Development Guidelines
 
-## 🐛 Troubleshooting
+### Manual Workflow
+This system is designed for manual invoice processing. All data entry is done through the web interface with assistance from searchable dropdowns.
 
-### Common Issues
+### No OCR Dependencies
+The system does not include OCR (Optical Character Recognition) functionality. All invoice data must be entered manually.
 
-**CORS Errors:**
-- Ensure FastAPI CORS middleware is properly configured
-- Check that frontend URL is in allowed origins
+### Searchable Dropdowns
+The system provides searchable dropdowns for:
+- Vendors (Lieferanten)
+- Cost centers (Kostenstellen)
+- Accounts (Konten)
+- Projects (Projekte)
 
-**File Upload Fails:**
-- Verify Supabase credentials
-- Check bucket permissions
-- Validate filename format
+## Contributing
 
-**Docker Issues:**
-- Clear Docker cache: `docker-compose down && docker system prune`
-- Rebuild images: `docker-compose build --no-cache`
+1. Follow the existing code structure
+2. Maintain the manual workflow approach
+3. Use TypeScript for frontend development
+4. Follow Python best practices for backend
+5. Ensure all changes are tested
 
-## 📄 License
+## License
 
-MIT License - see LICENSE file for details
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
-
-## 📞 Support
-
-- Create an issue for bugs or feature requests
-- Check existing issues before creating new ones
-- Provide clear reproduction steps for bugs
+[Your License Here]

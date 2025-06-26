@@ -4,7 +4,6 @@ import os
 import time
 import tempfile
 from datetime import datetime
-from config.ocr_config import ocr_config
 from services.database import db_service
 
 router = APIRouter()
@@ -12,7 +11,7 @@ router = APIRouter()
 @router.get("/")
 async def root():
     """Root endpoint"""
-    return {"message": "Invoice OCR API is running", "version": "0.1.0"}
+    return {"message": "Invoice Management API is running", "version": "1.0.0"}
 
 @router.get("/health")
 async def health_check():
@@ -202,58 +201,10 @@ async def system_health():
     except Exception as e:
         components["filesystem"] = {
             "status": "error",
-            "response_time_ms": round((time.time() - start_time) * 1000, 2),
+            "response_time_ms": round((time.time() - fs_start) * 1000, 2),
             "write_access": "No",
             "error": str(e)
         }
-    
-    # OCR component check
-    ocr_checks = {}
-    ocr_status = "healthy"
-    
-    # Check if we're using mock OCR
-    use_mock_ocr = ocr_config.use_mock_ocr or os.getenv("USE_MOCK_OCR", "false").lower() in ("true", "1", "yes")
-    
-    if use_mock_ocr:
-        ocr_checks["service"] = {"status": "healthy", "details": "Using mock OCR service (testing mode)"}
-        ocr_status = "healthy"
-        service_name = "Mock Service"
-    elif ocr_config.enable_ocr:
-        # Check credentials file if path is specified
-        if ocr_config.google_application_credentials:
-            if os.path.exists(ocr_config.google_application_credentials):
-                ocr_checks["credentials"] = {"status": "healthy", "details": "GCP credentials file found"}
-            else:
-                ocr_checks["credentials"] = {"status": "unhealthy", "details": "GCP credentials file missing"}
-                ocr_status = "degraded"
-        else:
-            ocr_checks["credentials"] = {"status": "degraded", "details": "Using default credentials"}
-            
-        ocr_checks["processor"] = {
-            "status": "healthy" if ocr_config.processor_id else "degraded",
-            "details": f"Processor ID: {ocr_config.processor_id or 'Using default processor'}"
-        }
-        
-        ocr_checks["project"] = {
-            "status": "healthy" if ocr_config.gcp_project_id else "unhealthy",
-            "details": f"Project: {ocr_config.gcp_project_id or 'Not configured'}"
-        }
-        
-        if not ocr_config.gcp_project_id:
-            ocr_status = "error"
-        elif not ocr_config.processor_id:
-            ocr_status = "degraded"
-        service_name = "Document AI"
-    else:
-        ocr_checks["service"] = {"status": "healthy", "details": "OCR disabled"}
-        service_name = "Disabled"
-    
-    components["ocr"] = {
-        "status": ocr_status,
-        "response_time_ms": round((time.time() - start_time) * 1000, 2),
-        "service": service_name,
-        "checks": ocr_checks
-    }
     
     # Determine overall status
     component_statuses = [comp["status"] for comp in components.values()]
@@ -290,23 +241,6 @@ async def debug_database():
             debug_info["get_invoices_error"] = str(e)
     
     return debug_info
-
-@router.get("/debug/ocr-config")
-async def debug_ocr_config():
-    """Debug endpoint to show OCR configuration"""
-    return {
-        "gcp_project_id": ocr_config.gcp_project_id,
-        "gcp_location": ocr_config.gcp_location,
-        "processor_id": ocr_config.processor_id,
-        "processor_name": ocr_config.get_processor_name(),
-        "enable_ocr": ocr_config.enable_ocr,
-        "env_vars": {
-            "GCP_PROJECT_ID": os.getenv("GCP_PROJECT_ID"),
-            "GCP_LOCATION": os.getenv("GCP_LOCATION"),
-            "DOCUMENT_AI_PROCESSOR_ID": os.getenv("DOCUMENT_AI_PROCESSOR_ID"),
-            "ENABLE_OCR": os.getenv("ENABLE_OCR")
-        }
-    }
 
 @router.get("/debug/storage")
 async def debug_storage():

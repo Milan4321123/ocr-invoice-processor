@@ -109,7 +109,7 @@ async def get_invoice_summary(
 @router.get("/reports/data-quality")
 async def get_data_quality():
     """
-    Get data quality metrics (OCR accuracy, missing fields, etc.)
+    Get data quality metrics (data completeness, field validation, etc.)
     Returns: Quality statistics and missing data summary
     """
     try:
@@ -138,47 +138,28 @@ async def get_data_quality():
                 }
             }
         
-        # Calculate metrics (use German field names)
-        ocr_completed = sum(1 for inv in invoices if inv.get('ocr_status') == 'completed')
-        ocr_pending = sum(1 for inv in invoices if inv.get('ocr_status') == 'pending')
-        ocr_failed = sum(1 for inv in invoices if inv.get('ocr_status') == 'failed')
+        # Calculate data completeness metrics (use German field names)
+        processed_invoices = sum(1 for inv in invoices if inv.get('status') in ['completed', 'in_review'])
+        pending_invoices = sum(1 for inv in invoices if inv.get('status') == 'uploaded')
         
         missing_due_dates = sum(1 for inv in invoices if not inv.get('faelligkeit'))
         missing_amounts = sum(1 for inv in invoices if not inv.get('rechnungsbetrag'))
         missing_vendors = sum(1 for inv in invoices if not inv.get('rechnungssteller'))
         
-        # Calculate average confidence (from OCR data)
-        confidences = []
-        for inv in invoices:
-            # Try to get confidence from raw_ocr_data first, then fall back to ocr_confidence field
-            ocr_data = inv.get('raw_ocr_data', {})
-            if isinstance(ocr_data, dict):
-                confidence = ocr_data.get('confidence', 0)
-            else:
-                confidence = inv.get('ocr_confidence', 0)
-            
-            if confidence is not None:
-                confidences.append(float(confidence))
-            else:
-                confidences.append(0)
-        avg_confidence = sum(confidences) / len(confidences) if confidences else 0
-        
-        # Calculate quality score (0-100)
-        ocr_score = (ocr_completed / total_invoices) * 100 if total_invoices > 0 else 0
+        # Calculate quality score based on data completeness (0-100)
+        completion_rate = (processed_invoices / total_invoices) * 100 if total_invoices > 0 else 0
         completeness_score = ((total_invoices - missing_due_dates - missing_amounts - missing_vendors) / (total_invoices * 3)) * 100 if total_invoices > 0 else 0
-        confidence_score = avg_confidence * 100
         
-        overall_quality = (ocr_score + completeness_score + confidence_score) / 3
-        
+        overall_quality = (completion_rate + completeness_score) / 2
+
         return {
             "success": True,
             "metrics": {
                 "total_invoices": total_invoices,
-                "ocr_statistics": {
-                    "completed": ocr_completed,
-                    "pending": ocr_pending,
-                    "failed": ocr_failed,
-                    "completion_rate": (ocr_completed / total_invoices) * 100 if total_invoices > 0 else 0
+                "processing_statistics": {
+                    "completed": processed_invoices,
+                    "pending": pending_invoices,
+                    "completion_rate": completion_rate
                 },
                 "missing_data": {
                     "due_dates": missing_due_dates,
@@ -186,18 +167,10 @@ async def get_data_quality():
                     "vendors": missing_vendors,
                     "total_missing": missing_due_dates + missing_amounts + missing_vendors
                 },
-                "confidence_metrics": {
-                    "average": avg_confidence,
-                    "average_percentage": avg_confidence * 100,
-                    "high_confidence": sum(1 for c in confidences if c >= 0.8),
-                    "medium_confidence": sum(1 for c in confidences if 0.6 <= c < 0.8),
-                    "low_confidence": sum(1 for c in confidences if c < 0.6)
-                },
                 "quality_score": {
                     "overall": round(overall_quality, 1),
-                    "ocr_processing": round(ocr_score, 1),
-                    "data_completeness": round(completeness_score, 1),
-                    "ocr_confidence": round(confidence_score, 1)
+                    "processing_rate": round(completion_rate, 1),
+                    "data_completeness": round(completeness_score, 1)
                 }
             }
         }
@@ -324,27 +297,18 @@ async def get_project_analysis():
             vendor = invoice.get('rechnungssteller') or 'Unknown Vendor'  # Use German field name
             amount = float(invoice.get('rechnungsbetrag', 0)) if invoice.get('rechnungsbetrag') else 0  # Use German field name
             
-            # Get confidence from OCR data
-            ocr_data = invoice.get('raw_ocr_data', {})
-            if isinstance(ocr_data, dict):
-                confidence = float(ocr_data.get('confidence', 0))
-            else:
-                confidence = float(invoice.get('ocr_confidence', 0)) if invoice.get('ocr_confidence') else 0
-            
             # Project analysis
             if project not in projects:
                 projects[project] = {
                     "name": project,
                     "invoice_count": 0,
                     "total_amount": 0,
-                    "vendors": set(),
-                    "confidences": []
+                    "vendors": set()
                 }
             
             projects[project]["invoice_count"] += 1
             projects[project]["total_amount"] += amount
             projects[project]["vendors"].add(vendor)
-            projects[project]["confidences"].append(confidence)
             
             # Vendor analysis
             if vendor not in vendors:
@@ -352,39 +316,33 @@ async def get_project_analysis():
                     "name": vendor,
                     "invoice_count": 0,
                     "total_amount": 0,
-                    "projects": set(),
-                    "confidences": []
+                    "projects": set()
                 }
             
             vendors[vendor]["invoice_count"] += 1
             vendors[vendor]["total_amount"] += amount
             vendors[vendor]["projects"].add(project)
-            vendors[vendor]["confidences"].append(confidence)
         
         # Process project data
         project_data = []
         for project_name, data in projects.items():
-            avg_confidence = sum(data["confidences"]) / len(data["confidences"]) if data["confidences"] else 0
             project_data.append({
                 "name": project_name,
                 "invoice_count": data["invoice_count"],
                 "total_amount": data["total_amount"],
                 "vendor_count": len(data["vendors"]),
-                "vendors": list(data["vendors"]),
-                "avg_confidence": avg_confidence
+                "vendors": list(data["vendors"])
             })
         
         # Process vendor data
         vendor_data = []
         for vendor_name, data in vendors.items():
-            avg_confidence = sum(data["confidences"]) / len(data["confidences"]) if data["confidences"] else 0
             vendor_data.append({
                 "name": vendor_name,
                 "invoice_count": data["invoice_count"],
                 "total_amount": data["total_amount"],
                 "project_count": len(data["projects"]),
-                "projects": list(data["projects"]),
-                "avg_confidence": avg_confidence
+                "projects": list(data["projects"])
             })
         
         # Sort by total amount
