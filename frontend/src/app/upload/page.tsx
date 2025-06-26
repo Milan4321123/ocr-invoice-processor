@@ -23,13 +23,13 @@ export default function UploadPage() {
 
   const handleUploadStart = () => {
     setIsUploading(true)
-    toast.loading('Uploading file...', { id: 'upload' })
+    toast.loading('Datei wird hochgeladen...', { id: 'upload' })
   }
 
   const handleUploadComplete = (data: UploadedFile) => {
     setUploadedFile(data)
     setIsUploading(false)
-    toast.success('File uploaded successfully!', { id: 'upload' })
+    toast.success('Datei erfolgreich hochgeladen!', { id: 'upload' })
   }
 
   const handleUploadError = (error: string) => {
@@ -66,12 +66,12 @@ export default function UploadPage() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Back to Home
+            Zurück zur Startseite
           </Link>
           
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Upload Invoice</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Rechnung hochladen</h1>
           <p className="text-gray-600">
-            Upload your PDF invoice for storage and manual editing with searchable dropdowns.
+            Laden Sie Ihre PDF-Rechnung für die Speicherung und manuelle Bearbeitung mit durchsuchbaren Dropdown-Menüs hoch.
           </p>
         </div>
 
@@ -84,17 +84,17 @@ export default function UploadPage() {
             />
             
             <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="font-medium text-gray-900 mb-2">Filename Requirements:</h3>
+              <h3 className="font-medium text-gray-900 mb-2">Dateinamen-Anforderungen:</h3>
               <p className="text-sm text-gray-600 mb-2">
                 <code className="bg-gray-200 px-2 py-1 rounded">
                   YYYYMMDD_IDENTIFIER_VENDOR_TYPE.pdf
                 </code>
               </p>
               <ul className="text-sm text-gray-600 space-y-1">
-                <li>• <strong>YYYYMMDD:</strong> Date in format (e.g., 20241201)</li>
-                <li>• <strong>IDENTIFIER:</strong> Invoice or order number (e.g., INV001)</li>
-                <li>• <strong>VENDOR:</strong> Company name (e.g., ACME)</li>
-                <li>• <strong>TYPE:</strong> Document type (e.g., SUPPLY, SERVICE)</li>
+                <li>• <strong>JJJJMMTT:</strong> Datum im Format (z.B. 20241201)</li>
+                <li>• <strong>KENNUNG:</strong> Rechnungs- oder Bestellnummer (z.B. INV001)</li>
+                <li>• <strong>LIEFERANT:</strong> Firmenname (z.B. ACME)</li>
+                <li>• <strong>TYP:</strong> Dokumenttyp (z.B. SUPPLY, SERVICE)</li>
               </ul>
             </div>
           </div>
@@ -104,14 +104,14 @@ export default function UploadPage() {
               <svg className="w-6 h-6 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <h2 className="text-lg font-semibold text-green-800">Upload Successful!</h2>
+              <h2 className="text-lg font-semibold text-green-800">Upload erfolgreich!</h2>
             </div>
             
             <div className="space-y-2 mb-6">
-              <p><strong>Filename:</strong> {uploadedFile.filename}</p>
-              <p><strong>File Size:</strong> {formatFileSize(uploadedFile.file_size)}</p>
+              <p><strong>Dateiname:</strong> {uploadedFile.filename}</p>
+              <p><strong>Dateigröße:</strong> {formatFileSize(uploadedFile.file_size)}</p>
               <p><strong>Status:</strong> {uploadedFile.status}</p>
-              <p><strong>File ID:</strong> {uploadedFile.id}</p>
+              <p><strong>Datei-ID:</strong> {uploadedFile.id}</p>
             </div>
             
             <div className="flex gap-4">
@@ -119,13 +119,13 @@ export default function UploadPage() {
                 onClick={navigateToDashboard}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
               >
-                View Dashboard
+                Dashboard anzeigen
               </button>
               <button
                 onClick={uploadAnother}
                 className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-6 py-2 rounded-lg font-medium transition-colors"
               >
-                Upload Another File
+                Weitere Datei hochladen
               </button>
             </div>
           </div>

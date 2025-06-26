@@ -26,30 +26,17 @@ export interface AddOptionRequest {
   label?: string;
 }
 
-export interface PotentialDuplicate {
-  existing_option: DropdownOption;
-  similarity: number;
-  normalized_new: string;
-  normalized_existing: string;
-}
-
 export interface AddOptionResponse {
   success: boolean;
   message?: string;
-  duplicate_detected?: boolean;
-  existing_option?: DropdownOption;
-  potential_duplicates?: PotentialDuplicate[];
-  suggested_option?: DropdownOption;
   option?: DropdownOption;
 }
-
-
 
 class DropdownService {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+    this.baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
   }
 
   /**
@@ -98,8 +85,6 @@ class DropdownService {
     return response.json();
   }
 
-
-
   /**
    * Delete a custom dropdown option (cannot delete default options)
    */
@@ -124,7 +109,8 @@ class DropdownService {
       'rechnungsempfaenger': 'Rechnungsempfänger',
       'rechnungssteller': 'Rechnungssteller',
       'projekt': 'Projekt',
-      'gewerk': 'Gewerk'
+      'gewerk': 'Gewerk',
+      'weiter_berechnen_an': 'Weiter berechnen an'
     };
     
     return labels[fieldName] || fieldName;
@@ -134,7 +120,7 @@ class DropdownService {
    * Get all supported German field names
    */
   getSupportedFields(): string[] {
-    return ['rechnungsempfaenger', 'rechnungssteller', 'projekt', 'gewerk'];
+    return ['rechnungsempfaenger', 'rechnungssteller', 'projekt', 'gewerk', 'weiter_berechnen_an'];
   }
 }
 

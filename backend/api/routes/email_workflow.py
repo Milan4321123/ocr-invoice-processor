@@ -25,6 +25,10 @@ class EditorNotificationRequest(BaseModel):
     editor_name: str
     changes_summary: Optional[List[Dict[str, Any]]] = None
 
+class DropdownChangeNotificationRequest(BaseModel):
+    user_email: EmailStr
+    changes: List[Dict[str, Any]]
+
 class BauleiterApprovalRequest(BaseModel):
     invoice_id: str
     bauleiter_email: EmailStr
@@ -114,6 +118,61 @@ async def send_editor_notification(
             await _update_invoice_status(request.invoice_id, 'edited')
         except:
             pass
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+@router.post("/email/dropdown-change-notification", response_model=EmailResponse)
+async def send_dropdown_change_notification(
+    request: DropdownChangeNotificationRequest,
+    http_request: Request
+):
+    """
+    Send notification email about dropdown option changes.
+    This endpoint:
+    1. Validates the request
+    2. Sends an email summary of dropdown changes
+    3. Logs the activity for audit
+    """
+    try:
+        request_id = getattr(http_request.state, 'request_id', None)
+        
+        # Validate changes list is not empty
+        if not request.changes:
+            raise HTTPException(status_code=400, detail="Changes list cannot be empty")
+        
+        # Send dropdown change notification
+        result = await email_service.send_dropdown_change_notification(
+            user_email=request.user_email,
+            changes=request.changes
+        )
+        
+        if not result["success"]:
+            raise HTTPException(status_code=500, detail=f"Email send failed: {result.get('error')}")
+        
+        # Log security event
+        await _log_security_event(
+            event_type="dropdown_change_notification_sent",
+            ip_address=http_request.client.host,
+            user_email=request.user_email,
+            event_data={
+                "changes_count": len(request.changes),
+                "message_id": result.get("message_id"),
+                "request_id": request_id
+            }
+        )
+        
+        logger.info(f"Dropdown change notification sent successfully to {request.user_email}")
+        
+        return EmailResponse(
+            success=True,
+            message="Dropdown change notification sent successfully",
+            message_id=result.get("message_id"),
+            timestamp=datetime.now().isoformat()
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error sending dropdown change notification: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @router.post("/email/bauleiter-approval", response_model=EmailResponse)

@@ -5,7 +5,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Plus, X } from 'lucide-react';
+import { ChevronDown, Plus, X, Trash2 } from 'lucide-react';
 import { DropdownOption } from '@/services/dropdown';
 
 interface SearchableDropdownProps {
@@ -14,10 +14,12 @@ interface SearchableDropdownProps {
   options: DropdownOption[];
   onChange: (value: string) => void;
   onAddNew?: (newValue: string) => void;
+  onDelete?: (optionValue: string) => void;
   placeholder?: string;
   disabled?: boolean;
   className?: string;
   showAddNew?: boolean;
+  showDelete?: boolean;
 }
 
 export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
@@ -26,10 +28,12 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
   options,
   onChange,
   onAddNew,
-  placeholder = "Select an option...",
+  onDelete,
+  placeholder = "Option auswählen...",
   disabled = false,
   className = "",
-  showAddNew = true
+  showAddNew = true,
+  showDelete = true
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -78,7 +82,7 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
       );
       
       if (exactDuplicate) {
-        alert(`This option already exists: "${exactDuplicate.label}"`);
+        alert(`Diese Option existiert bereits: "${exactDuplicate.label}"`);
         return;
       }
       
@@ -91,7 +95,7 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
       if (similarOptions.length > 0) {
         const similarLabels = similarOptions.map(opt => opt.label).join(', ');
         const confirmed = confirm(
-          `Similar options already exist: ${similarLabels}\n\nDo you still want to add "${trimmedValue}"?`
+          `Ähnliche Optionen existieren bereits: ${similarLabels}\n\nMöchten Sie "${trimmedValue}" trotzdem hinzufügen?`
         );
         if (!confirmed) {
           return;
@@ -102,6 +106,18 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
       setNewOptionValue('');
       setShowAddDialog(false);
       setIsOpen(false);
+    }
+  };
+
+  const handleDelete = (optionValue: string, optionLabel: string, isDefault: boolean, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent dropdown from closing
+    
+    if (onDelete) {
+      const optionType = isDefault ? 'Standard' : 'Benutzerdefinierte';
+      const confirmed = confirm(`Sind Sie sicher, dass Sie die ${optionType.toLowerCase()} Option "${optionLabel}" löschen möchten?\n\nDiese Aktion kann nicht rückgängig gemacht werden.`);
+      if (confirmed) {
+        onDelete(optionValue);
+      }
     }
   };
 
@@ -163,26 +179,42 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
             <div className="max-h-60 overflow-y-auto">
               {filteredOptions.length > 0 ? (
                 filteredOptions.map((option, index) => (
-                  <button
+                  <div
                     key={`${option.value}_${index}_${option.is_default ? 'default' : 'custom'}`}
-                    type="button"
-                    onClick={() => handleSelect(option.value)}
                     className={`
-                      w-full px-3 py-2 text-left hover:bg-blue-50 flex items-center justify-between
+                      flex items-center justify-between hover:bg-blue-50 group
                       ${value === option.value ? 'bg-blue-100 text-blue-900' : 'text-gray-900'}
                     `}
                   >
-                    <span>{option.label}</span>
-                    {option.is_default && (
-                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                        Standard
-                      </span>
+                    <button
+                      type="button"
+                      onClick={() => handleSelect(option.value)}
+                      className="flex-1 px-3 py-2 text-left flex items-center justify-between"
+                    >
+                      <span>{option.label}</span>
+                      {option.is_default && (
+                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded mr-2">
+                          Standard
+                        </span>
+                      )}
+                    </button>
+                    
+                    {/* Delete button for ALL options */}
+                    {showDelete && onDelete && (
+                      <button
+                        type="button"
+                        onClick={(e) => handleDelete(option.value, option.label, option.is_default, e)}
+                        className="opacity-0 group-hover:opacity-100 mr-2 p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-opacity"
+                        title={`Delete "${option.label}"`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     )}
-                  </button>
+                  </div>
                 ))
               ) : (
                 <div className="px-3 py-2 text-gray-500 text-sm">
-                  No options found
+                  Keine Optionen gefunden
                 </div>
               )}
             </div>
@@ -196,7 +228,7 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                   className="w-full px-3 py-2 text-left text-blue-600 hover:bg-blue-50 flex items-center gap-2 text-sm"
                 >
                   <Plus className="h-4 w-4" />
-                  Add new option
+                  Neue Option hinzufügen
                 </button>
               </div>
             )}
@@ -210,7 +242,7 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
           <div className="bg-white rounded-lg p-6 w-96 max-w-md mx-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium text-gray-900">
-                Add New {label}
+                Neue {label} hinzufügen
               </h3>
               <button
                 onClick={() => {
@@ -225,14 +257,14 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
 
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Option Name
+                Name der Option
               </label>
               <input
                 type="text"
                 value={newOptionValue}
                 onChange={(e) => setNewOptionValue(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAddNew()}
-                placeholder={`Enter new ${label.toLowerCase()}`}
+                placeholder={`Neue ${label.toLowerCase()} eingeben`}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                 autoFocus
               />
@@ -246,14 +278,14 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                 }}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
               >
-                Cancel
+                Abbrechen
               </button>
               <button
                 onClick={handleAddNew}
                 disabled={!newOptionValue.trim()}
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
-                Add Option
+                Option hinzufügen
               </button>
             </div>
           </div>

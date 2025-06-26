@@ -52,7 +52,7 @@ export default function Dropzone({ onUploadComplete, onUploadStart, onUploadErro
     
     // Validate file type
     if (pdf.type !== "application/pdf") {
-      const errorMsg = "Only PDF files are allowed";
+      const errorMsg = "Nur PDF-Dateien sind erlaubt";
       setErrorMessage(errorMsg);
       setStatus("error");
       toast.error(errorMsg);
@@ -62,10 +62,10 @@ export default function Dropzone({ onUploadComplete, onUploadStart, onUploadErro
     
     // Validate filename format
     if (!validateFilename(pdf.name)) {
-      const errorMsg = "Filename must follow pattern: YYYYMMDD_IDENTIFIER_VENDOR_TYPE.pdf";
+      const errorMsg = "Dateiname muss dem Muster folgen: JJJJMMTT_KENNUNG_LIEFERANT_TYP.pdf";
       setErrorMessage(errorMsg);
       setStatus("error");
-      toast.error("Invalid filename format");
+      toast.error("Ungültiges Dateinamen-Format");
       onUploadError?.(errorMsg);
       return;
     }
@@ -98,20 +98,20 @@ export default function Dropzone({ onUploadComplete, onUploadStart, onUploadErro
       
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || "Upload failed");
+        throw new Error(errorData.detail || "Upload fehlgeschlagen");
       }
       
       const data: UploadResponse = await response.json();
       setStatus("success");
       setUploadedFile(data);
-      toast.success("File uploaded successfully!");
+      toast.success("Datei erfolgreich hochgeladen!");
       
       if (onUploadComplete) {
         onUploadComplete(data);
       }
     } catch (error) {
       console.error("Upload error:", error);
-      const errorMsg = error instanceof Error ? error.message : "Upload failed";
+      const errorMsg = error instanceof Error ? error.message : "Upload fehlgeschlagen";
       setErrorMessage(errorMsg);
       setStatus("error");
       setUploadProgress(0);
@@ -154,7 +154,7 @@ export default function Dropzone({ onUploadComplete, onUploadStart, onUploadErro
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <p className="text-lg font-medium mb-2">Uploading...</p>
+            <p className="text-lg font-medium mb-2">Hochladen...</p>
             <div className="w-full bg-gray-200 rounded-full h-2 max-w-xs mx-auto">
               <div 
                 className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
@@ -168,11 +168,11 @@ export default function Dropzone({ onUploadComplete, onUploadStart, onUploadErro
             <svg className="h-12 w-12 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <p className="text-lg font-medium mb-2">Upload Successful!</p>
+            <p className="text-lg font-medium mb-2">Upload erfolgreich!</p>
             {uploadedFile && (
               <div className="text-sm text-gray-600 mt-4">
-                <p><strong>File:</strong> {uploadedFile.filename}</p>
-                <p><strong>Size:</strong> {formatFileSize(uploadedFile.file_size)}</p>
+                <p><strong>Datei:</strong> {uploadedFile.filename}</p>
+                <p><strong>Größe:</strong> {formatFileSize(uploadedFile.file_size)}</p>
                 <p><strong>Status:</strong> {uploadedFile.status}</p>
               </div>
             )}
@@ -183,7 +183,7 @@ export default function Dropzone({ onUploadComplete, onUploadStart, onUploadErro
               }}
               className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
             >
-              Upload Another File
+              Weitere Datei hochladen
             </button>
           </div>
         ) : status === 'error' ? (
@@ -191,7 +191,7 @@ export default function Dropzone({ onUploadComplete, onUploadStart, onUploadErro
             <svg className="h-12 w-12 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
             </svg>
-            <p className="text-lg font-medium mb-2">Upload Failed</p>
+            <p className="text-lg font-medium mb-2">Upload fehlgeschlagen</p>
             <p className="text-sm">{errorMessage}</p>
             <button 
               onClick={(e) => {
@@ -200,7 +200,7 @@ export default function Dropzone({ onUploadComplete, onUploadStart, onUploadErro
               }}
               className="mt-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
             >
-              Try Again
+              Erneut versuchen
             </button>
           </div>
         ) : (
@@ -209,13 +209,13 @@ export default function Dropzone({ onUploadComplete, onUploadStart, onUploadErro
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
             <p className="text-lg font-medium mb-2">
-              {isDragActive ? 'Drop the PDF file here' : 'Drag and drop a PDF file here'}
+              {isDragActive ? 'PDF-Datei hier ablegen' : 'PDF-Datei per Drag & Drop hier ablegen'}
             </p>
-            <p className="text-sm text-gray-400 mb-4">or click to select a file</p>
+            <p className="text-sm text-gray-400 mb-4">oder klicken Sie, um eine Datei auszuwählen</p>
             <div className="text-xs text-gray-400 bg-gray-100 rounded-lg p-3 max-w-md mx-auto">
-              <p className="font-medium mb-1">Filename Requirements:</p>
-              <p>YYYYMMDD_IDENTIFIER_VENDOR_TYPE.pdf</p>
-              <p className="mt-1">Example: 20250528_INV001_ACME_SERVICE.pdf</p>
+              <p className="font-medium mb-1">Dateinamen-Anforderungen:</p>
+              <p>JJJJMMTT_KENNUNG_LIEFERANT_TYP.pdf</p>
+              <p className="mt-1">Beispiel: 20250528_INV001_ACME_SERVICE.pdf</p>
             </div>
           </div>
         )}

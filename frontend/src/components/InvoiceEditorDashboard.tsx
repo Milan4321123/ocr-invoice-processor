@@ -43,16 +43,16 @@ export default function InvoiceEditorDashboard({
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const response = await fetch(`${apiUrl}/api/invoices/${invoiceId}/editor`);
       if (!response.ok) {
-        throw new Error(`Failed to load invoice: ${response.statusText}`);
+        throw new Error(`Rechnung konnte nicht geladen werden: ${response.statusText}`);
       }
 
       const data = await response.json();
       setPdfUrl(data.pdfUrl);
       setFields(data.fields || {});
-      setFilename(data.filename || `Invoice ${invoiceId}`);
+      setFilename(data.filename || `Rechnung ${invoiceId}`);
     } catch (err) {
       console.error('Error loading invoice data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load invoice data');
+      setError(err instanceof Error ? err.message : 'Rechnungsdaten konnten nicht geladen werden');
     } finally {
       setIsLoading(false);
     }
@@ -79,7 +79,7 @@ export default function InvoiceEditorDashboard({
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to save: ${response.statusText}`);
+        throw new Error(`Speichern fehlgeschlagen: ${response.statusText}`);
       }
 
       setFields(updatedFields);
@@ -105,7 +105,7 @@ export default function InvoiceEditorDashboard({
 
   const handlePdfLoadError = (error: any) => {
     console.error('PDF load error:', error);
-    setError('Failed to load PDF document');
+    setError('PDF-Dokument konnte nicht geladen werden');
   };
 
   if (isLoading) {
@@ -113,8 +113,8 @@ export default function InvoiceEditorDashboard({
       <div className="flex items-center justify-center h-screen bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <h2 className="text-xl font-semibold text-gray-700 mb-2">Loading Invoice Editor</h2>
-          <p className="text-gray-500">Preparing your document...</p>
+          <h2 className="text-xl font-semibold text-gray-700 mb-2">Rechnungseditor wird geladen</h2>
+          <p className="text-gray-500">Dokument wird vorbereitet...</p>
         </div>
       </div>
     );
@@ -125,13 +125,13 @@ export default function InvoiceEditorDashboard({
       <div className="flex items-center justify-center h-screen bg-gray-50">
         <div className="text-center max-w-md">
           <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-700 mb-2">Error Loading Invoice</h2>
+          <h2 className="text-xl font-semibold text-gray-700 mb-2">Fehler beim Laden der Rechnung</h2>
           <p className="text-gray-500 mb-4">{error}</p>
           <button
             onClick={loadInvoiceData}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
-            Try Again
+            Erneut versuchen
           </button>
         </div>
       </div>
@@ -140,16 +140,18 @@ export default function InvoiceEditorDashboard({
 
   return (
     <div className="h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
+      {/* Modern Header */}
+      <header className="bg-white border-b border-gray-200 shadow-sm">
+        <div className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center space-x-4">
-            <FileText className="h-6 w-6 text-blue-600" />
+            <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-lg">
+              <FileText className="h-5 w-5 text-blue-600" />
+            </div>
             <div>
               <h1 className="text-xl font-semibold text-gray-900 truncate max-w-md">
                 {filename}
               </h1>
-              <p className="text-sm text-gray-500">Invoice ID: {invoiceId}</p>
+              <p className="text-sm text-gray-500">Rechnungs-ID: {invoiceId}</p>
             </div>
           </div>
           
@@ -158,7 +160,7 @@ export default function InvoiceEditorDashboard({
             <div className="lg:hidden flex bg-gray-100 rounded-lg p-1">
               <button
                 onClick={() => setMobileView('pdf')}
-                className={`flex items-center space-x-1 px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
                   mobileView === 'pdf' 
                     ? 'bg-white text-blue-600 shadow-sm' 
                     : 'text-gray-600 hover:text-gray-900'
@@ -169,60 +171,74 @@ export default function InvoiceEditorDashboard({
               </button>
               <button
                 onClick={() => setMobileView('form')}
-                className={`flex items-center space-x-1 px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
                   mobileView === 'form' 
                     ? 'bg-white text-blue-600 shadow-sm' 
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
                 <FileInput className="h-4 w-4" />
-                <span>Form</span>
+                <span>Formular</span>
               </button>
             </div>
 
             {/* PDF Info */}
             {pdfNumPages > 0 && (
-              <div className="flex items-center space-x-2 text-sm text-gray-600">
-                <Eye className="h-4 w-4" />
-                <span>{pdfNumPages} page{pdfNumPages !== 1 ? 's' : ''}</span>
+              <div className="hidden sm:flex items-center space-x-2 px-3 py-2 bg-gray-50 rounded-lg">
+                <Eye className="h-4 w-4 text-gray-500" />
+                <span className="text-sm text-gray-600">{pdfNumPages} Seite{pdfNumPages !== 1 ? 'n' : ''}</span>
               </div>
             )}
 
             {/* Unsaved Changes Indicator */}
             {hasUnsavedChanges && (
-              <div className="flex items-center space-x-2 text-sm text-amber-600">
-                <Edit3 className="h-4 w-4" />
-                <span>Unsaved changes</span>
+              <div className="flex items-center space-x-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+                <Edit3 className="h-4 w-4 text-amber-600" />
+                <span className="text-sm text-amber-700 font-medium">Ungespeicherte Änderungen</span>
               </div>
             )}
           </div>
         </div>
       </header>
 
-      {/* Main Content - Split Screen */}
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        {/* Left Side - PDF Viewer (50% on desktop, conditional on mobile) */}
+      {/* Main Content - Modern Split Screen */}
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-gray-100">
+        {/* Left Side - Enhanced PDF Viewer */}
         <div className={`w-full lg:w-1/2 bg-white border-b lg:border-b-0 lg:border-r border-gray-200 h-1/2 lg:h-full ${
           mobileView === 'pdf' ? 'block' : 'hidden lg:block'
         }`}>
           {pdfUrl ? (
-            <PDFViewer
-              pdfUrl={pdfUrl}
-              onLoadSuccess={handlePdfLoadSuccess}
-              onLoadError={handlePdfLoadError}
-              className="h-full"
-            />
+            <div className="h-full flex flex-col">
+              <div className="bg-gray-50 border-b border-gray-200 px-4 py-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-700">PDF-Dokument</span>
+                  {pdfNumPages > 0 && (
+                    <span className="text-xs text-gray-500">{pdfNumPages} Seite{pdfNumPages !== 1 ? 'n' : ''}</span>
+                  )}
+                </div>
+              </div>
+              <div className="flex-1">
+                <PDFViewer
+                  pdfUrl={pdfUrl}
+                  onLoadSuccess={handlePdfLoadSuccess}
+                  onLoadError={handlePdfLoadError}
+                  className="h-full"
+                />
+              </div>
+            </div>
           ) : (
-            <div className="flex items-center justify-center h-full">
+            <div className="flex items-center justify-center h-full bg-gray-50">
               <div className="text-center text-gray-500">
-                <FileText className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                <p>No PDF document available</p>
+                <div className="w-16 h-16 mx-auto mb-4 bg-gray-200 rounded-lg flex items-center justify-center">
+                  <FileText className="h-8 w-8 text-gray-400" />
+                </div>
+                <p className="text-sm">Kein PDF-Dokument verfügbar</p>
               </div>
             </div>
           )}
         </div>
 
-        {/* Right Side - Invoice Form (50% on desktop, conditional on mobile) */}
+        {/* Right Side - Enhanced Invoice Form */}
         <div className={`w-full lg:w-1/2 bg-gray-50 h-1/2 lg:h-full ${
           mobileView === 'form' ? 'block' : 'hidden lg:block'
         }`}>

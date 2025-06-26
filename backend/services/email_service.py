@@ -200,6 +200,74 @@ class EmailService:
     </div>
 </body>
 </html>
+            """,
+            
+            "dropdown_change_notification": """
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dropdown Changes Notification</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .header { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .content { background: white; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; }
+        .changes-section { margin-top: 20px; }
+        .change-item { padding: 10px; border-left: 4px solid #007bff; margin-bottom: 10px; background: #f8f9fa; }
+        .change-add { border-left-color: #28a745; background: #f8fff9; }
+        .change-delete { border-left-color: #dc3545; background: #fff8f8; }
+        .footer { margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px; font-size: 0.9em; color: #666; }
+        .timestamp { font-size: 0.9em; color: #666; }
+        .field-name { font-weight: bold; color: #007bff; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📋 Dropdown Options Updated</h1>
+        <p><strong>Date:</strong> {{ timestamp }}</p>
+        <p><strong>Updated by:</strong> {{ user_email }}</p>
+        <p><strong>Total changes:</strong> {{ changes|length }}</p>
+    </div>
+    
+    <div class="content">
+        <h2>Changes Summary</h2>
+        <div class="changes-section">
+            {% for change in changes %}
+            <div class="change-item change-{{ change.type }}">
+                <h4>
+                    {% if change.type == 'add' %}
+                        ➕ Added new option
+                    {% elif change.type == 'delete' %}
+                        ➖ Deleted option
+                    {% endif %}
+                </h4>
+                <p><strong>Field:</strong> <span class="field-name">{{ change.fieldName }}</span></p>
+                <p><strong>Option:</strong> {{ change.optionLabel }}</p>
+                <p><strong>Value:</strong> <code>{{ change.optionValue }}</code></p>
+                <p class="timestamp"><strong>Time:</strong> {{ change.timestamp }}</p>
+                {% if change.success is defined %}
+                    <p><strong>Status:</strong> 
+                        {% if change.success %}
+                            <span style="color: #28a745;">✅ Success</span>
+                        {% else %}
+                            <span style="color: #dc3545;">❌ Failed</span>
+                        {% endif %}
+                    </p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        
+        <div class="footer">
+            <p><strong>System Information:</strong></p>
+            <p>This notification confirms that dropdown options have been updated in the invoice management system.</p>
+            <p>All changes are tracked for audit purposes.</p>
+            <p><strong>Timestamp:</strong> {{ iso_timestamp }}</p>
+        </div>
+    </div>
+</body>
+</html>
             """
         }
     
@@ -354,6 +422,54 @@ class EmailService:
                 "message_id": None
             }
     
+    async def send_dropdown_change_notification(
+        self,
+        user_email: str,
+        changes: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Send notification email about dropdown option changes.
+        """
+        try:
+            # Prepare template context
+            context = {
+                "user_email": user_email,
+                "changes": changes,
+                "timestamp": datetime.now().strftime("%d.%m.%Y um %H:%M"),
+                "iso_timestamp": datetime.now().isoformat()
+            }
+            
+            # Render template
+            template = self.jinja_env.get_template("dropdown_change_notification")
+            html_content = template.render(**context)
+            
+            # Email details
+            subject = f"Dropdown Options Updated - {len(changes)} changes"
+            
+            # Send email
+            result = await self._send_email(
+                to_email=user_email,
+                to_name=user_email.split('@')[0].title(),
+                subject=subject,
+                html_content=html_content,
+                email_type="dropdown_change_notification",
+                invoice_id=None,
+                template_used="dropdown_change_notification"
+            )
+            
+            if result["success"]:
+                logger.info(f"Dropdown change notification sent successfully to {user_email}")
+                
+            return result
+            
+        except Exception as e:
+            logger.error(f"Failed to send dropdown change notification: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e),
+                "message_id": None
+            }
+
     async def send_html_email(
         self,
         to_email: str,

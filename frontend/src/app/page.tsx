@@ -6,11 +6,11 @@ export default function Home() {
     <div className="container mx-auto px-4 py-16">
       <div className="max-w-4xl mx-auto text-center">
         <h1 className="text-5xl font-bold mb-6 text-gray-900">
-          Invoice Management System
+          Rechnungsverwaltungssystem
         </h1>
         <p className="text-xl text-gray-600 mb-12 max-w-2xl mx-auto">
-          Upload, edit, and manage your PDF invoices with searchable dropdowns and automated workflow. 
-          Transform manual invoice processing into an efficient digital system.
+          Laden Sie PDF-Rechnungen hoch, bearbeiten und verwalten Sie sie mit durchsuchbaren Dropdown-Menüs und automatisierten Arbeitsabläufen. 
+          Verwandeln Sie die manuelle Rechnungsverarbeitung in ein effizientes digitales System.
         </p>
         
         <div className="flex flex-col sm:flex-row justify-center gap-6 mb-16">
@@ -21,7 +21,7 @@ export default function Home() {
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
-            Upload Invoice
+            Rechnung hochladen
           </Link>
           <Link 
             href="/dashboard/folder-watcher" 
@@ -30,7 +30,7 @@ export default function Home() {
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2v0a2 2 0 002-2h6l2 2h6a2 2 0 012 2z" />
             </svg>
-            Folder Watcher
+            Ordnerüberwachung
           </Link>
         </div>
 
@@ -39,7 +39,7 @@ export default function Home() {
             href="/dashboard" 
             className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-6 py-3 rounded-lg font-medium transition-colors"
           >
-            View Dashboard →
+            Dashboard anzeigen →
           </Link>
         </div>
 
@@ -51,8 +51,8 @@ export default function Home() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold mb-2">Manual Upload</h3>
-            <p className="text-gray-600">Drag and drop PDF invoices for instant processing and review</p>
+            <h3 className="text-lg font-semibold mb-2">Manueller Upload</h3>
+            <p className="text-gray-600">Ziehen Sie PDF-Rechnungen per Drag & Drop für sofortige Verarbeitung und Prüfung</p>
           </div>
 
           <div className="bg-white p-6 rounded-lg shadow-sm">
@@ -61,8 +61,8 @@ export default function Home() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2v0a2 2 0 002-2h6l2 2h6a2 2 0 012 2z" />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold mb-2">Folder Watcher</h3>
-            <p className="text-gray-600">Automatic monitoring and processing of invoices from network folders</p>
+            <h3 className="text-lg font-semibold mb-2">Ordnerüberwachung</h3>
+            <p className="text-gray-600">Automatische Überwachung und Verarbeitung von Rechnungen aus Netzwerkordnern</p>
           </div>
 
           <div className="bg-white p-6 rounded-lg shadow-sm">
@@ -71,8 +71,8 @@ export default function Home() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold mb-2">Approval Workflow</h3>
-            <p className="text-gray-600">Review, edit, and approve invoices with skonto tracking in Prüfbericht</p>
+            <h3 className="text-lg font-semibold mb-2">Genehmigungsworkflow</h3>
+            <p className="text-gray-600">Prüfen, bearbeiten und genehmigen Sie Rechnungen mit Skonto-Verfolgung im Prüfbericht</p>
           </div>
         </div>
       </div>

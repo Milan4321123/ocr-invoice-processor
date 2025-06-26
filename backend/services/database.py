@@ -468,6 +468,32 @@ class DatabaseService:
         except Exception as e:
             logger.error(f"❌ Database error deleting dropdown option: {e}")
             return {"success": False, "error": str(e)}
+    
+    def update_dropdown_option(self, field_name: str, old_value: str, new_value: str, new_label: str) -> Dict[str, Any]:
+        """Update a dropdown option in the database"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            response = (self._client.table("dropdown_options")
+                       .update({
+                           "value": new_value,
+                           "label": new_label
+                       })
+                       .eq("field_name", field_name)
+                       .eq("value", old_value)
+                       .eq("is_active", True)
+                       .execute())
+            
+            if response.data:
+                logger.info(f"✅ Updated dropdown option: {field_name}.{old_value} -> {new_value}")
+                return {"success": True, "data": response.data[0]}
+            else:
+                return {"success": False, "error": "Option not found or no changes made"}
+                
+        except Exception as e:
+            logger.error(f"❌ Database error updating dropdown option: {e}")
+            return {"success": False, "error": str(e)}
 
 # =============================================================================
 # GLOBAL INSTANCE - Single database service for entire application

@@ -24,23 +24,23 @@ const nextConfig = {
       // Proxy API calls to backend server
       {
         source: '/api/folder-watcher/:path*',
-        destination: 'http://localhost:8001/api/folder-watcher/:path*',
+        destination: 'http://localhost:8000/api/folder-watcher/:path*',
       },
       {
         source: '/api/:path*',
-        destination: 'http://localhost:8001/api/:path*',
+        destination: 'http://localhost:8000/api/:path*',
       },
       {
         source: '/invoices/:path*',
-        destination: 'http://localhost:8001/invoices/:path*',
+        destination: 'http://localhost:8000/invoices/:path*',
       },
       {
         source: '/ocr/:path*',
-        destination: 'http://localhost:8001/ocr/:path*',
+        destination: 'http://localhost:8000/ocr/:path*',
       },
       {
         source: '/upload/:path*',
-        destination: 'http://localhost:8001/upload/:path*',
+        destination: 'http://localhost:8000/upload/:path*',
       },
     ];
   },
