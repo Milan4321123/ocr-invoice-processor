@@ -5,6 +5,7 @@ from typing import List, Dict, Any, Optional
 import logging
 
 from services.database import db_service
+from services.email_service import email_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -258,6 +259,7 @@ async def update_invoice_editor_data(
         raise HTTPException(status_code=400, detail="No data provided")
     
     fields = request_data.get("fields", {})
+    editor_info = request_data.get("editor_info", {})
     
     if not db_service.is_available:
         # Mock success for demo
@@ -306,11 +308,45 @@ async def update_invoice_editor_data(
             if not response.data:
                 raise HTTPException(status_code=404, detail="Invoice not found or update failed")
         
+        # Send email notification if editor information is provided
+        email_sent = False
+        if editor_info.get("editor_email") and editor_info.get("editor_name"):
+            try:
+                # Get updated invoice data for email
+                invoice_response = db_service.client.table("invoices_clean").select("*").eq("id", invoice_id).execute()
+                if invoice_response.data:
+                    invoice_data = invoice_response.data[0]
+                    
+                    # Send editor notification email
+                    email_result = await email_service.send_editor_notification(
+                        invoice_data=invoice_data,
+                        editor_email=editor_info["editor_email"],
+                        editor_name=editor_info["editor_name"],
+                        changes_summary=editor_info.get("changes_summary", []),
+                        request_id=None
+                    )
+                    
+                    if email_result["success"]:
+                        email_sent = True
+                        logger.info(f"Email notification sent successfully for invoice {invoice_id}")
+                    else:
+                        logger.warning(f"Email notification failed for invoice {invoice_id}: {email_result.get('error')}")
+                        
+            except ValueError as ve:
+                if "No email provider configured" in str(ve):
+                    logger.info(f"Email notification skipped for invoice {invoice_id}: No email provider configured (demo mode)")
+                else:
+                    logger.warning(f"Email notification error for invoice {invoice_id}: {str(ve)}")
+            except Exception as email_error:
+                logger.warning(f"Email notification error for invoice {invoice_id}: {str(email_error)}")
+                # Continue with successful save response even if email fails
+        
         return {
             "success": True,
             "message": "Invoice updated successfully",
             "invoice_id": invoice_id,
-            "updated_fields": list(update_data.keys())
+            "updated_fields": list(update_data.keys()),
+            "email_sent": email_sent
         }
         
     except HTTPException:

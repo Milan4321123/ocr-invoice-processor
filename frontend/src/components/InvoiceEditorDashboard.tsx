@@ -22,6 +22,7 @@ export default function InvoiceEditorDashboard({
   const [fields, setFields] = useState<GermanInvoiceFields>(initialData?.fields || {});
   const [filename, setFilename] = useState<string>(initialData?.filename || '');
   const [isLoading, setIsLoading] = useState<boolean>(!initialData);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
   const [pdfNumPages, setPdfNumPages] = useState<number>(0);
@@ -68,26 +69,57 @@ export default function InvoiceEditorDashboard({
 
   const handleSave = async (updatedFields: GermanInvoiceFields) => {
     try {
-      // API call to save invoice data
+      setIsSaving(true);
+      
+      // API call to save invoice data with editor information for email notification
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      
+      // Prepare editor information for email notification
+      const editorInfo = {
+        editor_email: updatedFields.rechnungspruefung_email || "editor@company.de",
+        editor_name: "Rechnung Bearbeiter",
+        changes_summary: [
+          {
+            field: "last_edited",
+            old_value: new Date().toISOString(),
+            new_value: "Rechnung wurde bearbeitet und gespeichert"
+          }
+        ]
+      };
+
       const response = await fetch(`${apiUrl}/api/invoices/${invoiceId}/editor`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ fields: updatedFields }),
+        body: JSON.stringify({ 
+          fields: updatedFields,
+          editor_info: editorInfo
+        }),
       });
 
       if (!response.ok) {
         throw new Error(`Speichern fehlgeschlagen: ${response.statusText}`);
       }
 
+      const result = await response.json();
       setFields(updatedFields);
       setHasUnsavedChanges(false);
+      
+      // Show success message including email confirmation
+      if (result.email_sent) {
+        alert(`✅ Rechnung erfolgreich gespeichert! Bestätigungs-E-Mail wurde an ${editorInfo.editor_email} gesendet.`);
+      } else {
+        alert('✅ Rechnung erfolgreich gespeichert!');
+      }
+      
       return true;
     } catch (err) {
       console.error('Error saving invoice:', err);
+      alert(`❌ Fehler beim Speichern: ${err instanceof Error ? err.message : 'Unbekannter Fehler'}`);
       throw err;
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -246,7 +278,7 @@ export default function InvoiceEditorDashboard({
             fields={fields}
             onFieldChange={(fieldName: string, value: any) => handleFieldChange(fieldName as keyof GermanInvoiceFields, value)}
             onSave={() => handleSave(fields)}
-            isSaving={isLoading}
+            isSaving={isSaving}
             className="h-full"
           />
         </div>
