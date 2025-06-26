@@ -2,15 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import PDFViewer from './PDFViewer';
-import InvoiceForm, { GermanInvoiceFields, ConfidenceScores } from './InvoiceForm';
-import { FileText, Eye, Edit3, AlertTriangle, CheckCircle, Monitor, FileInput } from 'lucide-react';
+import CleanInvoiceForm, { GermanInvoiceFields } from './CleanInvoiceForm';
+import { FileText, Eye, Edit3, AlertTriangle, Monitor, FileInput } from 'lucide-react';
 
 interface InvoiceEditorDashboardProps {
   invoiceId: string;
   initialData?: {
     pdfUrl: string;
     fields: GermanInvoiceFields;
-    confidenceScores: ConfidenceScores;
     filename?: string;
   };
 }
@@ -21,7 +20,6 @@ export default function InvoiceEditorDashboard({
 }: InvoiceEditorDashboardProps) {
   const [pdfUrl, setPdfUrl] = useState<string>(initialData?.pdfUrl || '');
   const [fields, setFields] = useState<GermanInvoiceFields>(initialData?.fields || {});
-  const [confidenceScores, setConfidenceScores] = useState<ConfidenceScores>(initialData?.confidenceScores || {});
   const [filename, setFilename] = useState<string>(initialData?.filename || '');
   const [isLoading, setIsLoading] = useState<boolean>(!initialData);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +48,6 @@ export default function InvoiceEditorDashboard({
       const data = await response.json();
       setPdfUrl(data.pdfUrl);
       setFields(data.fields || {});
-      setConfidenceScores(data.confidenceScores || {});
       setFilename(data.filename || `Invoice ${invoiceId}`);
     } catch (err) {
       console.error('Error loading invoice data:', err);
@@ -68,15 +65,15 @@ export default function InvoiceEditorDashboard({
     setHasUnsavedChanges(true);
   };
 
-  const handleSave = async (updatedFields: GermanInvoiceFields, reviewStatus?: 'under_review' | 'completed_review') => {
+  const handleSave = async (updatedFields: GermanInvoiceFields, submitForReview?: boolean) => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
       
       // Prepare the payload in the format expected by the backend
       const payload = {
         fields: updatedFields,
-        ...(reviewStatus && {
-          review_status: reviewStatus,
+        ...(submitForReview && {
+          review_status: 'under_review',
           reviewed_by: updatedFields.rechnungspruefung_email || 'system@example.com',
           reviewed_at: new Date().toISOString()
         })
@@ -85,7 +82,7 @@ export default function InvoiceEditorDashboard({
       console.log('Save request details:');
       console.log('- Invoice ID:', invoiceId);
       console.log('- Updated fields:', updatedFields);
-      console.log('- Review status:', reviewStatus);
+      console.log('- Submit for review:', submitForReview);
       console.log('- Final payload:', payload);
 
       const response = await fetch(`${apiUrl}/invoices/${invoiceId}/editor`, {
@@ -140,11 +137,6 @@ export default function InvoiceEditorDashboard({
     console.error('PDF load error:', error);
     setError('Failed to load PDF document');
   };
-
-  // Calculate overall confidence score
-  const overallConfidence = Object.values(confidenceScores).length > 0 
-    ? Math.round(Object.values(confidenceScores).reduce((a, b) => a + b, 0) / Object.values(confidenceScores).length)
-    : 0;
 
   if (isLoading) {
     return (
@@ -225,20 +217,6 @@ export default function InvoiceEditorDashboard({
                 <span>{pdfNumPages} page{pdfNumPages !== 1 ? 's' : ''}</span>
               </div>
             )}
-            
-            {/* Confidence Score */}
-            {overallConfidence > 0 && (
-              <div className="flex items-center space-x-2">
-                {overallConfidence >= 80 ? (
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                ) : (
-                  <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                )}
-                <span className="text-sm font-medium text-gray-700">
-                  {overallConfidence}% confidence
-                </span>
-              </div>
-            )}
 
             {/* Unsaved Changes Indicator */}
             {hasUnsavedChanges && (
@@ -278,9 +256,8 @@ export default function InvoiceEditorDashboard({
         <div className={`w-full lg:w-1/2 bg-gray-50 h-1/2 lg:h-full ${
           mobileView === 'form' ? 'block' : 'hidden lg:block'
         }`}>
-          <InvoiceForm
+          <CleanInvoiceForm
             fields={fields}
-            confidenceScores={confidenceScores}
             onFieldChange={handleFieldChange}
             onSave={handleSave}
             onCancel={handleCancel}
