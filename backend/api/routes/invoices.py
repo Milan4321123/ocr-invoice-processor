@@ -2,6 +2,7 @@
 from fastapi import APIRouter, HTTPException, Path
 from fastapi.responses import StreamingResponse
 from typing import List, Dict, Any, Optional
+import logging
 
 from services.database import db_service
 
