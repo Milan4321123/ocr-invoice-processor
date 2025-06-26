@@ -24,7 +24,7 @@ export default function Home() {
             Upload Invoice
           </Link>
           <Link 
-            href="/folder-watcher" 
+            href="/dashboard/folder-watcher" 
             className="bg-green-600 hover:bg-green-700 text-white px-8 py-6 rounded-lg font-medium text-lg transition-colors flex items-center justify-center gap-3 shadow-lg"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -28,7 +28,8 @@ export default function FolderWatcherWidget() {
 
   const fetchStatus = async () => {
     try {
-      const response = await fetch('/api/folder-watcher/status');
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(`${apiUrl}/api/folder-watcher/status`);
       if (response.ok) {
         const data = await response.json();
         setStatus(data);
@@ -156,7 +157,7 @@ export default function FolderWatcherWidget() {
 
       <div className="flex gap-2">
         <button 
-          onClick={() => window.location.href = '/folder-watcher'}
+          onClick={() => window.location.href = '/dashboard/folder-watcher'}
           className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 px-4 py-2 rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2"
         >
           <FolderIcon className="w-4 h-4" />

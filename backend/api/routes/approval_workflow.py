@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Dict, Any
 import logging
 
-from ..services.database import db_service
+from services.database import db_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/approval", tags=["approval"])

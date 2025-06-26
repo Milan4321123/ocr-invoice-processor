@@ -24,7 +24,7 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001", "http://127.0.0.1:3001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -62,7 +62,7 @@ app.include_router(approval.router, prefix="/api", tags=["approval"])
 app.include_router(approval_workflow.router, prefix="/api", tags=["workflow"])
 app.include_router(email_workflow.router, prefix="/api", tags=["email"])
 app.include_router(reports.router, prefix="/api", tags=["reports"])
-app.include_router(folder_watcher.router, prefix="/api", tags=["folder-watcher"])
+app.include_router(folder_watcher.router, prefix="/api/folder-watcher", tags=["folder-watcher"])
 
 @app.get("/")
 async def root():

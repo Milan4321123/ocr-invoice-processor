@@ -53,10 +53,12 @@ export default function PDFViewer({
 
   const onDocumentLoadError = useCallback((error: any) => {
     console.error('PDF loading error:', error);
-    setError('Failed to load PDF');
+    console.error('PDF URL:', pdfUrl);
+    console.error('Error details:', JSON.stringify(error, null, 2));
+    setError(`Failed to load PDF: ${error.message || error.toString()}`);
     setIsLoading(false);
     onLoadError?.(error);
-  }, [onLoadError]);
+  }, [onLoadError, pdfUrl]);
 
   const handleZoomIn = () => {
     setScale(prev => Math.min(prev + 0.25, 3.0));

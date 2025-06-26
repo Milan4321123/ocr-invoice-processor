@@ -16,6 +16,7 @@ import {
   Clock,
   RefreshCw
 } from 'lucide-react'
+import FolderWatcherWidget from './FolderWatcherWidget'
 
 interface CleanInvoice {
   id: string
@@ -60,8 +61,8 @@ export default function CleanInvoiceDashboard() {
     try {
       setLoading(true)
       setError(null)
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
-      const response = await fetch(`${apiUrl}/invoices`)
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(`${apiUrl}/api/invoices`)
       
       if (!response.ok) {
         throw new Error(`Failed to fetch invoices: ${response.statusText}`)
@@ -84,8 +85,8 @@ export default function CleanInvoiceDashboard() {
     }
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
-      const response = await fetch(`${apiUrl}/invoices/${id}`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(`${apiUrl}/api/invoices/${id}`, {
         method: 'DELETE'
       })
 
@@ -250,6 +251,11 @@ export default function CleanInvoiceDashboard() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Folder Watcher Widget */}
+        <div className="mb-8">
+          <FolderWatcherWidget />
         </div>
 
         {/* Invoice List */}

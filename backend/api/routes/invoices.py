@@ -1,8 +1,9 @@
 """Invoice management route handlers"""
 from fastapi import APIRouter, HTTPException, Path
+from fastapi.responses import StreamingResponse
 from typing import List, Dict, Any, Optional
-import logging
-from supabase import Client
+
+from services.database import db_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -10,21 +11,18 @@ logger = logging.getLogger(__name__)
 @router.get("/invoices")
 async def get_invoices():
     """Get all invoices"""
-    # Import here to avoid circular imports
-    import main
-    supabase = main.supabase
     
-    if not supabase:
-        # Mock response when Supabase is not available
+    if not db_service.is_available:
+        # Mock response when database is not available
         return {
             "invoices": [],
             "total": 0,
-            "message": "Demo mode - Supabase not configured"
+            "message": "Demo mode - Database not configured"
         }
     
     try:
-        # Fetch invoices from Supabase
-        response = supabase.table("invoices").select("*").order("created_at", desc=True).execute()
+        # Fetch invoices from database using correct table name
+        response = db_service.client.table("invoices_clean").select("*").order("created_at", desc=True).execute()
         
         return {
             "invoices": response.data if response.data else [],
@@ -32,23 +30,54 @@ async def get_invoices():
         }
         
     except Exception as e:
-        logger.error(f"Failed to fetch invoices: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch invoices: {str(e)}")
+        error_msg = str(e)
+        logger.warning(f"Database query failed (falling back to demo mode): {error_msg}")
+        
+        # If table doesn't exist, return demo data
+        if "does not exist" in error_msg or "relation" in error_msg:
+            return {
+                "invoices": [
+                    {
+                        "id": "demo-001",
+                        "filename": "20250626_DEMO_INVOICE_001.pdf",
+                        "url": "http://localhost:8000/api/mock-storage/demo_invoice_001.pdf",
+                        "status": "uploaded",
+                        "file_size": 245760,
+                        "created_at": "2025-06-26T10:30:00Z",
+                        "customer_name": "Demo Customer Ltd",
+                        "vendor_name": "Demo Vendor GmbH",
+                        "total_amount": 1250.00
+                    },
+                    {
+                        "id": "demo-002", 
+                        "filename": "20250625_DEMO_INVOICE_002.pdf",
+                        "url": "http://localhost:8000/api/mock-storage/demo_invoice_002.pdf",
+                        "status": "uploaded",
+                        "file_size": 156432,
+                        "created_at": "2025-06-25T14:20:00Z",
+                        "customer_name": "Demo Construction AG",
+                        "vendor_name": "Demo Electrical Services",
+                        "total_amount": 3750.50
+                    }
+                ],
+                "total": 2,
+                "message": "Demo mode - Using sample data"
+            }
+        
+        # For other errors, raise exception
+        raise HTTPException(status_code=500, detail=f"Failed to fetch invoices: {error_msg}")
 
 @router.get("/invoices/{invoice_id}")
 async def get_invoice(invoice_id: str = Path(..., description="The invoice ID")):
     """Get a specific invoice by ID"""
-    # Import here to avoid circular imports
-    import main
-    supabase = main.supabase
     
-    if not supabase:
-        # Mock response when Supabase is not available
+    if not db_service.is_available:
+        # Mock response when database is not available
         raise HTTPException(status_code=404, detail="Invoice not found (Demo mode)")
     
     try:
-        # Fetch specific invoice from Supabase
-        response = supabase.table("invoices").select("*").eq("id", invoice_id).execute()
+        # Fetch specific invoice from database using correct table name
+        response = db_service.client.table("invoices_clean").select("*").eq("id", invoice_id).execute()
         
         if not response.data or len(response.data) == 0:
             raise HTTPException(status_code=404, detail="Invoice not found")
@@ -67,12 +96,9 @@ async def get_invoice(invoice_id: str = Path(..., description="The invoice ID"))
 @router.delete("/invoices/{invoice_id}")
 async def delete_invoice(invoice_id: str = Path(..., description="The invoice ID")):
     """Delete an invoice by ID"""
-    # Import here to avoid circular imports
-    import main
-    supabase = main.supabase
     
-    if not supabase:
-        # Mock response when Supabase is not available
+    if not db_service.is_available:
+        # Mock response when database is not available
         return {
             "message": "Invoice deleted (Demo mode)",
             "invoice_id": invoice_id,
@@ -80,8 +106,8 @@ async def delete_invoice(invoice_id: str = Path(..., description="The invoice ID
         }
     
     try:
-        # First, check if the invoice exists
-        response = supabase.table("invoices").select("*").eq("id", invoice_id).execute()
+        # First, check if the invoice exists using correct table name
+        response = db_service.client.table("invoices_clean").select("*").eq("id", invoice_id).execute()
         
         if not response.data or len(response.data) == 0:
             raise HTTPException(status_code=404, detail="Invoice not found")
@@ -89,23 +115,23 @@ async def delete_invoice(invoice_id: str = Path(..., description="The invoice ID
         invoice = response.data[0]
         
         # Delete from storage if URL exists and it's not a mock URL
-        if invoice.get("url") and not invoice.get("url", "").startswith("http://localhost:8000/mock-storage/"):
+        if invoice.get("file_path") and not invoice.get("file_path", "").startswith("http://localhost:8000/mock-storage/"):
             try:
-                # Extract filename from URL or use filename field
-                filename = invoice.get("filename")
+                # Extract filename from file_path or use file_name field
+                filename = invoice.get("file_name")
                 if filename:
-                    supabase.storage.from_("invoices").remove([filename])
+                    db_service.client.storage.from_("invoices").remove([filename])
             except Exception as storage_error:
                 logger.warning(f"Failed to delete file from storage: {str(storage_error)}")
                 # Continue with database deletion even if storage deletion fails
         
         # Delete from database
-        delete_response = supabase.table("invoices").delete().eq("id", invoice_id).execute()
+        delete_response = db_service.client.table("invoices_clean").delete().eq("id", invoice_id).execute()
         
         return {
             "message": "Invoice deleted successfully",
             "invoice_id": invoice_id,
-            "filename": invoice.get("filename"),
+            "filename": invoice.get("file_name"),
             "status": "success"
         }
         
@@ -118,11 +144,8 @@ async def delete_invoice(invoice_id: str = Path(..., description="The invoice ID
 @router.get("/invoices/{invoice_id}/validate")
 async def validate_invoice(invoice_id: str = Path(..., description="The invoice ID")):
     """Validate if an invoice exists and is accessible"""
-    # Import here to avoid circular imports
-    import main
-    supabase = main.supabase
     
-    if not supabase:
+    if not db_service.is_available:
         # Mock validation for demo
         if invoice_id == "test-123":
             return {"valid": True, "invoice_id": invoice_id}
@@ -130,8 +153,8 @@ async def validate_invoice(invoice_id: str = Path(..., description="The invoice 
             raise HTTPException(status_code=404, detail="Invoice not found")
     
     try:
-        # Check if invoice exists in Supabase
-        response = supabase.table("invoices").select("id, filename").eq("id", invoice_id).execute()
+        # Check if invoice exists in database using correct table name
+        response = db_service.client.table("invoices_clean").select("id, file_name").eq("id", invoice_id).execute()
         
         if not response.data or len(response.data) == 0:
             raise HTTPException(status_code=404, detail="Invoice not found")
@@ -139,7 +162,7 @@ async def validate_invoice(invoice_id: str = Path(..., description="The invoice 
         return {
             "valid": True,
             "invoice_id": invoice_id,
-            "filename": response.data[0].get("filename")
+            "filename": response.data[0].get("file_name")
         }
         
     except HTTPException:
@@ -151,11 +174,8 @@ async def validate_invoice(invoice_id: str = Path(..., description="The invoice 
 @router.get("/invoices/{invoice_id}/editor")
 async def get_invoice_editor_data(invoice_id: str = Path(..., description="The invoice ID")):
     """Get invoice data formatted for the editor interface"""
-    # Import here to avoid circular imports
-    import main
-    supabase = main.supabase
     
-    if not supabase:
+    if not db_service.is_available:
         # Mock data for demo
         if invoice_id == "test-123":
             return {
@@ -181,33 +201,41 @@ async def get_invoice_editor_data(invoice_id: str = Path(..., description="The i
             raise HTTPException(status_code=404, detail="Invoice not found")
     
     try:
-        # Fetch invoice data from Supabase
-        response = supabase.table("invoices").select("*").eq("id", invoice_id).execute()
+        # Fetch invoice data from database using correct table name
+        response = db_service.client.table("invoices_clean").select("*").eq("id", invoice_id).execute()
         
         if not response.data or len(response.data) == 0:
             raise HTTPException(status_code=404, detail="Invoice not found")
         
         invoice_data = response.data[0]
         
-        # Format data for editor interface
+        # Construct proper PDF URL from file_path
+        file_path = invoice_data.get("file_path", "")
+        if file_path:
+            # Construct full Supabase storage URL
+            pdf_url = f"https://bdtcfypvadryfeabqnlc.supabase.co/storage/v1/object/public/invoices/{file_path}"
+        else:
+            pdf_url = ""
+        
+        # Format data for editor interface using correct field names
         editor_data = {
-            "pdfUrl": invoice_data.get("url", ""),
+            "pdfUrl": pdf_url,
             "fields": {
-                "rechnungsempfaenger": invoice_data.get("customer_name", ""),
-                "rechnungssteller": invoice_data.get("vendor_name", ""),
-                "projekt": invoice_data.get("po_number", ""),
+                "rechnungsempfaenger": invoice_data.get("rechnungsempfaenger", ""),
+                "rechnungssteller": invoice_data.get("rechnungssteller", ""),
+                "projekt": invoice_data.get("projekt", ""),
                 "gewerk": invoice_data.get("gewerk", ""),
-                "rechnungsbetrag": invoice_data.get("total_amount", 0),
-                "rechnungseingang": invoice_data.get("invoice_date", ""),
-                "faelligkeit": invoice_data.get("due_date", ""),
+                "rechnungsbetrag": invoice_data.get("rechnungsbetrag", 0),
+                "rechnungseingang": invoice_data.get("rechnungseingang", ""),
+                "faelligkeit": invoice_data.get("faelligkeit", ""),
                 "skonto_datum": invoice_data.get("skonto_datum", ""),
                 "skonto_prozent": invoice_data.get("skonto_prozent", 0),
                 "rechnungsart": invoice_data.get("rechnungsart", "rechnung"),
-                "kfw_anrechenbar": invoice_data.get("kfw_anrechenbar", False),
-                "rechnungspruefung_email": invoice_data.get("rechnungspruefung_email", ""),
+                "kfw_anrechenbar": invoice_data.get("kfw_anrechenbare_kosten", False),
+                "rechnungspruefung_email": invoice_data.get("rechnungspruefung", ""),
                 "weiter_berechnen_an": invoice_data.get("weiter_berechnen_an", "")
             },
-            "filename": invoice_data.get("filename", f"Invoice {invoice_id}")
+            "filename": invoice_data.get("file_name", f"Invoice {invoice_id}")
         }
         
         return editor_data
@@ -224,16 +252,13 @@ async def update_invoice_editor_data(
     request_data: Dict[str, Any] = None
 ):
     """Update invoice data from the editor interface"""
-    # Import here to avoid circular imports
-    import main
-    supabase = main.supabase
     
     if not request_data:
         raise HTTPException(status_code=400, detail="No data provided")
     
     fields = request_data.get("fields", {})
     
-    if not supabase:
+    if not db_service.is_available:
         # Mock success for demo
         if invoice_id == "test-123":
             return {
@@ -246,34 +271,36 @@ async def update_invoice_editor_data(
             raise HTTPException(status_code=404, detail="Invoice not found")
     
     try:
-        # Update invoice data in Supabase
-        # Map German fields back to database fields (complete mapping)
+        # Update invoice data in database using correct table name and field mappings
         update_data = {
-            # Basic information
-            "customer_name": fields.get("rechnungsempfaenger"),
-            "vendor_name": fields.get("rechnungssteller"),
-            "po_number": fields.get("projekt"),
+            # Basic information - using correct field names from schema
+            "rechnungsempfaenger": fields.get("rechnungsempfaenger"),
+            "rechnungssteller": fields.get("rechnungssteller"), 
+            "projekt": fields.get("projekt"),
             "gewerk": fields.get("gewerk"),
+            "weiter_berechnen_an": fields.get("weiter_berechnen_an"),
             
             # Financial information
-            "total_amount": fields.get("rechnungsbetrag"),
-            "invoice_date": fields.get("rechnungseingang"),
-            "due_date": fields.get("faelligkeit"),
+            "rechnungsbetrag": fields.get("rechnungsbetrag"),
+            "rechnungseingang": fields.get("rechnungseingang"),
+            "faelligkeit": fields.get("faelligkeit"),
             "skonto_datum": fields.get("skonto_datum"),
             "skonto_prozent": fields.get("skonto_prozent"),
             "rechnungsart": fields.get("rechnungsart"),
             
             # Additional fields
-            "kfw_anrechenbar": fields.get("kfw_anrechenbar"),
-            "rechnungspruefung_email": fields.get("rechnungspruefung_email"),
-            "weiter_berechnen_an": fields.get("weiter_berechnen_an")
+            "kfw_anrechenbare_kosten": fields.get("kfw_anrechenbar"),
+            "rechnungspruefung": fields.get("rechnungspruefung_email"),
+            
+            # Update timestamp
+            "updated_at": "now()"
         }
         
         # Remove None values but keep empty strings and False values for proper field clearing
         update_data = {k: v for k, v in update_data.items() if v is not None}
         
         if update_data:
-            response = supabase.table("invoices").update(update_data).eq("id", invoice_id).execute()
+            response = db_service.client.table("invoices_clean").update(update_data).eq("id", invoice_id).execute()
             
             if not response.data:
                 raise HTTPException(status_code=404, detail="Invoice not found or update failed")

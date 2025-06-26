@@ -88,7 +88,7 @@ export default function Dropzone({ onUploadComplete, onUploadStart, onUploadErro
         });
       }, 200);
       
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/upload`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/upload`, {
         method: "POST",
         body: formData,
       });
