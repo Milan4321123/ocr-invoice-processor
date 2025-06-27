@@ -1,6 +1,9 @@
 """
 Email Workflow API Routes
-Handles editor notifications and Bau-Leiter approval workflow
+Handles editor notifications and Bau-Leite        # Update invoice to "in Bearbeitung" state (processing started)
+        status_result = db_service.update_invoice_to_editing_stage(request.invoice_id)
+        if not status_result["success"]:
+            raise HTTPException(status_code=500, detail=f"Failed to update invoice status: {status_result['error']}")pproval workflow
 """
 import logging
 import json
@@ -70,8 +73,9 @@ async def send_editor_notification(
                 detail=f"Invoice status '{invoice_data.get('status')}' is not eligible for editor notification"
             )
         
-        # Update invoice to pending_email state
-        await _update_invoice_status(request.invoice_id, 'pending_email')
+        # Update invoice to "in Bearbeitung" state (processing started)
+        await _update_invoice_status(request.invoice_id, 'edited')
+        await _update_invoice_review_status(request.invoice_id, 'under_review')
         
         # Send editor notification
         result = await email_service.send_editor_notification(
@@ -84,7 +88,7 @@ async def send_editor_notification(
         
         if not result["success"]:
             # Revert status on email failure
-            await _update_invoice_status(request.invoice_id, 'edited')
+            await _update_invoice_status(request.invoice_id, 'uploaded')
             raise HTTPException(status_code=500, detail=f"Email send failed: {result.get('error')}")
         
         # Log security event
@@ -374,28 +378,44 @@ async def get_email_audit_log(
 
 # Helper Functions
 async def _get_invoice_data(invoice_id: str) -> Optional[Dict[str, Any]]:
-    """Fetch invoice data from database"""
+    """Fetch invoice data from database using centralized service"""
     try:
-        query = """
-        SELECT * FROM invoices_clean WHERE id = %s
-        """
-        result = await db_service.fetch_one(query, (invoice_id,))
-        return dict(result) if result else None
+        result = db_service.get_invoice(invoice_id)
+        if result["success"]:
+            return result["data"]
+        else:
+            logger.error(f"Error fetching invoice data: {result['error']}")
+            return None
     except Exception as e:
         logger.error(f"Error fetching invoice data: {str(e)}")
         return None
 
 async def _update_invoice_status(invoice_id: str, status: str):
-    """Update invoice status"""
+    """Update invoice status using centralized database service"""
     try:
-        query = """
-        UPDATE invoices_clean 
-        SET status = %s, updated_at = NOW()
-        WHERE id = %s
-        """
-        await db_service.execute_query(query, (status, invoice_id))
+        result = db_service.update_invoice_status(invoice_id, status)
+        if not result["success"]:
+            raise Exception(result["error"])
     except Exception as e:
         logger.error(f"Error updating invoice status: {str(e)}")
+        raise e
+
+async def _update_invoice_review_status(invoice_id: str, review_status: str):
+    """Update invoice review status using centralized database service"""
+    try:
+        # Get current status first
+        invoice_result = db_service.get_invoice(invoice_id)
+        if not invoice_result["success"]:
+            raise Exception(f"Invoice not found: {invoice_result['error']}")
+        
+        current_status = invoice_result["data"].get("status", "pending")
+        
+        # Update with both status and review_status
+        result = db_service.update_invoice_status(invoice_id, current_status, review_status)
+        if not result["success"]:
+            raise Exception(result["error"])
+    except Exception as e:
+        logger.error(f"Error updating invoice review status: {str(e)}")
         raise e
 
 async def _update_invoice_approval_status(

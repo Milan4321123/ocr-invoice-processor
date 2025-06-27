@@ -279,6 +279,104 @@ class DatabaseService:
             logger.error(f"❌ Database error updating invoice {invoice_id}: {e}")
             return {"success": False, "error": str(e)}
     
+    def update_invoice_status(self, invoice_id: str, status: str, review_status: str = None) -> Dict[str, Any]:
+        """
+        Update invoice status fields using the 3-stage workflow.
+        
+        3-Stage Workflow:
+        1. nicht begonnen: status='pending'/'uploaded', review_status='pending'/null
+        2. in Bearbeitung: status='edited', review_status='under_review'  
+        3. abgeschlossen: status='completed', review_status='completed_review'
+        """
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        # Validate status values against your schema constraints
+        valid_statuses = [
+            'pending', 'uploaded', 'edited', 'pending_email', 'edit_completed',
+            'in_review_by_bauleiter', 'approved_by_bauleiter', 'rejected_by_bauleiter',
+            'completed', 'error'
+        ]
+        
+        valid_review_statuses = ['pending', 'under_review', 'completed_review', 'needs_attention']
+        
+        if status not in valid_statuses:
+            return {"success": False, "error": f"Invalid status: {status}. Must be one of: {valid_statuses}"}
+        
+        if review_status and review_status not in valid_review_statuses:
+            return {"success": False, "error": f"Invalid review_status: {review_status}. Must be one of: {valid_review_statuses}"}
+        
+        try:
+            # Build update data
+            update_data = {
+                "status": status,
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            
+            if review_status:
+                update_data["review_status"] = review_status
+            
+            # Log the status change for debugging
+            logger.info(f"🔄 Updating invoice {invoice_id}: status='{status}', review_status='{review_status}'")
+            
+            response = (self._client.table(self.table_name)
+                       .update(update_data)
+                       .eq("id", invoice_id)
+                       .execute())
+            
+            if response.data and len(response.data) > 0:
+                updated_invoice = response.data[0]
+                logger.info(f"✅ Status updated successfully: {invoice_id} -> status='{updated_invoice.get('status')}', review_status='{updated_invoice.get('review_status')}'")
+                return {"success": True, "data": updated_invoice}
+            else:
+                logger.error(f"❌ Status update failed: No data returned for invoice {invoice_id}")
+                return {"success": False, "error": "Invoice not found or status update failed"}
+                
+        except Exception as e:
+            logger.error(f"❌ Database error updating status for invoice {invoice_id}: {e}")
+            return {"success": False, "error": str(e)}
+
+    def update_invoice_to_editing_stage(self, invoice_id: str) -> Dict[str, Any]:
+        """Update invoice to 'in Bearbeitung' stage when editing starts"""
+        return self.update_invoice_status(invoice_id, 'edited', 'under_review')
+    
+    def update_invoice_to_completed_stage(self, invoice_id: str, completed_by: str = None, notes: str = None) -> Dict[str, Any]:
+        """Update invoice to 'abgeschlossen' stage when completed"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            update_data = {
+                "status": "completed",
+                "review_status": "completed_review",
+                "reviewed_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            
+            if completed_by:
+                update_data["reviewed_by"] = completed_by
+            
+            if notes:
+                update_data["review_notes"] = notes
+            
+            logger.info(f"🏁 Completing invoice {invoice_id} by {completed_by}")
+            
+            response = (self._client.table(self.table_name)
+                       .update(update_data)
+                       .eq("id", invoice_id)
+                       .execute())
+            
+            if response.data and len(response.data) > 0:
+                updated_invoice = response.data[0]
+                logger.info(f"✅ Invoice completed successfully: {invoice_id}")
+                return {"success": True, "data": updated_invoice}
+            else:
+                return {"success": False, "error": "Invoice not found or completion failed"}
+                
+        except Exception as e:
+            logger.error(f"❌ Database error completing invoice {invoice_id}: {e}")
+            return {"success": False, "error": str(e)}
+    
     def delete_invoice(self, invoice_id: str) -> Dict[str, Any]:
         """Delete an invoice record from invoices_clean table"""
         if not self.is_available:

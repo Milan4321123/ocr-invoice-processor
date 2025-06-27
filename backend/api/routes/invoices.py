@@ -23,13 +23,16 @@ async def get_invoices():
         }
     
     try:
-        # Fetch invoices from database using correct table name
-        response = db_service.client.table("invoices_clean").select("*").order("created_at", desc=True).execute()
+        # Use centralized database service method
+        result = db_service.get_all_invoices(limit=1000)
         
-        return {
-            "invoices": response.data if response.data else [],
-            "total": len(response.data) if response.data else 0
-        }
+        if result["success"]:
+            return {
+                "invoices": result["data"],
+                "total": len(result["data"])
+            }
+        else:
+            raise Exception(result["error"])
         
     except Exception as e:
         error_msg = str(e)
@@ -78,16 +81,16 @@ async def get_invoice(invoice_id: str = Path(..., description="The invoice ID"))
         raise HTTPException(status_code=404, detail="Invoice not found (Demo mode)")
     
     try:
-        # Fetch specific invoice from database using correct table name
-        response = db_service.client.table("invoices_clean").select("*").eq("id", invoice_id).execute()
+        # Use centralized database service method
+        result = db_service.get_invoice(invoice_id)
         
-        if not response.data or len(response.data) == 0:
+        if result["success"]:
+            return {
+                "status": "success",
+                "invoice": result["data"]
+            }
+        else:
             raise HTTPException(status_code=404, detail="Invoice not found")
-        
-        return {
-            "status": "success",
-            "invoice": response.data[0]
-        }
         
     except HTTPException:
         raise
@@ -108,49 +111,21 @@ async def delete_invoice(invoice_id: str = Path(..., description="The invoice ID
         }
     
     try:
-        # First, check if the invoice exists using correct table name
-        response = db_service.client.table("invoices_clean").select("*").eq("id", invoice_id).execute()
+        # Use centralized database service method
+        result = db_service.delete_invoice(invoice_id)
         
-        if not response.data or len(response.data) == 0:
-            raise HTTPException(status_code=404, detail="Invoice not found")
-        
-        invoice = response.data[0]
-        
-        # Delete from storage if URL exists and it's not a mock URL
-        if invoice.get("file_path") and not invoice.get("file_path", "").startswith("http://localhost:8000/mock-storage/"):
-            try:
-                # Determine the correct bucket based on file_path prefix
-                file_path = invoice.get("file_path", "")
-                if file_path.startswith("folder_watcher/"):
-                    bucket_name = "folderwatcher"
-                    filename = file_path.replace("folder_watcher/", "")
-                elif file_path.startswith("manual/"):
-                    bucket_name = "manual"
-                    filename = file_path.replace("manual/", "")
-                else:
-                    bucket_name = "invoices"  # Default for drag-drop
-                    filename = file_path
-                
-                # Use extracted filename, or fall back to file_name field
-                if not filename:
-                    filename = invoice.get("file_name")
-                if filename:
-                    db_service.client.storage.from_(bucket_name).remove([filename])
-                    logger.info(f"Deleted file '{filename}' from bucket '{bucket_name}'")
-            except Exception as storage_error:
-                logger.warning(f"Failed to delete file from storage: {str(storage_error)}")
-                # Continue with database deletion even if storage deletion fails
-        
-        # Delete from database
-        delete_response = db_service.client.table("invoices_clean").delete().eq("id", invoice_id).execute()
-        
-        # Simple success message since we can't determine upload source
-        return {
-            "message": "Invoice deleted successfully",
-            "invoice_id": invoice_id,
-            "filename": invoice.get("file_name"),
-            "status": "success"
-        }
+        if result["success"]:
+            return {
+                "message": "Invoice deleted successfully",
+                "invoice_id": invoice_id,
+                "filename": result.get("filename"),
+                "status": "success"
+            }
+        else:
+            if "not found" in result["error"].lower():
+                raise HTTPException(status_code=404, detail="Invoice not found")
+            else:
+                raise Exception(result["error"])
         
     except HTTPException:
         raise
@@ -170,17 +145,17 @@ async def validate_invoice(invoice_id: str = Path(..., description="The invoice 
             raise HTTPException(status_code=404, detail="Invoice not found")
     
     try:
-        # Check if invoice exists in database using correct table name
-        response = db_service.client.table("invoices_clean").select("id, file_name").eq("id", invoice_id).execute()
+        # Use centralized database service method
+        result = db_service.get_invoice(invoice_id)
         
-        if not response.data or len(response.data) == 0:
+        if result["success"]:
+            return {
+                "valid": True,
+                "invoice_id": invoice_id,
+                "filename": result["data"].get("file_name")
+            }
+        else:
             raise HTTPException(status_code=404, detail="Invoice not found")
-        
-        return {
-            "valid": True,
-            "invoice_id": invoice_id,
-            "filename": response.data[0].get("file_name")
-        }
         
     except HTTPException:
         raise
@@ -218,13 +193,13 @@ async def get_invoice_editor_data(invoice_id: str = Path(..., description="The i
             raise HTTPException(status_code=404, detail="Invoice not found")
     
     try:
-        # Fetch invoice data from database using correct table name
-        response = db_service.client.table("invoices_clean").select("*").eq("id", invoice_id).execute()
+        # Use centralized database service method
+        result = db_service.get_invoice(invoice_id)
         
-        if not response.data or len(response.data) == 0:
+        if not result["success"]:
             raise HTTPException(status_code=404, detail="Invoice not found")
         
-        invoice_data = response.data[0]
+        invoice_data = result["data"]
         
         # Construct proper PDF URL from file_path
         file_path = invoice_data.get("file_path", "")
@@ -302,7 +277,7 @@ async def update_invoice_editor_data(
             raise HTTPException(status_code=404, detail="Invoice not found")
     
     try:
-        # Update invoice data in database using correct table name and field mappings
+        # Update invoice data using centralized database service
         update_data = {
             # Basic information - using correct field names from schema
             "rechnungsempfaenger": fields.get("rechnungsempfaenger"),
@@ -321,29 +296,33 @@ async def update_invoice_editor_data(
             
             # Additional fields
             "kfw_anrechenbare_kosten": fields.get("kfw_anrechenbar"),
-            "rechnungspruefung": fields.get("rechnungspruefung_email"),
-            
-            # Update timestamp
-            "updated_at": "now()"
+            "rechnungspruefung": fields.get("rechnungspruefung_email")
         }
         
         # Remove None values but keep empty strings and False values for proper field clearing
         update_data = {k: v for k, v in update_data.items() if v is not None}
         
+        # Update invoice fields first
         if update_data:
-            response = db_service.client.table("invoices_clean").update(update_data).eq("id", invoice_id).execute()
-            
-            if not response.data:
-                raise HTTPException(status_code=404, detail="Invoice not found or update failed")
+            field_result = db_service.update_invoice(invoice_id, update_data)
+            if not field_result["success"]:
+                raise HTTPException(status_code=500, detail=f"Failed to update invoice fields: {field_result['error']}")
+        
+        # Update status to "in Bearbeitung" stage (edited + under_review)
+        status_result = db_service.update_invoice_to_editing_stage(invoice_id)
+        if not status_result["success"]:
+            raise HTTPException(status_code=500, detail=f"Failed to update invoice status: {status_result['error']}")
+        
+        logger.info(f"✅ Invoice {invoice_id} updated and moved to 'in Bearbeitung' stage")
         
         # Send email notification if editor information is provided
         email_sent = False
         if editor_info.get("editor_email") and editor_info.get("editor_name"):
             try:
                 # Get updated invoice data for email
-                invoice_response = db_service.client.table("invoices_clean").select("*").eq("id", invoice_id).execute()
-                if invoice_response.data:
-                    invoice_data = invoice_response.data[0]
+                updated_result = db_service.get_invoice(invoice_id)
+                if updated_result["success"]:
+                    invoice_data = updated_result["data"]
                     
                     # Send editor notification email
                     email_result = await email_service.send_editor_notification(
@@ -408,32 +387,26 @@ async def complete_invoice(
             raise HTTPException(status_code=404, detail="Invoice not found")
     
     try:
-        # Update invoice with completion status
-        update_data = {
-            "review_status": completion_info.get("review_status", "completed_review"),
-            "reviewed_by": completion_info.get("completed_by"),
-            "reviewed_at": completion_info.get("completed_at", "now()"),
-            "review_notes": completion_info.get("completion_notes"),
-            "edit_completed_at": "now()",
-            "status": "completed",
-            "updated_at": "now()"
-        }
+        # Use centralized database service to complete invoice
+        completion_info = request_data.get("completion_info", {})
         
-        # Remove None values
-        update_data = {k: v for k, v in update_data.items() if v is not None}
+        result = db_service.update_invoice_to_completed_stage(
+            invoice_id=invoice_id,
+            completed_by=completion_info.get("completed_by"),
+            notes=completion_info.get("completion_notes")
+        )
         
-        if update_data:
-            response = db_service.client.table("invoices_clean").update(update_data).eq("id", invoice_id).execute()
-            
-            if not response.data:
-                raise HTTPException(status_code=404, detail="Invoice not found or completion failed")
+        if not result["success"]:
+            raise HTTPException(status_code=500, detail=f"Failed to complete invoice: {result['error']}")
+        
+        updated_invoice = result["data"]
         
         return {
             "success": True,
             "message": "Invoice marked as completed successfully",
             "invoice_id": invoice_id,
-            "completion_status": update_data.get("review_status", "completed_review"),
-            "completed_at": update_data.get("reviewed_at")
+            "completion_status": updated_invoice.get("review_status", "completed_review"),
+            "completed_at": updated_invoice.get("reviewed_at")
         }
         
     except HTTPException:
