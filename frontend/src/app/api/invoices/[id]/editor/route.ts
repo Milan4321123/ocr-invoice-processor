@@ -7,13 +7,12 @@ export async function GET(
   try {
     const { id: invoiceId } = await params;
 
-    // TODO: Replace with actual API call to backend
+    // Proxy to backend API
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:8000';
-    const response = await fetch(`${backendUrl}/invoices/${invoiceId}/editor`, {
+    const response = await fetch(`${backendUrl}/api/invoices/${invoiceId}/editor`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        // TODO: Add authentication headers
       },
     });
 
@@ -47,13 +46,12 @@ export async function PUT(
     const { id: invoiceId } = await params;
     const body = await request.json();
 
-    // TODO: Replace with actual API call to backend
+    // Proxy to backend API
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:8000';
-    const response = await fetch(`${backendUrl}/invoices/${invoiceId}/editor`, {
+    const response = await fetch(`${backendUrl}/api/invoices/${invoiceId}/editor`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        // TODO: Add authentication headers
       },
       body: JSON.stringify(body),
     });

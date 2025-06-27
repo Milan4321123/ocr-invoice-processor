@@ -391,7 +391,6 @@ async def get_processing_status():
         
         # Group by status
         status_groups = {}
-        ocr_status_groups = {}
         
         for invoice in invoices:
             # Processing status
@@ -407,25 +406,11 @@ async def get_processing_status():
             status_groups[status]["count"] += 1
             status_groups[status]["total_amount"] += amount
             status_groups[status]["invoices"].append(invoice)
-            
-            # OCR status
-            ocr_status = invoice.get('ocr_status', 'unknown')
-            if ocr_status not in ocr_status_groups:
-                ocr_status_groups[ocr_status] = {
-                    "count": 0,
-                    "total_amount": 0,
-                    "invoices": []
-                }
-            
-            ocr_status_groups[ocr_status]["count"] += 1
-            ocr_status_groups[ocr_status]["total_amount"] += amount
-            ocr_status_groups[ocr_status]["invoices"].append(invoice)
         
         return {
             "success": True,
             "data": {
                 "processing_status": status_groups,
-                "ocr_status": ocr_status_groups,
                 "summary": {
                     "total_invoices": len(invoices),
                     "total_amount": sum(
@@ -434,9 +419,6 @@ async def get_processing_status():
                     ),
                     "status_distribution": {
                         status: data["count"] for status, data in status_groups.items()
-                    },
-                    "ocr_distribution": {
-                        status: data["count"] for status, data in ocr_status_groups.items()
                     }
                 }
             }
