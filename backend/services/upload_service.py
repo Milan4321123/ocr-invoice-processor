@@ -47,8 +47,19 @@ class FileData:
 class UploadService:
     """Centralized upload service for invoice files"""
     
-    # Filename pattern validation
-    FILENAME_PATTERN = r'^\d{8}_[A-Za-z0-9]+_[A-Za-z0-9]+_[A-Za-z0-9]+\.pdf$'
+    # Filename pattern validation following German business convention:
+    # FIXED Pattern: EINGANGSDATUM_PROJEKT_GEWERK_LIEFERANT.pdf
+    # - EINGANGSDATUM: YYYYMMDD (8 digits - receipt date)
+    # - PROJEKT: Project identifier (letters, numbers, hyphens, periods - NO underscores)
+    # - GEWERK: Trade/work type (letters, numbers, hyphens, periods - NO underscores)  
+    # - LIEFERANT: Supplier name (letters, numbers, hyphens, periods - NO underscores)
+    # Must be exactly 4 parts separated by underscores, no more, no less
+    # Supports German characters (ä, ö, ü, ß) and international characters
+    # Examples:
+    # - 20250627_BauProjekt-A1_Elektrik_Müller-GmbH.pdf
+    # - 20250627_Neubau.Office_Heizung_Schmidt-Co.pdf
+    # - 20250627_Sanierung_Sanitär_ABC.Industries.pdf
+    FILENAME_PATTERN = r'^\d{8}_[A-Za-z0-9äöüÄÖÜß][A-Za-z0-9äöüÄÖÜß.\-]*_[A-Za-z0-9äöüÄÖÜß][A-Za-z0-9äöüÄÖÜß.\-]*_[A-Za-z0-9äöüÄÖÜß][A-Za-z0-9äöüÄÖÜß.\-]*\.pdf$'
     
     # Supported content types
     SUPPORTED_CONTENT_TYPES = {"application/pdf"}
@@ -111,7 +122,7 @@ class UploadService:
         
         # Validate filename pattern for all uploads (unified validation)
         if not re.match(self.FILENAME_PATTERN, file_data.filename):
-            return False, "Dateiname muss dem Muster folgen: JJJJMMTT_KENNUNG_LIEFERANT_TYP.pdf"
+            return False, "Dateiname muss dem festen Muster folgen: EINGANGSDATUM_PROJEKT_GEWERK_LIEFERANT.pdf"
         
         # Check for duplicate files by filename
         if db_service.is_available:
