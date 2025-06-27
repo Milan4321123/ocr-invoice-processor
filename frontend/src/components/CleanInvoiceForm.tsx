@@ -34,7 +34,9 @@ interface CleanInvoiceFormProps {
   fields: GermanInvoiceFields;
   onFieldChange: (fieldName: string, value: any) => void;
   onSave: () => void;
+  onComplete?: () => void;
   isSaving?: boolean;
+  isCompleting?: boolean;
   className?: string;
 }
 
@@ -42,7 +44,9 @@ const CleanInvoiceForm: React.FC<CleanInvoiceFormProps> = ({
   fields,
   onFieldChange,
   onSave,
+  onComplete,
   isSaving = false,
+  isCompleting = false,
   className = ""
 }) => {
   const [dropdownOptions, setDropdownOptions] = useState<Record<string, DropdownOption[]>>({
@@ -295,7 +299,7 @@ const CleanInvoiceForm: React.FC<CleanInvoiceFormProps> = ({
             {/* Main Invoice Save Button */}
             <button
               onClick={onSave}
-              disabled={isSaving}
+              disabled={isSaving || isCompleting}
               className="flex items-center gap-2 px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium shadow-md hover:shadow-lg transition-all duration-200 disabled:bg-gray-400"
             >
               {isSaving ? (
@@ -312,6 +316,29 @@ const CleanInvoiceForm: React.FC<CleanInvoiceFormProps> = ({
                 </>
               )}
             </button>
+
+            {/* Complete Invoice Button */}
+            {onComplete && (
+              <button
+                onClick={onComplete}
+                disabled={isSaving || isCompleting}
+                className="flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium shadow-md hover:shadow-lg transition-all duration-200 disabled:bg-gray-400"
+              >
+                {isCompleting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Wird abgeschlossen...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Bearbeitung abschließen</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>

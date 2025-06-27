@@ -275,6 +275,33 @@ async def process_pending_files():
         logger.error(f"Error processing pending files: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to process pending files: {str(e)}")
 
+@router.get("/notifications")
+async def get_notifications(limit: int = Query(20, description="Number of recent notifications to return")):
+    """Get recent file processing notifications"""
+    try:
+        notifications = folder_watcher_service.get_notifications(limit=limit)
+        return {
+            "success": True,
+            "notifications": notifications,
+            "total": len(notifications)
+        }
+    except Exception as e:
+        logger.error(f"Error getting notifications: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get notifications: {str(e)}")
+
+@router.delete("/notifications")
+async def clear_notifications():
+    """Clear all file processing notifications"""
+    try:
+        folder_watcher_service.clear_notifications()
+        return {
+            "success": True,
+            "message": "All notifications cleared"
+        }
+    except Exception as e:
+        logger.error(f"Error clearing notifications: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to clear notifications: {str(e)}")
+
 # Utility Functions
 
 def _format_uptime(seconds: int) -> str:

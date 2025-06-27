@@ -8,11 +8,15 @@ import logging
 import uuid
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Any, Tuple
+from typing import Dict, List, Optional, Set, Any, Tuple, TYPE_CHECKING
 from dataclasses import dataclass, field
 from enum import Enum
+from datetime import datetime
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler, FileModifiedEvent, FileCreatedEvent
+
+if TYPE_CHECKING:
+    from watchdog.observers import Observer as ObserverType
 
 from services.upload_service import upload_service, FileData, UploadSource
 
@@ -25,6 +29,28 @@ class WatcherStatus(Enum):
     RUNNING = "running"
     STOPPING = "stopping"
     ERROR = "error"
+
+class NotificationType(Enum):
+    """Types of file processing notifications"""
+    FILE_DETECTED = "file_detected"
+    PROCESSING_STARTED = "processing_started"
+    UPLOAD_SUCCESS = "upload_success"
+    UPLOAD_FAILED = "upload_failed"
+    VALIDATION_FAILED = "validation_failed"
+
+@dataclass
+class FileNotification:
+    """Notification about file processing event"""
+    id: str
+    type: NotificationType
+    filename: str
+    file_path: str
+    timestamp: str
+    message: str
+    error: Optional[str] = None
+    invoice_id: Optional[str] = None
+    file_size: Optional[int] = None
+    watch_config_id: Optional[str] = None
 
 @dataclass
 class WatchConfig:
@@ -103,6 +129,17 @@ class InvoiceFileHandler(FileSystemEventHandler):
             
             logger.info(f"Detected {event_type} event for PDF: {file_path}")
             
+            # Send file detected notification
+            self.folder_watcher._add_notification(FileNotification(
+                id=str(uuid.uuid4()),
+                type=NotificationType.FILE_DETECTED,
+                filename=path.name,
+                file_path=file_path,
+                timestamp=datetime.now().isoformat(),
+                message=f"Neue PDF-Datei erkannt: {path.name}",
+                watch_config_id=self.watch_config.id
+            ))
+            
             # Use thread-safe approach to schedule processing
             try:
                 # Get the event loop from the main thread
@@ -127,14 +164,37 @@ class InvoiceFileHandler(FileSystemEventHandler):
     
     async def _process_file_async(self, file_path: str):
         """Asynchronously process detected file"""
+        path = Path(file_path)
+        notification_id = str(uuid.uuid4())
+        
         try:
+            # Send processing started notification
+            self.folder_watcher._add_notification(FileNotification(
+                id=notification_id,
+                type=NotificationType.PROCESSING_STARTED,
+                filename=path.name,
+                file_path=file_path,
+                timestamp=datetime.now().isoformat(),
+                message=f"Verarbeitung gestartet: {path.name}",
+                watch_config_id=self.watch_config.id
+            ))
+            
             # Wait a bit to ensure file is fully written
             await asyncio.sleep(2)
             
             # Check if file still exists and is readable
-            path = Path(file_path)
             if not path.exists():
                 logger.warning(f"File no longer exists: {file_path}")
+                self.folder_watcher._add_notification(FileNotification(
+                    id=str(uuid.uuid4()),
+                    type=NotificationType.UPLOAD_FAILED,
+                    filename=path.name,
+                    file_path=file_path,
+                    timestamp=datetime.now().isoformat(),
+                    message=f"Datei nicht mehr vorhanden: {path.name}",
+                    error="Die Datei wurde gelöscht oder ist nicht mehr verfügbar",
+                    watch_config_id=self.watch_config.id
+                ))
                 return
             
             # Read file content
@@ -142,11 +202,33 @@ class InvoiceFileHandler(FileSystemEventHandler):
                 with open(file_path, 'rb') as f:
                     content = f.read()
             except (IOError, PermissionError) as e:
+                error_msg = f"Datei konnte nicht gelesen werden: {str(e)}"
                 logger.error(f"Cannot read file {file_path}: {str(e)}")
+                self.folder_watcher._add_notification(FileNotification(
+                    id=str(uuid.uuid4()),
+                    type=NotificationType.UPLOAD_FAILED,
+                    filename=path.name,
+                    file_path=file_path,
+                    timestamp=datetime.now().isoformat(),
+                    message=f"Lesefehler: {path.name}",
+                    error=error_msg,
+                    watch_config_id=self.watch_config.id
+                ))
                 return
             
             if len(content) == 0:
+                error_msg = "Die Datei ist leer"
                 logger.warning(f"File is empty: {file_path}")
+                self.folder_watcher._add_notification(FileNotification(
+                    id=str(uuid.uuid4()),
+                    type=NotificationType.VALIDATION_FAILED,
+                    filename=path.name,
+                    file_path=file_path,
+                    timestamp=datetime.now().isoformat(),
+                    message=f"Validierungsfehler: {path.name}",
+                    error=error_msg,
+                    watch_config_id=self.watch_config.id
+                ))
                 return
             
             # Create FileData for upload service
@@ -172,6 +254,19 @@ class InvoiceFileHandler(FileSystemEventHandler):
                 logger.info(f"  Invoice ID: {result.invoice_id}")
                 logger.info(f"  Storage URL: {result.url}")
                 
+                # Send success notification
+                self.folder_watcher._add_notification(FileNotification(
+                    id=str(uuid.uuid4()),
+                    type=NotificationType.UPLOAD_SUCCESS,
+                    filename=path.name,
+                    file_path=file_path,
+                    timestamp=datetime.now().isoformat(),
+                    message=f"Upload erfolgreich: {path.name}",
+                    invoice_id=result.invoice_id,
+                    file_size=result.file_size,
+                    watch_config_id=self.watch_config.id
+                ))
+                
                 # Update statistics
                 self.folder_watcher.stats.successful_uploads += 1
                 self.folder_watcher.stats.total_files_processed += 1
@@ -183,10 +278,48 @@ class InvoiceFileHandler(FileSystemEventHandler):
                 
             else:
                 logger.error(f"Failed to upload {path.name}: {result.error}")
+                
+                # Determine notification type based on error
+                notification_type = NotificationType.UPLOAD_FAILED
+                error_message = result.error or "Unbekannter Fehler"
+                
+                # Check if it's a validation error
+                if error_message and any(keyword in error_message.lower() for keyword in [
+                    "dateiname", "muster", "pattern", "filename", "format", 
+                    "pdf", "dateityp", "filetype", "zu groß", "too large",
+                    "leer", "empty", "existiert bereits", "already exists", "duplicate"
+                ]):
+                    notification_type = NotificationType.VALIDATION_FAILED
+                
+                # Send failure notification with specific error
+                self.folder_watcher._add_notification(FileNotification(
+                    id=str(uuid.uuid4()),
+                    type=notification_type,
+                    filename=path.name,
+                    file_path=file_path,
+                    timestamp=datetime.now().isoformat(),
+                    message=f"{'Validierungsfehler' if notification_type == NotificationType.VALIDATION_FAILED else 'Upload fehlgeschlagen'}: {path.name}",
+                    error=error_message,
+                    watch_config_id=self.watch_config.id
+                ))
+                
                 self.folder_watcher.stats.failed_uploads += 1
                 
         except Exception as e:
             logger.error(f"Error processing file {file_path}: {str(e)}")
+            
+            # Send generic error notification
+            self.folder_watcher._add_notification(FileNotification(
+                id=str(uuid.uuid4()),
+                type=NotificationType.UPLOAD_FAILED,
+                filename=path.name,
+                file_path=file_path,
+                timestamp=datetime.now().isoformat(),
+                message=f"Verarbeitungsfehler: {path.name}",
+                error=str(e),
+                watch_config_id=self.watch_config.id
+            ))
+            
             self.folder_watcher.stats.failed_uploads += 1
 
 class FolderWatcherService:
@@ -195,14 +328,52 @@ class FolderWatcherService:
     def __init__(self):
         self.status = WatcherStatus.STOPPED
         self.watch_configs: Dict[str, WatchConfig] = {}
-        self.observers: Dict[str, Observer] = {}
+        self.observers: Dict[str, Any] = {}  # Observer instances
         self.handlers: Dict[str, InvoiceFileHandler] = {}
         self.stats = WatcherStats()
         self.start_time: Optional[float] = None
         self._lock = asyncio.Lock()
         self._pending_files: Set[str] = set()  # Files queued for processing
         self._event_loop: Optional[asyncio.AbstractEventLoop] = None  # Main event loop reference
+        
+        # Notification system
+        self._notifications: List[FileNotification] = []
+        self._max_notifications = 100  # Keep last 100 notifications
     
+    def _add_notification(self, notification: FileNotification):
+        """Add a new notification to the list"""
+        self._notifications.append(notification)
+        
+        # Keep only the most recent notifications
+        if len(self._notifications) > self._max_notifications:
+            self._notifications = self._notifications[-self._max_notifications:]
+        
+        logger.info(f"📋 Notification: {notification.message}")
+    
+    def get_notifications(self, limit: int = 20) -> List[Dict[str, Any]]:
+        """Get recent notifications"""
+        recent_notifications = self._notifications[-limit:] if limit else self._notifications
+        return [
+            {
+                "id": notif.id,
+                "type": notif.type.value,
+                "filename": notif.filename,
+                "file_path": notif.file_path,
+                "timestamp": notif.timestamp,
+                "message": notif.message,
+                "error": notif.error,
+                "invoice_id": notif.invoice_id,
+                "file_size": notif.file_size,
+                "watch_config_id": notif.watch_config_id
+            }
+            for notif in reversed(recent_notifications)  # Most recent first
+        ]
+    
+    def clear_notifications(self):
+        """Clear all notifications"""
+        self._notifications.clear()
+        logger.info("📋 All notifications cleared")
+
     async def add_watch_folder(self, folder_path: str, pattern: str = "*.pdf", 
                              recursive: bool = False, enabled: bool = True) -> Tuple[bool, str, Optional[str]]:
         """

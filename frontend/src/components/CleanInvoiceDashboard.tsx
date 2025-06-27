@@ -17,11 +17,13 @@ import {
   RefreshCw
 } from 'lucide-react'
 import FolderWatcherWidget from './FolderWatcherWidget'
+import DeleteConfirmationDialog from './DeleteConfirmationDialog'
 
 interface CleanInvoice {
   id: string
   file_name: string
   url: string
+  file_path?: string
   status: 'uploaded' | 'processing' | 'completed' | 'error'
   file_size: number
   created_at: string
@@ -52,6 +54,17 @@ export default function CleanInvoiceDashboard() {
   const [invoices, setInvoices] = useState<CleanInvoice[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [deleteDialog, setDeleteDialog] = useState<{
+    isOpen: boolean
+    invoiceId: string
+    fileName: string
+    uploadSource: 'drag-drop' | 'folder-watcher' | 'manual' | 'unknown'
+  }>({
+    isOpen: false,
+    invoiceId: '',
+    fileName: '',
+    uploadSource: 'unknown'
+  })
 
   useEffect(() => {
     fetchInvoices()
@@ -80,10 +93,6 @@ export default function CleanInvoiceDashboard() {
   }
 
   const deleteInvoice = async (id: string, filename: string) => {
-    if (!confirm(`Sind Sie sicher, dass Sie "${filename}" löschen möchten?`)) {
-      return
-    }
-
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
       const response = await fetch(`${apiUrl}/api/invoices/${id}`, {
@@ -96,10 +105,53 @@ export default function CleanInvoiceDashboard() {
 
       toast.success(`Rechnung "${filename}" erfolgreich gelöscht`)
       await fetchInvoices() // Refresh the list
+      
+      // Close delete dialog
+      setDeleteDialog({
+        isOpen: false,
+        invoiceId: '',
+        fileName: '',
+        uploadSource: 'unknown'
+      })
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Rechnung konnte nicht gelöscht werden'
       toast.error(errorMessage)
     }
+  }
+
+  const openDeleteDialog = (invoice: CleanInvoice) => {
+    // Detect upload source from file_path or other indicators
+    let uploadSource: 'drag-drop' | 'folder-watcher' | 'manual' | 'unknown' = 'unknown'
+    
+    if (invoice.file_path) {
+      if (invoice.file_path.startsWith('folder_watcher/')) {
+        uploadSource = 'folder-watcher'
+      } else if (invoice.file_path.startsWith('manual/')) {
+        uploadSource = 'manual'
+      } else {
+        uploadSource = 'drag-drop'
+      }
+    }
+    
+    setDeleteDialog({
+      isOpen: true,
+      invoiceId: invoice.id,
+      fileName: invoice.file_name,
+      uploadSource
+    })
+  }
+
+  const closeDeleteDialog = () => {
+    setDeleteDialog({
+      isOpen: false,
+      invoiceId: '',
+      fileName: '',
+      uploadSource: 'unknown'
+    })
+  }
+
+  const handleDeleteConfirm = async () => {
+    await deleteInvoice(deleteDialog.invoiceId, deleteDialog.fileName)
   }
 
   const getStatusColor = (status: string | undefined): string => {
@@ -116,7 +168,22 @@ export default function CleanInvoiceDashboard() {
       case 'completed_review': return 'text-green-600 bg-green-50'
       case 'under_review': return 'text-blue-600 bg-blue-50'
       case 'needs_attention': return 'text-yellow-600 bg-yellow-50'
+      case null:
+      case undefined:
+      case 'pending': return 'text-orange-600 bg-orange-50'
       default: return 'text-gray-600 bg-gray-50'
+    }
+  }
+
+  const getReviewStatusLabel = (reviewStatus: string | undefined): string => {
+    switch (reviewStatus) {
+      case 'completed_review': return 'Abgeschlossen'
+      case 'under_review': return 'In Bearbeitung'
+      case 'needs_attention': return 'Aufmerksamkeit erforderlich'
+      case null:
+      case undefined:
+      case 'pending': return 'Erfassung/Prüfung'
+      default: return reviewStatus || 'Unbekannt'
     }
   }
 
@@ -218,7 +285,7 @@ export default function CleanInvoiceDashboard() {
             <div className="flex items-center space-x-3">
               <CheckCircle className="h-8 w-8 text-green-600" />
               <div>
-                <p className="text-sm font-medium text-gray-600">Geprüft</p>
+                <p className="text-sm font-medium text-gray-600">Abgeschlossen</p>
                 <p className="text-2xl font-bold text-gray-900">
                   {invoices.filter(inv => inv.review_status === 'completed_review').length}
                 </p>
@@ -228,9 +295,9 @@ export default function CleanInvoiceDashboard() {
 
           <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
             <div className="flex items-center space-x-3">
-              <Clock className="h-8 w-8 text-yellow-600" />
+              <Clock className="h-8 w-8 text-orange-600" />
               <div>
-                <p className="text-sm font-medium text-gray-600">Ausstehende Prüfung</p>
+                <p className="text-sm font-medium text-gray-600">Erfassung/Prüfung</p>
                 <p className="text-2xl font-bold text-gray-900">
                   {invoices.filter(inv => !inv.review_status || inv.review_status === 'pending').length}
                 </p>
@@ -360,11 +427,9 @@ export default function CleanInvoiceDashboard() {
                           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(invoice.status)}`}>
                             {invoice.status || 'uploaded'}
                           </span>
-                          {invoice.review_status && (
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getReviewStatusColor(invoice.review_status)}`}>
-                              {invoice.review_status.replace('_', ' ')}
-                            </span>
-                          )}
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getReviewStatusColor(invoice.review_status)}`}>
+                            {getReviewStatusLabel(invoice.review_status)}
+                          </span>
                         </div>
                       </td>
                       
@@ -379,7 +444,7 @@ export default function CleanInvoiceDashboard() {
                           </Link>
                           
                           <button
-                            onClick={() => deleteInvoice(invoice.id, invoice.file_name)}
+                            onClick={() => openDeleteDialog(invoice)}
                             className="flex items-center space-x-1 px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -394,6 +459,15 @@ export default function CleanInvoiceDashboard() {
             </div>
           )}
         </div>
+
+        {/* Delete Confirmation Dialog */}
+        <DeleteConfirmationDialog
+          isOpen={deleteDialog.isOpen}
+          fileName={deleteDialog.fileName}
+          uploadSource={deleteDialog.uploadSource}
+          onConfirm={handleDeleteConfirm}
+          onCancel={closeDeleteDialog}
+        />
       </main>
     </div>
   )

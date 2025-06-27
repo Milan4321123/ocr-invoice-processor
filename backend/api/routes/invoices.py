@@ -119,10 +119,24 @@ async def delete_invoice(invoice_id: str = Path(..., description="The invoice ID
         # Delete from storage if URL exists and it's not a mock URL
         if invoice.get("file_path") and not invoice.get("file_path", "").startswith("http://localhost:8000/mock-storage/"):
             try:
-                # Extract filename from file_path or use file_name field
-                filename = invoice.get("file_name")
+                # Determine the correct bucket based on file_path prefix
+                file_path = invoice.get("file_path", "")
+                if file_path.startswith("folder_watcher/"):
+                    bucket_name = "folderwatcher"
+                    filename = file_path.replace("folder_watcher/", "")
+                elif file_path.startswith("manual/"):
+                    bucket_name = "manual"
+                    filename = file_path.replace("manual/", "")
+                else:
+                    bucket_name = "invoices"  # Default for drag-drop
+                    filename = file_path
+                
+                # Use extracted filename, or fall back to file_name field
+                if not filename:
+                    filename = invoice.get("file_name")
                 if filename:
-                    db_service.client.storage.from_("invoices").remove([filename])
+                    db_service.client.storage.from_(bucket_name).remove([filename])
+                    logger.info(f"Deleted file '{filename}' from bucket '{bucket_name}'")
             except Exception as storage_error:
                 logger.warning(f"Failed to delete file from storage: {str(storage_error)}")
                 # Continue with database deletion even if storage deletion fails
@@ -130,6 +144,7 @@ async def delete_invoice(invoice_id: str = Path(..., description="The invoice ID
         # Delete from database
         delete_response = db_service.client.table("invoices_clean").delete().eq("id", invoice_id).execute()
         
+        # Simple success message since we can't determine upload source
         return {
             "message": "Invoice deleted successfully",
             "invoice_id": invoice_id,
@@ -214,8 +229,21 @@ async def get_invoice_editor_data(invoice_id: str = Path(..., description="The i
         # Construct proper PDF URL from file_path
         file_path = invoice_data.get("file_path", "")
         if file_path:
-            # Construct full Supabase storage URL
-            pdf_url = f"https://bdtcfypvadryfeabqnlc.supabase.co/storage/v1/object/public/invoices/{file_path}"
+            # Determine the correct bucket based on file_path prefix
+            if file_path.startswith('folder_watcher/'):
+                bucket_name = "folderwatcher"
+                # Remove the prefix since it's now part of the bucket structure
+                file_name = file_path.replace('folder_watcher/', '')
+            elif file_path.startswith('manual/'):
+                bucket_name = "manual"
+                file_name = file_path.replace('manual/', '')
+            else:
+                # Default for drag-drop uploads
+                bucket_name = "invoices"
+                file_name = file_path
+            
+            # Construct full Supabase storage URL with correct bucket
+            pdf_url = f"https://bdtcfypvadryfeabqnlc.supabase.co/storage/v1/object/public/{bucket_name}/{file_name}"
         else:
             pdf_url = ""
         
@@ -354,3 +382,62 @@ async def update_invoice_editor_data(
     except Exception as e:
         logger.error(f"Failed to update editor data for invoice {invoice_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to update invoice: {str(e)}")
+
+@router.put("/invoices/{invoice_id}/complete")
+async def complete_invoice(
+    invoice_id: str = Path(..., description="The invoice ID"),
+    request_data: Dict[str, Any] = None
+):
+    """Mark invoice as completed with review status"""
+    
+    if not request_data:
+        raise HTTPException(status_code=400, detail="No completion data provided")
+    
+    completion_info = request_data.get("completion_info", {})
+    
+    if not db_service.is_available:
+        # Mock success for demo
+        if invoice_id == "test-123":
+            return {
+                "success": True,
+                "message": "Invoice marked as completed (demo mode)",
+                "invoice_id": invoice_id,
+                "completion_status": "completed_review"
+            }
+        else:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    try:
+        # Update invoice with completion status
+        update_data = {
+            "review_status": completion_info.get("review_status", "completed_review"),
+            "reviewed_by": completion_info.get("completed_by"),
+            "reviewed_at": completion_info.get("completed_at", "now()"),
+            "review_notes": completion_info.get("completion_notes"),
+            "edit_completed_at": "now()",
+            "status": "completed",
+            "updated_at": "now()"
+        }
+        
+        # Remove None values
+        update_data = {k: v for k, v in update_data.items() if v is not None}
+        
+        if update_data:
+            response = db_service.client.table("invoices_clean").update(update_data).eq("id", invoice_id).execute()
+            
+            if not response.data:
+                raise HTTPException(status_code=404, detail="Invoice not found or completion failed")
+        
+        return {
+            "success": True,
+            "message": "Invoice marked as completed successfully",
+            "invoice_id": invoice_id,
+            "completion_status": update_data.get("review_status", "completed_review"),
+            "completed_at": update_data.get("reviewed_at")
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to complete invoice {invoice_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to complete invoice: {str(e)}")

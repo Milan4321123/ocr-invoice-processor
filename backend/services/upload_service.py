@@ -57,7 +57,12 @@ class UploadService:
     MAX_FILE_SIZE = 10 * 1024 * 1024
     
     def __init__(self):
-        self.storage_bucket = "invoices"
+        # Use separate buckets for different upload sources
+        self.buckets = {
+            UploadSource.DRAG_DROP: "invoices",
+            UploadSource.FOLDER_WATCHER: "folderwatcher", 
+            UploadSource.MANUAL: "manual-invoices"
+        }
     
     def sanitize_filename(self, filename: str) -> str:
         """
@@ -94,56 +99,71 @@ class UploadService:
         """
         # Check if file is empty
         if file_data.file_size == 0:
-            return False, "File is empty"
+            return False, "Die Datei ist leer"
         
         # Check file size
         if file_data.file_size > self.MAX_FILE_SIZE:
-            return False, f"File size exceeds maximum allowed size of {self.MAX_FILE_SIZE // (1024*1024)}MB"
+            return False, f"Datei ist zu groß. Maximum: {self.MAX_FILE_SIZE // (1024*1024)}MB"
         
         # Validate content type
         if file_data.content_type not in self.SUPPORTED_CONTENT_TYPES:
-            return False, f"Unsupported file type. Only {', '.join(self.SUPPORTED_CONTENT_TYPES)} are allowed"
+            return False, "Nur PDF-Dateien sind erlaubt"
         
-        # Validate filename pattern (only for drag & drop uploads)
-        if file_data.source == UploadSource.DRAG_DROP:
-            if not re.match(self.FILENAME_PATTERN, file_data.filename):
-                return False, "Filename must follow pattern: YYYYMMDD_IDENTIFIER_VENDOR_TYPE.pdf"
+        # Validate filename pattern for all uploads (unified validation)
+        if not re.match(self.FILENAME_PATTERN, file_data.filename):
+            return False, "Dateiname muss dem Muster folgen: JJJJMMTT_KENNUNG_LIEFERANT_TYP.pdf"
+        
+        # Check for duplicate files by filename
+        if db_service.is_available:
+            try:
+                # Query for existing files with the same filename
+                response = db_service.client.table("invoices_clean").select("id,file_name").eq("file_name", file_data.filename).execute()
+                if response.data and len(response.data) > 0:
+                    return False, f"Eine Datei mit dem Namen '{file_data.filename}' existiert bereits"
+            except Exception as e:
+                logger.warning(f"Could not check for duplicate files: {e}")
+                # Don't fail the upload just because we can't check for duplicates
         
         return True, None
     
     def generate_storage_path(self, filename: str, source: UploadSource) -> str:
         """
         Generate storage path based on source and filename
+        For database storage, we include bucket prefix to help with PDF URL construction
         """
-        # Add source prefix for organization
         if source == UploadSource.FOLDER_WATCHER:
             return f"folder_watcher/{filename}"
         elif source == UploadSource.MANUAL:
             return f"manual/{filename}"
-        else:
-            return filename  # Default path for drag & drop
-    
+        else:  # DRAG_DROP
+            return filename  # No prefix for drag-drop (default)
     async def upload_to_storage(self, file_data: FileData, storage_path: str) -> Tuple[bool, Optional[str], Optional[str]]:
         """
-        Upload file to Supabase storage
+        Upload file to Supabase storage using the appropriate bucket
         Returns (success, public_url, error_message)
         """
         if not db_service.is_available:
             # Mock upload for demo mode
             mock_url = f"http://localhost:8000/mock-storage/{file_data.filename}"
             return True, mock_url, None
-        
+
         try:
-            # Upload file to storage
-            db_service.client.storage.from_(self.storage_bucket).upload(storage_path, file_data.content)
+            # Get the appropriate bucket for this upload source
+            bucket_name = self.buckets[file_data.source]
             
-            # Get public URL
-            public_url = db_service.client.storage.from_(self.storage_bucket).get_public_url(storage_path)
+            # Extract just the filename for storage (remove any prefix)
+            filename = storage_path.split('/')[-1] if '/' in storage_path else storage_path
+            
+            # Upload file to the source-specific bucket using just the filename
+            db_service.client.storage.from_(bucket_name).upload(filename, file_data.content)
+            
+            # Get public URL from the specific bucket
+            public_url = db_service.client.storage.from_(bucket_name).get_public_url(filename)
             
             return True, public_url, None
             
         except Exception as e:
-            logger.error(f"Storage upload failed: {str(e)}")
+            logger.error(f"Storage upload failed to bucket '{bucket_name}': {str(e)}")
             return False, None, str(e)
     
     def create_invoice_record(self, file_data: FileData, storage_path: str, 
@@ -161,6 +181,7 @@ class UploadService:
                 "file_size": file_data.file_size,
                 "mime_type": file_data.content_type,
                 "status": "uploaded"
+                # Note: upload_source removed as column doesn't exist in current schema
                 # created_at and updated_at will be auto-generated by database default
             }
             # Create invoice record in database using clean database service

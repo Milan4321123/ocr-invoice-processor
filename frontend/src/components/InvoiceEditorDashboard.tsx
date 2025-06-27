@@ -23,6 +23,7 @@ export default function InvoiceEditorDashboard({
   const [filename, setFilename] = useState<string>(initialData?.filename || '');
   const [isLoading, setIsLoading] = useState<boolean>(!initialData);
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isCompleting, setIsCompleting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
   const [pdfNumPages, setPdfNumPages] = useState<number>(0);
@@ -138,6 +139,59 @@ export default function InvoiceEditorDashboard({
   const handlePdfLoadError = (error: any) => {
     console.error('PDF load error:', error);
     setError('PDF-Dokument konnte nicht geladen werden');
+  };
+
+  const handleComplete = async () => {
+    try {
+      setIsCompleting(true);
+      
+      // First save the current changes
+      await handleSave(fields);
+      
+      // Then mark as completed
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      
+      // Prepare completion data with review status
+      const completionData = {
+        fields: {
+          ...fields,
+          // Don't override existing fields, just add completion status
+        },
+        completion_info: {
+          completed_by: fields.rechnungspruefung_email || "editor@company.de",
+          completed_at: new Date().toISOString(),
+          review_status: "completed_review",
+          completion_notes: "Rechnung wurde vollständig bearbeitet und abgeschlossen"
+        }
+      };
+
+      const response = await fetch(`${apiUrl}/api/invoices/${invoiceId}/complete`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(completionData),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Abschluss fehlgeschlagen: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      alert('✅ Rechnung erfolgreich abgeschlossen! Status wurde auf "Bearbeitung abgeschlossen" gesetzt.');
+      
+      // Redirect to dashboard after completion
+      window.location.href = '/dashboard';
+      
+      return true;
+    } catch (err) {
+      console.error('Error completing invoice:', err);
+      alert(`❌ Fehler beim Abschließen: ${err instanceof Error ? err.message : 'Unbekannter Fehler'}`);
+      throw err;
+    } finally {
+      setIsCompleting(false);
+    }
   };
 
   if (isLoading) {
@@ -278,7 +332,9 @@ export default function InvoiceEditorDashboard({
             fields={fields}
             onFieldChange={(fieldName: string, value: any) => handleFieldChange(fieldName as keyof GermanInvoiceFields, value)}
             onSave={() => handleSave(fields)}
+            onComplete={handleComplete}
             isSaving={isSaving}
+            isCompleting={isCompleting}
             className="h-full"
           />
         </div>

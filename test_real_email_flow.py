@@ -9,54 +9,62 @@ def test_invoice_save_with_real_email():
     # Use a real invoice ID from the database
     invoice_id = "3441971d-ecc4-4c41-af0d-3444b36908e9"
     
-    # Test data with real email address
+    # Test data with realistic construction project data for Bauleiter control
     test_data = {
         "fields": {
-            "rechnungsempfaenger": "Milan Test Company GmbH",
-            "rechnungssteller": "Updated Test Vendor Services",
-            "projekt": "Real Email Test Project",
-            "gewerk": "Email Testing Work",
-            "rechnungsbetrag": 3750.99,
+            "rechnungsempfaenger": "Bauunternehmen Milan GmbH",
+            "rechnungssteller": "Elektro Müller & Söhne GmbH",
+            "projekt": "Wohnkomplex Musterstraße 15-17",
+            "gewerk": "Elektroinstallation Phase 2",
+            "rechnungsbetrag": 15750.85,
             "rechnungseingang": "2025-06-26",
-            "faelligkeit": "2025-07-26",
+            "faelligkeit": "2025-07-26", 
             "skonto_datum": "2025-07-06",
-            "skonto_prozent": 2.5,
+            "skonto_prozent": 2.0,
             "rechnungsart": "rechnung",
             "kfw_anrechenbar": True,
             "rechnungspruefung_email": "incognizant321@gmail.com",
-            "weiter_berechnen_an": "Milan Test Department"
+            "weiter_berechnen_an": "Controlling Abteilung"
         },
         "editor_info": {
-            "editor_email": "incognizant321@gmail.com",
-            "editor_name": "Milan Adhokari",
+            "editor_email": "incognizant321@gmail.com",  # Bauleiter email
+            "editor_name": "Milan Adhokari (Bauleiter)",
             "changes_summary": [
                 {
                     "field": "rechnungsbetrag",
-                    "old_value": "2500.75",
-                    "new_value": "3750.99",
-                    "description": "Updated invoice amount for real email test"
+                    "old_value": "3750.99",
+                    "new_value": "15750.85",
+                    "description": "Rechnungsbetrag nach Materialprüfung angepasst"
                 },
                 {
                     "field": "projekt",
-                    "old_value": "Test Project Updated", 
-                    "new_value": "Real Email Test Project",
-                    "description": "Updated project name for real email test"
+                    "old_value": "Real Email Test Project", 
+                    "new_value": "Wohnkomplex Musterstraße 15-17",
+                    "description": "Korrektes Projekt zugeordnet"
                 },
                 {
-                    "field": "rechnungsempfaenger",
-                    "old_value": "Test Customer GmbH",
-                    "new_value": "Milan Test Company GmbH", 
-                    "description": "Updated customer name for real email test"
+                    "field": "gewerk",
+                    "old_value": "Email Testing Work",
+                    "new_value": "Elektroinstallation Phase 2",
+                    "description": "Spezifizierung der Arbeitsphase"
+                },
+                {
+                    "field": "kfw_anrechenbar",
+                    "old_value": "false",
+                    "new_value": "true",
+                    "description": "KfW-Anrechenbarkeit nach Prüfung bestätigt"
                 }
             ]
         }
     }
     
     try:
-        print("🧪 Testing invoice save with REAL email to incognizant321@gmail.com...")
-        print(f"📧 Email will be sent to: {test_data['editor_info']['editor_email']}")
-        print(f"👤 Editor: {test_data['editor_info']['editor_name']}")
+        print("🧪 Testing Bauleiter control email with BEAUTIFUL HTML format...")
+        print(f"📧 Control email will be sent to Bauleiter: {test_data['editor_info']['editor_email']}")
+        print(f"👤 Bearbeiter: {test_data['editor_info']['editor_name']}")
         print(f"🆔 Invoice ID: {invoice_id}")
+        print(f"🏗️  Project: {test_data['fields']['projekt']}")
+        print(f"💰 Amount: €{test_data['fields']['rechnungsbetrag']}")
         print()
         
         # Make the request
@@ -77,14 +85,17 @@ def test_invoice_save_with_real_email():
             print()
             
             if result.get('email_sent'):
-                print("🎉 SUCCESS! Email notification sent to incognizant321@gmail.com")
-                print("📬 Check your email inbox for the invoice update notification!")
+                print("🎉 SUCCESS! Beautiful Bauleiter control email sent to incognizant321@gmail.com")
+                print("📬 Check your email inbox for the detailed invoice control notification!")
                 print()
-                print("Email should contain:")
-                print("- Invoice details (amount, dates, customer, etc.)")
-                print("- Change summary showing what was updated")
-                print("- Professional HTML formatting")
-                print("- Editor information (Milan Adhokari)")
+                print("Email contains BEAUTIFUL HTML with:")
+                print("- 📋 Complete invoice form fields in organized sections")
+                print("- 💰 Financial details with formatting")
+                print("- 📅 All dates and deadlines")
+                print("- ✅ Checkbox fields (KfW status)")
+                print("- 📝 Change summary with highlights")
+                print("- 🎨 Professional responsive design")
+                print("- 🔍 Ready for Bauleiter control and review")
             else:
                 print("⚠️  No email was sent (check email configuration)")
                 
