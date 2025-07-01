@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { invoiceId: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { invoiceId } = params;
+    const { id } = params;
     
     // Get the search params for optional recipient_email and recipient_name
     const { searchParams } = new URL(request.url);
@@ -20,7 +20,7 @@ export async function POST(
     if (recipientName) queryParams.append('recipient_name', recipientName);
     
     const queryString = queryParams.toString();
-    const endpoint = `${apiUrl}/api/invoices/${invoiceId}/send-skonto-reminder${queryString ? `?${queryString}` : ''}`;
+    const endpoint = `${apiUrl}/api/invoices/${id}/send-skonto-reminder${queryString ? `?${queryString}` : ''}`;
     
     const response = await fetch(endpoint, {
       method: 'POST',

@@ -2,15 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { invoiceId: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { invoiceId } = params;
+    const { id } = params;
     const updateData = await request.json();
     
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     
-    const response = await fetch(`${apiUrl}/api/invoices/${invoiceId}`, {
+    const response = await fetch(`${apiUrl}/api/invoices/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
