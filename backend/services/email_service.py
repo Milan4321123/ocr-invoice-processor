@@ -468,7 +468,132 @@ class EmailService:
     </div>
 </body>
 </html>
-            """
+            """,
+        
+        "skonto_reminder": """
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 Skonto-Erinnerung - Handlung erforderlich</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #f39c12, #e67e22); color: white; padding: 25px; border-radius: 8px; margin-bottom: 20px; text-align: center; }
+        .header h1 { margin: 0; font-size: 28px; }
+        .content { background: white; padding: 25px; border: 1px solid #e0e0e0; border-radius: 8px; }
+        .alert-box { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        .invoice-details { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .skonto-info { background: #e8f5e8; border-left: 4px solid #28a745; padding: 15px; margin: 20px 0; }
+        .savings-calculation { background: #f0f8ff; border: 1px solid #b3d9ff; padding: 15px; border-radius: 5px; margin: 15px 0; }
+        .action-buttons { text-align: center; margin: 30px 0; }
+        .action-btn { display: inline-block; padding: 15px 30px; margin: 10px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px; }
+        .take-skonto-btn { background: #28a745; color: white; }
+        .skip-skonto-btn { background: #6c757d; color: white; }
+        .action-btn:hover { opacity: 0.9; }
+        .deadline-warning { background: #ffecec; border: 1px solid #ff9999; padding: 15px; border-radius: 5px; margin: 20px 0; color: #d63031; text-align: center; }
+        .footer { margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px; font-size: 0.9em; color: #666; }
+        .security-notice { background: #e8f4f8; border: 1px solid #bee5eb; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        .detail-row { display: flex; justify-content: space-between; margin: 8px 0; }
+        .detail-label { font-weight: bold; }
+        .detail-value { color: #495057; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎯 Skonto-Erinnerung</h1>
+        <p style="margin: 10px 0 0 0; font-size: 18px;">Handlung erforderlich - Skonto läuft bald ab!</p>
+    </div>
+    
+    <div class="content">
+        <div class="alert-box">
+            <strong>⏰ ZEITKRITISCH:</strong> Das Skonto für diese Rechnung läuft in {{ days_until_expiry }} Tag(en) ab. 
+            Bitte treffen Sie eine Entscheidung, um potenzielle Einsparungen nicht zu verpassen.
+        </div>
+        
+        <h2>📋 Rechnung Details</h2>
+        <div class="invoice-details">
+            <div class="detail-row">
+                <span class="detail-label">Rechnungsnummer:</span>
+                <span class="detail-value">{{ invoice_number or 'Nicht verfügbar' }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Lieferant:</span>
+                <span class="detail-value">{{ supplier_name or 'Nicht verfügbar' }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Rechnungsdatum:</span>
+                <span class="detail-value">{{ invoice_date or 'Nicht verfügbar' }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Rechnungsbetrag:</span>
+                <span class="detail-value">{{ total_amount or 'Nicht verfügbar' }}{% if currency %} {{ currency }}{% endif %}</span>
+            </div>
+        </div>
+        
+        <div class="skonto-info">
+            <h3>💰 Skonto Information</h3>
+            <div class="detail-row">
+                <span class="detail-label">Skonto Prozent:</span>
+                <span class="detail-value">{{ skonto_prozent }}%</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Skonto bis:</span>
+                <span class="detail-value">{{ skonto_datum }}</span>
+            </div>
+        </div>
+        
+        {% if potential_savings %}
+        <div class="savings-calculation">
+            <h4>📊 Potenzielle Einsparung</h4>
+            <p style="font-size: 18px; font-weight: bold; color: #28a745;">
+                {{ potential_savings }} {{ currency }}
+            </p>
+            <small>Berechnung: {{ total_amount }} × {{ skonto_prozent }}% = {{ potential_savings }} {{ currency }}</small>
+        </div>
+        {% endif %}
+        
+        {% if days_until_expiry <= 3 %}
+        <div class="deadline-warning">
+            <strong>🚨 DRINGEND: Nur noch {{ days_until_expiry }} Tag(en) bis zum Skonto-Ablauf!</strong>
+        </div>
+        {% endif %}
+        
+        <div class="action-buttons">
+            <h3>🎯 Entscheidung erforderlich</h3>
+            <p style="color: #4a5568; margin-bottom: 25px;">
+                Möchten Sie das Skonto in Anspruch nehmen oder überspringen?
+            </p>
+            <a href="{{ take_skonto_url }}" class="action-btn take-skonto-btn">
+                ✅ SKONTO NEHMEN ({{ potential_savings }} {{ currency }} sparen)
+            </a>
+            <a href="{{ skip_skonto_url }}" class="action-btn skip-skonto-btn">
+                ⏭️ SKONTO ÜBERSPRINGEN
+            </a>
+            <br><br>
+            <p style="font-size: 14px; color: #718096;">
+                Nach Ihrer Entscheidung wird das System automatisch die entsprechenden Schritte einleiten.
+            </p>
+        </div>
+
+        <div class="security-notice">
+            <strong>🔒 Sicherheitshinweis:</strong> Diese Aktionslinks sind verschlüsselt und verfallen automatisch in 7 Tagen. 
+            Klicken Sie nur auf Links in E-Mails, die Sie erwartet haben. Bei Verdacht auf Manipulation kontaktieren Sie sofort den System-Administrator.
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p><strong>🤖 Automatisch generiert vom Rechnungsverarbeitungssystem</strong></p>
+        <p><strong>Zeitstempel:</strong> {{ timestamp }}</p>
+        <p><strong>Token gültig bis:</strong> {{ token_expires }}</p>
+        <p><strong>E-Mail ID:</strong> {{ email_id or 'N/A' }}</p>
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 15px 0;">
+        <p>Diese E-Mail wurde automatisch versendet. Bei Fragen oder Problemen wenden Sie sich an den System-Administrator.</p>
+        <p><strong>Skonto-Verwaltung:</strong> Für Unterstützung bei Skonto-Entscheidungen kontaktieren Sie die Buchhaltung.</p>
+    </div>
+</body>
+</html>
+        """
         }
     
     async def send_editor_notification(
@@ -705,46 +830,180 @@ class EmailService:
                 "error": str(e),
                 "message_id": None
             }
-
-    async def send_html_email(
+    
+    async def send_skonto_reminder(
         self,
-        to_email: str,
-        subject: str,
-        html_content: str,
-        to_name: str = None,
-        invoice_id: Optional[UUID] = None,
-        email_type: str = "general"
+        invoice_data: Dict[str, Any],
+        recipient_email: str,
+        recipient_name: str = None,
+        request_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Send HTML email using the configured email providers.
-        Generic method for sending any HTML email with fallback support.
+        Send Skonto reminder email to stakeholder.
+        
+        Args:
+            invoice_data: Invoice data including Skonto information
+            recipient_email: Email address to send reminder to
+            recipient_name: Name of recipient (optional)
+            request_id: Request ID for tracking (optional)
         """
         try:
-            # Use configured name if not provided
-            if not to_name:
-                to_name = to_email.split('@')[0].title()
+            # Validate Skonto data
+            skonto_datum = invoice_data.get("skonto_datum")
+            skonto_prozent = invoice_data.get("skonto_prozent")
+            total_amount = invoice_data.get("rechnungsbetrag")
             
-            # Send email with retry and fallback
+            if not skonto_datum or not skonto_prozent or not total_amount:
+                return {
+                    "success": False,
+                    "error": "Missing required Skonto data (datum, prozent, or total_amount)"
+                }
+            
+            # Calculate days until expiry
+            from datetime import datetime, timedelta
+            try:
+                if isinstance(skonto_datum, str):
+                    # Handle different date formats
+                    if "." in skonto_datum:
+                        skonto_date = datetime.strptime(skonto_datum, "%d.%m.%Y")
+                    elif "-" in skonto_datum:
+                        skonto_date = datetime.strptime(skonto_datum, "%Y-%m-%d")
+                    else:
+                        skonto_date = datetime.strptime(skonto_datum, "%Y%m%d")
+                else:
+                    skonto_date = skonto_datum
+                
+                days_until_expiry = (skonto_date - datetime.now()).days
+            except (ValueError, TypeError) as e:
+                logger.error(f"Failed to parse Skonto date {skonto_datum}: {e}")
+                return {
+                    "success": False,
+                    "error": f"Invalid Skonto date format: {skonto_datum}"
+                }
+            
+            # Calculate potential savings
+            try:
+                potential_savings = round(float(total_amount) * float(skonto_prozent) / 100, 2)
+            except (ValueError, TypeError):
+                potential_savings = 0
+            
+            # Create approval tokens for Skonto actions
+            token_data = {
+                "action_type": "skonto_decision",
+                "invoice_id": invoice_data.get("id"),
+                "recipient_email": recipient_email,
+                "metadata": {
+                    "potential_savings": potential_savings,
+                    "skonto_prozent": skonto_prozent,
+                    "skonto_datum": skonto_datum
+                }
+            }
+            
+            # Create tokens for take and skip actions using the helper method
+            try:
+                take_token = await self._generate_approval_token(
+                    invoice_id=UUID(invoice_data.get("id")),
+                    action="skonto_taken",
+                    user_email=recipient_email
+                )
+                skip_token = await self._generate_approval_token(
+                    invoice_id=UUID(invoice_data.get("id")),
+                    action="skonto_missed",
+                    user_email=recipient_email
+                )
+                
+                # Set token expiry (7 days from now)
+                token_expires = (datetime.now() + timedelta(days=7)).isoformat()
+                
+            except Exception as e:
+                return {
+                    "success": False,
+                    "error": f"Failed to create approval tokens for Skonto decision: {str(e)}"
+                }
+            
+            # Build action URLs
+            take_skonto_url = f"{self.base_url}/api/email/skonto-decision?token={take_token}&decision=taken"
+            skip_skonto_url = f"{self.base_url}/api/email/skonto-decision?token={skip_token}&decision=missed"
+            
+            # Prepare template context
+            context = {
+                "recipient_name": recipient_name or recipient_email.split("@")[0],
+                "recipient_email": recipient_email,
+                "timestamp": datetime.now().isoformat(),
+                "request_id": request_id or "N/A",
+                "invoice_number": invoice_data.get("rechnungsnummer"),
+                "supplier_name": invoice_data.get("lieferant"),
+                "invoice_date": invoice_data.get("rechnungsdatum"),
+                "total_amount": total_amount,
+                "currency": invoice_data.get("currency", "EUR"),
+                "skonto_datum": skonto_datum,
+                "skonto_prozent": skonto_prozent,
+                "days_until_expiry": days_until_expiry,
+                "potential_savings": potential_savings,
+                "take_skonto_url": take_skonto_url,
+                "skip_skonto_url": skip_skonto_url,
+                "token_expires": token_expires,
+                "email_id": f"SKONTO-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+            }
+            
+            # Render email template
+            template = self.jinja_env.get_template("skonto_reminder")
+            html_content = template.render(**context)
+            
+            # Determine subject urgency
+            if days_until_expiry <= 1:
+                urgency = "🚨 DRINGEND"
+            elif days_until_expiry <= 3:
+                urgency = "⚠️ WICHTIG"
+            else:
+                urgency = "📋"
+                
+            subject = f"{urgency} Skonto-Erinnerung: {invoice_data.get('rechnungsnummer', 'Rechnung')} - {potential_savings} EUR sparen"
+            
+            # Send email
             result = await self._send_email(
-                to_email=to_email,
-                to_name=to_name,
+                to_email=recipient_email,
+                to_name=recipient_name or recipient_email.split("@")[0],
                 subject=subject,
                 html_content=html_content,
-                email_type=email_type,
-                invoice_id=invoice_id,
-                template_used="custom_html"
+                invoice_id=invoice_data.get("id"),
+                email_type="skonto_reminder",
+                template_used="skonto_reminder"
             )
             
-            return result
-            
+            if result["success"]:
+                # Update database with reminder sent status
+                reminder_result = db_service.update_skonto_reminder_sent(
+                    invoice_id=invoice_data.get("id")
+                )
+                
+                if not reminder_result["success"]:
+                    logger.warning(f"Failed to update Skonto reminder status: {reminder_result.get('error')}")
+                
+                logger.info(f"✅ Skonto reminder sent successfully to {recipient_email} for invoice {invoice_data.get('id')}")
+                return {
+                    "success": True,
+                    "message": f"Skonto reminder sent successfully to {recipient_email}",
+                    "message_id": result.get("message_id"),
+                    "timestamp": datetime.now().isoformat(),
+                    "potential_savings": potential_savings,
+                    "days_until_expiry": days_until_expiry
+                }
+            else:
+                logger.error(f"❌ Failed to send Skonto reminder: {result.get('error')}")
+                return result
+                
         except Exception as e:
-            logger.error(f"Failed to send HTML email to {to_email}: {str(e)}")
+            logger.error(f"❌ Exception in send_skonto_reminder: {str(e)}")
             return {
                 "success": False,
                 "error": str(e),
-                "provider": "none"
+                "timestamp": datetime.now().isoformat()
             }
-    
+
+    # =============================================================================
+    # PRIVATE HELPER METHODS
+    # =============================================================================
     async def _send_email(
         self,
         to_email: str,

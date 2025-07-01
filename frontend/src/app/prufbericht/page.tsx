@@ -25,6 +25,14 @@ interface InvoiceItem {
   notes?: string
   approved_by?: string
   approved_at?: string
+  
+  // Skonto tracking fields (Phase 1)
+  skonto_reminder_sent?: boolean
+  skonto_reminder_sent_at?: string
+  skonto_decision?: 'pending' | 'taken' | 'missed' | 'not_applicable'
+  skonto_decision_at?: string
+  skonto_decision_by?: string
+  actual_skonto_savings?: number
 }
 
 interface CriticalDatesInfo {
@@ -138,6 +146,32 @@ export default function PrufberichtPage() {
     }
   }
 
+  // Skonto helper functions (Phase 1)
+  const getSkontoStatusColor = (skontoDecision: string | undefined): string => {
+    switch (skontoDecision) {
+      case 'taken': return 'bg-green-100 text-green-800'
+      case 'missed': return 'bg-red-100 text-red-800'
+      case 'pending': return 'bg-yellow-100 text-yellow-800'
+      case 'not_applicable': return 'bg-gray-100 text-gray-800'
+      default: return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const getSkontoStatusLabel = (skontoDecision: string | undefined): string => {
+    switch (skontoDecision) {
+      case 'taken': return 'Skonto Taken'
+      case 'missed': return 'Skonto Missed'
+      case 'pending': return 'Skonto Pending'
+      case 'not_applicable': return 'No Skonto'
+      default: return 'Unknown'
+    }
+  }
+
+  const calculateSkontoSavings = (amount: number | undefined, percentage: number | undefined): number => {
+    if (!amount || !percentage) return 0
+    return (amount * percentage) / 100
+  }
+
   const handleApproval = async (invoiceId: string, action: 'approve' | 'reject') => {
     try {
       const response = await fetch(`${apiUrl}/api/invoices/${invoiceId}/${action}`, {
@@ -153,6 +187,37 @@ export default function PrufberichtPage() {
       }
     } catch (error) {
       toast.error(`Failed to ${action} invoice`)
+    }
+  }
+
+  // Skonto action functions (Phase 1)
+  const sendSkontoReminder = async (invoiceId: string) => {
+    try {
+      const response = await fetch(`${apiUrl}/api/invoices/${invoiceId}/send-skonto-reminder`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          finance_email: "finance@company.com", // TODO: Make configurable
+          reminder_type: "skonto_expiring",
+          sent_by: "prufbericht_user"
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to send Skonto reminder: ${response.statusText}`)
+      }
+
+      const result = await response.json()
+      
+      if (result.success) {
+        toast.success(`📧 Skonto reminder sent successfully!`)
+        fetchPrufberichtData() // Refresh data
+      } else {
+        toast.error(`❌ Failed to send Skonto reminder: ${result.error || 'Unknown error'}`)
+      }
+    } catch (err) {
+      console.error('Error sending Skonto reminder:', err)
+      toast.error(`Failed to send Skonto reminder: ${err instanceof Error ? err.message : 'Unknown error'}`)
     }
   }
 
@@ -294,6 +359,7 @@ export default function PrufberichtPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Skonto</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Skonto Status</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
@@ -333,9 +399,35 @@ export default function PrufberichtPage() {
                         {invoice.days_until_skonto !== undefined && invoice.days_until_skonto >= 0 && (
                           <div className="text-xs text-yellow-600">{invoice.days_until_skonto} days left</div>
                         )}
+                        <div className="text-xs text-green-600 mt-1">
+                          Save: {formatCurrency(calculateSkontoSavings(invoice.total_amount, invoice.skonto_percentage))}
+                        </div>
                       </div>
                     ) : (
                       <span className="text-sm text-gray-400">No skonto</span>
+                    )}
+                  </td>
+                  
+                  {/* Skonto Status Column */}
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {invoice.skonto_date && invoice.skonto_percentage ? (
+                      <div>
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getSkontoStatusColor(invoice.skonto_decision)}`}>
+                          {getSkontoStatusLabel(invoice.skonto_decision)}
+                        </span>
+                        {invoice.skonto_reminder_sent && (
+                          <div className="text-xs text-blue-600 mt-1">
+                            📧 Reminder sent
+                          </div>
+                        )}
+                        {invoice.actual_skonto_savings && (
+                          <div className="text-xs text-green-600 mt-1">
+                            Saved: {formatCurrency(invoice.actual_skonto_savings)}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-sm text-gray-400">N/A</span>
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -360,6 +452,25 @@ export default function PrufberichtPage() {
                         </button>
                       </>
                     )}
+                    
+                    {/* Skonto Reminder Button */}
+                    {invoice.skonto_date && 
+                     invoice.skonto_percentage && 
+                     !invoice.skonto_reminder_sent && 
+                     invoice.skonto_decision !== 'taken' && 
+                     invoice.skonto_decision !== 'missed' && 
+                     invoice.days_until_skonto !== undefined && 
+                     invoice.days_until_skonto >= 0 && 
+                     invoice.days_until_skonto <= 7 && (
+                      <button
+                        onClick={() => sendSkontoReminder(invoice.id)}
+                        className="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1 rounded text-xs"
+                        title={`Send Skonto reminder - ${invoice.days_until_skonto} days until expiry`}
+                      >
+                        📧 Skonto
+                      </button>
+                    )}
+                    
                     <Link
                       href={`/dashboard/${invoice.id}`}
                       className="text-blue-600 hover:text-blue-900 text-xs"

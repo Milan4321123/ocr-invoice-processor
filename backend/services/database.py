@@ -80,36 +80,7 @@ class DatabaseService:
             logger.error(f"Failed to execute query: {e}")
             return {"success": False, "error": str(e)}
 
-    async def create_approval_token(self, token_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Create approval token record for email workflow.
-        Uses your actual approval_tokens table.
-        """
-        if not self.is_available:
-            return {"success": False, "error": "Database unavailable"}
-        
-        try:
-            token_record = {
-                "token_hash": token_data["token_hash"],
-                "invoice_id": token_data["invoice_id"],
-                "action": token_data["action"],
-                "user_email": token_data["user_email"],
-                "expires_at": token_data["expires_at"],
-                "nonce": token_data["nonce"],
-                "is_revoked": False
-            }
-            
-            response = self._client.table("approval_tokens").insert(token_record).execute()
-            
-            if response.data:
-                logger.info(f"✅ Created approval token for invoice {token_data['invoice_id']}")
-                return {"success": True, "data": response.data[0]}
-            else:
-                return {"success": False, "error": "Failed to create approval token"}
-            
-        except Exception as e:
-            logger.error(f"❌ Failed to create approval token: {e}")
-            return {"success": False, "error": str(e)}
+
 
     async def log_email_attempt(self, email_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -931,6 +902,242 @@ class DatabaseService:
                 
         except Exception as e:
             logger.error(f"❌ Failed to create security event: {e}")
+            return {"success": False, "error": str(e)}
+
+    # =============================================================================
+    # SKONTO MANAGEMENT METHODS
+    # =============================================================================
+    
+    def get_invoices_with_skonto_due(self, days_ahead: int = 7) -> Dict[str, Any]:
+        """
+        Get invoices with Skonto expiring within specified days.
+        
+        Args:
+            days_ahead: Number of days ahead to check for Skonto expiry
+            
+        Returns:
+            Dict with success status and list of invoices
+        """
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            from datetime import datetime, timedelta
+            
+            # Calculate the date range for Skonto due
+            today = datetime.now().date()
+            future_date = today + timedelta(days=days_ahead)
+            
+            # Query invoices with Skonto due within the specified period
+            # Include invoices where skonto_decision is pending or null
+            response = self._client.table(self.table_name)\
+                .select("*")\
+                .not_.is_("skonto_datum", "null")\
+                .not_.is_("skonto_prozent", "null")\
+                .eq("skonto_decision", "pending")\
+                .execute()
+            
+            if response.data:
+                # Filter invoices based on Skonto date
+                filtered_invoices = []
+                for invoice in response.data:
+                    try:
+                        skonto_datum = invoice.get("skonto_datum")
+                        if not skonto_datum:
+                            continue
+                            
+                        # Parse different date formats
+                        if isinstance(skonto_datum, str):
+                            if "." in skonto_datum:
+                                skonto_date = datetime.strptime(skonto_datum, "%d.%m.%Y").date()
+                            elif "-" in skonto_datum:
+                                skonto_date = datetime.strptime(skonto_datum, "%Y-%m-%d").date()
+                            else:
+                                skonto_date = datetime.strptime(skonto_datum, "%Y%m%d").date()
+                        else:
+                            skonto_date = skonto_datum
+                        
+                        # Check if Skonto is due within the specified period
+                        if today <= skonto_date <= future_date:
+                            filtered_invoices.append(invoice)
+                            
+                    except Exception as e:
+                        logger.warning(f"Failed to parse Skonto date for invoice {invoice.get('id')}: {e}")
+                        continue
+                
+                logger.info(f"✅ Found {len(filtered_invoices)} invoices with Skonto due within {days_ahead} days")
+                return {"success": True, "data": filtered_invoices}
+            else:
+                logger.info("No invoices found with Skonto due")
+                return {"success": True, "data": []}
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to get invoices with Skonto due: {e}")
+            return {"success": False, "error": str(e)}
+
+    def update_skonto_reminder_sent(self, invoice_id: str) -> Dict[str, Any]:
+        """
+        Mark Skonto reminder as sent for an invoice.
+        
+        Args:
+            invoice_id: The ID of the invoice
+            
+        Returns:
+            Dict with success status and updated data
+        """
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            update_data = {
+                "skonto_reminder_sent": True,
+                "skonto_reminder_sent_at": datetime.utcnow().isoformat()
+            }
+            
+            response = self._client.table(self.table_name)\
+                .update(update_data)\
+                .eq("id", invoice_id)\
+                .execute()
+            
+            if response.data:
+                logger.info(f"✅ Marked Skonto reminder as sent for invoice {invoice_id}")
+                return {"success": True, "data": response.data[0]}
+            else:
+                logger.error(f"❌ Failed to update Skonto reminder status for invoice {invoice_id}")
+                return {"success": False, "error": "Skonto reminder update failed"}
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to update Skonto reminder status: {e}")
+            return {"success": False, "error": str(e)}
+
+    def update_skonto_decision(self, invoice_id: str, decision: str, actual_savings: float = None, 
+                             decision_timestamp: str = None, decision_email: str = None) -> Dict[str, Any]:
+        """
+        Update Skonto decision for an invoice.
+        
+        Args:
+            invoice_id: The ID of the invoice
+            decision: The Skonto decision ('taken', 'missed', 'not_applicable')
+            actual_savings: The actual savings amount (optional)
+            decision_timestamp: When the decision was made (optional)
+            decision_email: Email of who made the decision (optional)
+            
+        Returns:
+            Dict with success status and updated data
+        """
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        # Validate decision value
+        valid_decisions = ["taken", "missed", "not_applicable"]
+        if decision not in valid_decisions:
+            return {"success": False, "error": f"Invalid decision. Must be one of: {valid_decisions}"}
+        
+        try:
+            update_data = {
+                "skonto_decision": decision
+            }
+            
+            # Only update actual_savings if provided
+            if actual_savings is not None:
+                update_data["actual_skonto_savings"] = actual_savings
+            
+            response = self._client.table(self.table_name)\
+                .update(update_data)\
+                .eq("id", invoice_id)\
+                .execute()
+            
+            if response.data:
+                logger.info(f"✅ Updated Skonto decision for invoice {invoice_id}: {decision}")
+                return {"success": True, "data": response.data[0]}
+            else:
+                logger.error(f"❌ Failed to update Skonto decision for invoice {invoice_id}")
+                return {"success": False, "error": "Skonto decision update failed"}
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to update Skonto decision: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_skonto_statistics(self, date_from: str = None, date_to: str = None) -> Dict[str, Any]:
+        """
+        Get Skonto statistics for reporting.
+        
+        Args:
+            date_from: Start date for statistics (optional)
+            date_to: End date for statistics (optional)
+            
+        Returns:
+            Dict with success status and statistics data
+        """
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            # Build query
+            query = self._client.table(self.table_name).select("*")
+            
+            # Add date filters if provided
+            if date_from:
+                query = query.gte("rechnungsdatum", date_from)
+            if date_to:
+                query = query.lte("rechnungsdatum", date_to)
+            
+            # Execute query
+            response = query.execute()
+            
+            if response.data:
+                invoices = response.data
+                
+                # Calculate statistics
+                stats = {
+                    "total_invoices_with_skonto": 0,
+                    "skonto_reminders_sent": 0,
+                    "skonto_taken": 0,
+                    "skonto_missed": 0,
+                    "skonto_not_applicable": 0,
+                    "total_potential_savings": 0.0,
+                    "total_actual_savings": 0.0,
+                    "pending_decisions": 0
+                }
+                
+                for invoice in invoices:
+                    # Check if invoice has Skonto data
+                    if invoice.get("skonto_datum") and invoice.get("skonto_prozent"):
+                        stats["total_invoices_with_skonto"] += 1
+                        
+                        # Calculate potential savings
+                        total_amount = invoice.get("rechnungsbetrag")
+                        skonto_percent = invoice.get("skonto_prozent")
+                        if total_amount and skonto_percent:
+                            potential_savings = float(total_amount) * float(skonto_percent) / 100
+                            stats["total_potential_savings"] += potential_savings
+                        
+                        # Check reminder status
+                        if invoice.get("skonto_reminder_sent"):
+                            stats["skonto_reminders_sent"] += 1
+                        
+                        # Check decision status
+                        decision = invoice.get("skonto_decision")
+                        if decision == "taken":
+                            stats["skonto_taken"] += 1
+                            actual_savings = invoice.get("actual_skonto_savings")
+                            if actual_savings:
+                                stats["total_actual_savings"] += float(actual_savings)
+                        elif decision == "missed":
+                            stats["skonto_missed"] += 1
+                        elif decision == "not_applicable":
+                            stats["skonto_not_applicable"] += 1
+                        else:
+                            stats["pending_decisions"] += 1
+                
+                logger.info(f"✅ Generated Skonto statistics for {len(invoices)} invoices")
+                return {"success": True, "data": stats}
+            else:
+                logger.info("No invoices found for statistics")
+                return {"success": True, "data": {}}
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to get Skonto statistics: {e}")
             return {"success": False, "error": str(e)}
 
     # =============================================================================

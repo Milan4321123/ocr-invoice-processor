@@ -1,7 +1,8 @@
 """Invoice management route handlers"""
-from fastapi import APIRouter, HTTPException, Path, Depends
+from fastapi import APIRouter, HTTPException, Path, Depends, Query
 from fastapi.responses import StreamingResponse
 from typing import List, Dict, Any, Optional
+from datetime import datetime
 import logging
 
 from services.database import db_service
@@ -132,6 +133,82 @@ async def get_invoices_by_status(status: str, limit: int = 100):
     except Exception as e:
         logger.error(f"❌ Failed to get invoices by status {status}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to get invoices by status: {str(e)}")
+
+@router.get("/invoices/skonto-due")
+async def get_invoices_with_skonto_due(days_ahead: int = 7):
+    """
+    Get invoices with Skonto expiring within the specified number of days.
+    
+    Args:
+        days_ahead: Number of days ahead to check for Skonto expiry (default: 7)
+    """
+    try:
+        logger.info(f"🔍 Getting invoices with Skonto due within {days_ahead} days")
+        
+        # Get invoices with Skonto due
+        result = db_service.get_invoices_with_skonto_due(days_ahead=days_ahead)
+        
+        if result["success"]:
+            invoices = result["data"]
+            logger.info(f"✅ Found {len(invoices)} invoices with Skonto due within {days_ahead} days")
+            
+            # Calculate additional metadata for each invoice
+            for invoice in invoices:
+                try:
+                    # Calculate days until expiry
+                    from datetime import datetime, timedelta
+                    skonto_datum = invoice.get("skonto_datum")
+                    if skonto_datum:
+                        if isinstance(skonto_datum, str):
+                            if "." in skonto_datum:
+                                skonto_date = datetime.strptime(skonto_datum, "%d.%m.%Y")
+                            elif "-" in skonto_datum:
+                                skonto_date = datetime.strptime(skonto_datum, "%Y-%m-%d")
+                            else:
+                                skonto_date = datetime.strptime(skonto_datum, "%Y%m%d")
+                        else:
+                            skonto_date = skonto_datum
+                        
+                        invoice["days_until_expiry"] = (skonto_date - datetime.now()).days
+                        
+                        # Calculate potential savings
+                        total_amount = invoice.get("rechnungsbetrag")
+                        skonto_prozent = invoice.get("skonto_prozent")
+                        if total_amount and skonto_prozent:
+                            invoice["potential_savings"] = round(float(total_amount) * float(skonto_prozent) / 100, 2)
+                        else:
+                            invoice["potential_savings"] = 0
+                    else:
+                        invoice["days_until_expiry"] = None
+                        invoice["potential_savings"] = 0
+                        
+                except Exception as e:
+                    logger.warning(f"Failed to calculate metadata for invoice {invoice.get('id')}: {e}")
+                    invoice["days_until_expiry"] = None
+                    invoice["potential_savings"] = 0
+            
+            return {
+                "success": True,
+                "invoices": invoices,
+                "total": len(invoices),
+                "days_ahead": days_ahead,
+                "retrieved_at": datetime.now().isoformat()
+            }
+        else:
+            logger.error(f"❌ Failed to get invoices with Skonto due: {result.get('error')}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to get invoices with Skonto due: {result.get('error')}"
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to get invoices with Skonto due: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get invoices with Skonto due: {str(e)}"
+        )
 
 @router.get("/invoices/{invoice_id}")
 async def get_invoice(invoice_id: str = Path(..., description="The invoice ID")):
@@ -574,3 +651,94 @@ async def send_invoice_to_bauleiter(
     except Exception as e:
         logger.error(f"❌ Failed to send invoice {invoice_id} to Bauleiter: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to send invoice to Bauleiter: {str(e)}")
+
+@router.post("/invoices/{invoice_id}/send-skonto-reminder")
+async def send_skonto_reminder(
+    invoice_id: str = Path(..., description="Invoice ID"),
+    recipient_email: str = Query(default=None, description="Email address to send reminder to"),
+    recipient_name: str = Query(default=None, description="Name of recipient")
+):
+    """
+    Send Skonto reminder email for an invoice.
+    
+    Args:
+        invoice_id: The ID of the invoice
+        recipient_email: Email address to send reminder to (optional, falls back to default)
+        recipient_name: Name of recipient (optional)
+    """
+    try:
+        logger.info(f"🔔 Sending Skonto reminder for invoice {invoice_id}")
+        
+        # Get invoice data
+        invoice_result = db_service.get_invoice(invoice_id)
+        if not invoice_result["success"]:
+            raise HTTPException(status_code=404, detail=f"Invoice not found: {invoice_result['error']}")
+        
+        invoice_data = invoice_result["data"]
+        
+        # Validate invoice has Skonto data
+        if not invoice_data.get("skonto_datum") or not invoice_data.get("skonto_prozent"):
+            raise HTTPException(
+                status_code=400, 
+                detail="Invoice does not have Skonto information (missing skonto_datum or skonto_prozent)"
+            )
+        
+        # Check if reminder already sent
+        if invoice_data.get("skonto_reminder_sent"):
+            logger.info(f"⚠️ Skonto reminder already sent for invoice {invoice_id}")
+            return {
+                "success": False,
+                "message": "Skonto reminder already sent for this invoice",
+                "invoice_id": invoice_id,
+                "already_sent": True,
+                "sent_at": invoice_data.get("skonto_reminder_sent_at")
+            }
+        
+        # Check if Skonto decision already made
+        skonto_decision = invoice_data.get("skonto_decision")
+        if skonto_decision in ["taken", "missed", "not_applicable"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Skonto decision already made: {skonto_decision}"
+            )
+        
+        # Use provided email or fall back to default stakeholder
+        if not recipient_email:
+            # Default to bauleiter_email or a configured default
+            recipient_email = invoice_data.get("bauleiter_email") or "default@company.com"
+            logger.info(f"📧 Using default recipient email: {recipient_email}")
+        
+        # Send Skonto reminder email
+        email_result = await email_service.send_skonto_reminder(
+            invoice_data=invoice_data,
+            recipient_email=recipient_email,
+            recipient_name=recipient_name
+        )
+        
+        if email_result["success"]:
+            logger.info(f"✅ Skonto reminder sent successfully for invoice {invoice_id}")
+            return {
+                "success": True,
+                "message": f"Skonto reminder sent to {recipient_email}",
+                "invoice_id": invoice_id,
+                "recipient_email": recipient_email,
+                "message_id": email_result.get("message_id"),
+                "potential_savings": email_result.get("potential_savings"),
+                "days_until_expiry": email_result.get("days_until_expiry"),
+                "sent_at": email_result.get("timestamp")
+            }
+        else:
+            logger.error(f"❌ Failed to send Skonto reminder: {email_result.get('error')}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to send Skonto reminder: {email_result.get('error')}"
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to send Skonto reminder for invoice {invoice_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to send Skonto reminder: {str(e)}"
+        )

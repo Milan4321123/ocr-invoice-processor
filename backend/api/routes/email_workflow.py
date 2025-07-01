@@ -1,9 +1,6 @@
 """
 Email Workflow API Routes
-Handles editor notifications and Bau-Leite        # Update invoice to "in Bearbeitung" state (processing started)
-        status_result = db_service.update_invoice_to_editing_stage(request.invoice_id)
-        if not status_result["success"]:
-            raise HTTPException(status_code=500, detail=f"Failed to update invoice status: {status_result['error']}")pproval workflow
+Handles editor notifications and Bau-Leiter approval workflow
 """
 import logging
 import json
@@ -13,6 +10,7 @@ from uuid import UUID
 import jwt
 from fastapi import APIRouter, HTTPException, Depends, Request, Query
 from pydantic import BaseModel, EmailStr, validator
+from fastapi.responses import HTMLResponse
 
 from services.database import db_service
 from services.email_service import email_service
@@ -627,6 +625,217 @@ def _create_error_html(error_message: str) -> str:
         </div>
         
         <p><small>Zeitstempel: {datetime.now().strftime('%d.%m.%Y um %H:%M')}</small></p>
+    </body>
+    </html>
+    """
+
+@router.get("/email/skonto-decision")
+async def process_skonto_decision(
+    token: str,
+    decision: str,
+    http_request: Request
+):
+    """
+    Process Skonto decision action from email link.
+    This endpoint:
+    1. Validates and decodes secure token
+    2. Checks token hasn't expired or been used
+    3. Updates invoice Skonto decision status
+    4. Marks token as used
+    5. Logs security event
+    6. Returns user-friendly HTML response
+    
+    Args:
+        token: Secure token from email link
+        decision: 'taken' or 'missed'
+    """
+    try:
+        ip_address = http_request.client.host
+        
+        # Decode and validate token
+        token_data = await _validate_approval_token(token, ip_address)
+        
+        if not token_data:
+            return _create_error_html("Invalid or expired Skonto decision token")
+        
+        invoice_id = token_data["invoice_id"]
+        user_email = token_data["user_email"]
+        
+        # Validate decision parameter
+        if decision not in ["taken", "missed"]:
+            return _create_error_html(f"Invalid decision: {decision}. Must be 'taken' or 'missed'")
+        
+        # Get invoice data
+        invoice_data = await _get_invoice_data(invoice_id)
+        if not invoice_data:
+            return _create_error_html("Invoice not found")
+        
+        # Validate invoice has Skonto data
+        if not invoice_data.get("skonto_datum") or not invoice_data.get("skonto_prozent"):
+            return _create_error_html("Invoice does not have Skonto information")
+        
+        # Check if Skonto decision already made
+        current_decision = invoice_data.get("skonto_decision")
+        if current_decision in ["taken", "missed", "not_applicable"]:
+            return _create_error_html(f"Skonto decision already made: {current_decision}")
+        
+        # Calculate actual savings if Skonto was taken
+        actual_savings = None
+        if decision == "taken":
+            try:
+                total_amount = float(invoice_data.get("rechnungsbetrag", 0))
+                skonto_percent = float(invoice_data.get("skonto_prozent", 0))
+                actual_savings = round(total_amount * skonto_percent / 100, 2)
+            except (ValueError, TypeError):
+                actual_savings = 0
+        
+        # Update Skonto decision in database
+        skonto_result = db_service.update_skonto_decision(
+            invoice_id=invoice_id,
+            decision=decision,
+            actual_savings=actual_savings,
+            decision_timestamp=datetime.now().isoformat(),
+            decision_email=user_email
+        )
+        
+        if not skonto_result["success"]:
+            logger.error(f"Failed to update Skonto decision: {skonto_result.get('error')}")
+            return _create_error_html(f"Failed to update Skonto decision: {skonto_result.get('error')}")
+        
+        # Mark token as used
+        await _mark_token_as_used(token, ip_address)
+        
+        # Log security event
+        await _log_security_event(
+            event_type="skonto_decision_processed",
+            ip_address=ip_address,
+            user_email=user_email,
+            invoice_id=invoice_id,
+            event_data={
+                "decision": decision,
+                "actual_savings": actual_savings,
+                "token_used": token[:8] + "...",
+                "skonto_percent": invoice_data.get("skonto_prozent"),
+                "skonto_date": invoice_data.get("skonto_datum")
+            }
+        )
+        
+        # Create success message
+        action_text = "SKONTO GENOMMEN" if decision == "taken" else "SKONTO ÜBERSPRUNGEN"
+        
+        if decision == "taken":
+            success_message = (
+                f"Das Skonto wurde erfolgreich in Anspruch genommen. "
+                f"Ersparnis: {actual_savings} EUR ({invoice_data.get('skonto_prozent')}%)"
+            )
+        else:
+            success_message = (
+                f"Das Skonto wurde übersprungen. "
+                f"Die volle Rechnungssumme wird bezahlt."
+            )
+        
+        logger.info(f"✅ Skonto decision processed: {invoice_id} -> {decision} by {user_email}")
+        
+        # Return success HTML page
+        return HTMLResponse(_create_skonto_success_html(
+            action_text=action_text,
+            success_message=success_message,
+            invoice_data=invoice_data,
+            decision=decision,
+            actual_savings=actual_savings,
+            user_email=user_email
+        ))
+        
+    except Exception as e:
+        logger.error(f"❌ Error processing Skonto decision: {str(e)}")
+        return _create_error_html(f"System error: {str(e)}")
+
+def _create_skonto_success_html(
+    action_text: str,
+    success_message: str,
+    invoice_data: Dict[str, Any],
+    decision: str,
+    actual_savings: float = None,
+    user_email: str = None
+) -> str:
+    """Create HTML success response for Skonto decision"""
+    
+    # Determine styling based on decision
+    if decision == "taken":
+        status_color = "#28a745"  # Green for taken
+        icon = "💰"
+    else:
+        status_color = "#6c757d"  # Gray for missed/skipped
+        icon = "⏭️"
+    
+    return f"""
+    <!DOCTYPE html>
+    <html lang="de">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Skonto Entscheidung - {action_text}</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; max-width: 700px; margin: 50px auto; padding: 20px; background: #f8f9fa; }}
+            .container {{ background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
+            .header {{ text-align: center; margin-bottom: 30px; }}
+            .status {{ background: {status_color}; color: white; padding: 15px; border-radius: 8px; font-size: 20px; font-weight: bold; }}
+            .invoice-info {{ background: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0; }}
+            .detail-row {{ display: flex; justify-content: space-between; margin: 8px 0; }}
+            .detail-label {{ font-weight: bold; }}
+            .detail-value {{ color: #495057; }}
+            .savings-info {{ background: #e8f5e8; border-left: 4px solid #28a745; padding: 15px; margin: 20px 0; }}
+            .timestamp {{ text-align: center; color: #6c757d; font-size: 14px; margin-top: 30px; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <div class="status">{icon} {action_text}</div>
+                <p style="font-size: 18px; color: #495057; margin-top: 15px;">{success_message}</p>
+            </div>
+            
+            <div class="invoice-info">
+                <h3>📋 Rechnung Details</h3>
+                <div class="detail-row">
+                    <span class="detail-label">Rechnungsnummer:</span>
+                    <span class="detail-value">{invoice_data.get('rechnungsnummer', 'N/A')}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Lieferant:</span>
+                    <span class="detail-value">{invoice_data.get('lieferant', 'N/A')}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Rechnungsbetrag:</span>
+                    <span class="detail-value">{invoice_data.get('rechnungsbetrag', 'N/A')} EUR</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Skonto:</span>
+                    <span class="detail-value">{invoice_data.get('skonto_prozent', 'N/A')}% bis {invoice_data.get('skonto_datum', 'N/A')}</span>
+                </div>
+            </div>
+            
+            {f'''
+            <div class="savings-info">
+                <h4>💰 Einsparung</h4>
+                <p style="font-size: 16px; margin: 0;">
+                    <strong>{actual_savings} EUR</strong> wurden durch das Skonto eingespart!
+                </p>
+            </div>
+            ''' if decision == "taken" and actual_savings else ""}
+            
+            <div style="background: #e8f4f8; border: 1px solid #bee5eb; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <strong>✅ Nächste Schritte:</strong>
+                <p>Die Skonto-Entscheidung wurde erfolgreich im System erfasst. Die Buchhaltung wird entsprechend informiert und die Zahlung wird entsprechend bearbeitet.</p>
+            </div>
+            
+            <div class="timestamp">
+                <strong>Verarbeitet von:</strong> {user_email or 'N/A'}<br>
+                <strong>Zeitstempel:</strong> {datetime.now().strftime('%d.%m.%Y um %H:%M')}
+            </div>
+            
+            <p style="text-align: center; margin-top: 30px;"><small>Diese Seite kann geschlossen werden. Die Aktion wurde erfolgreich verarbeitet.</small></p>
+        </div>
     </body>
     </html>
     """
