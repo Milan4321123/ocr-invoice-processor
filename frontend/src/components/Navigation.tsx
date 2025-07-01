@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   Home,
   LayoutDashboard, 
@@ -24,6 +25,14 @@ const Navigation = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+  const { logout, user } = useAuth();
+
+  const handleSignOut = () => {
+    logout();
+    setIsProfileDropdownOpen(false);
+    router.push('/login');
+  };
 
   const navItems = [
     { href: '/', label: 'Home', icon: Home },
@@ -105,8 +114,8 @@ const Navigation = () => {
                   <User className="h-4 w-4 text-white" />
                 </div>
                 <div className="hidden md:block text-left">
-                  <p className="text-sm font-medium">Admin User</p>
-                  <p className="text-xs text-gray-500">admin@company.com</p>
+                  <p className="text-sm font-medium">{user?.full_name || user?.username || 'Admin User'}</p>
+                  <p className="text-xs text-gray-500">{user?.email || 'admin@company.com'}</p>
                 </div>
                 <ChevronDown className="h-4 w-4 text-gray-500" />
               </button>
@@ -129,7 +138,10 @@ const Navigation = () => {
                     System Settings
                   </Link>
                   <hr className="my-2 border-gray-200" />
-                  <button className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                  <button 
+                    onClick={handleSignOut}
+                    className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                  >
                     <LogOut className="h-4 w-4 mr-3" />
                     Sign Out
                   </button>

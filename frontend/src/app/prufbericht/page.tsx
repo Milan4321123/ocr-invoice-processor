@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { AlertCircle, TrendingUp, Clock, CheckCircle, XCircle, Filter, Download, RefreshCw } from 'lucide-react';
+import { AlertCircle, TrendingUp, Clock, CheckCircle, XCircle, Filter, Download, RefreshCw, Mail, ThumbsUp, ThumbsDown } from 'lucide-react';
 
 interface SkontoMetrics {
   totalInvoices: number;
@@ -32,107 +32,161 @@ export default function PrufberichtPage() {
   const [error, setError] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      
+      // Mock data for demonstration - replace with actual API calls
+      const mockMetrics: SkontoMetrics = {
+        totalInvoices: 847,
+        totalSkontoAmount: 89750,
+        capturedSkonto: 67320,
+        missedSkonto: 12450,
+        pendingReview: 23,
+        averageProcessingTime: 2.3
+      };
+
+      const mockInvoices: SkontoInvoice[] = [
+        {
+          id: '1',
+          invoiceNumber: 'INV-2024-001',
+          vendor: 'Siemens AG',
+          amount: 15420,
+          skontoRate: 2.5,
+          skontoAmount: 385.50,
+          skontoDeadline: '2024-01-15',
+          status: 'pending',
+          daysRemaining: 5
+        },
+        {
+          id: '2',
+          invoiceNumber: 'INV-2024-002',
+          vendor: 'BMW Group',
+          amount: 28750,
+          skontoRate: 3.0,
+          skontoAmount: 862.50,
+          skontoDeadline: '2024-01-12',
+          status: 'captured',
+          processedDate: '2024-01-10'
+        },
+        {
+          id: '3',
+          invoiceNumber: 'INV-2024-003',
+          vendor: 'Mercedes-Benz',
+          amount: 42100,
+          skontoRate: 2.0,
+          skontoAmount: 842.00,
+          skontoDeadline: '2024-01-08',
+          status: 'missed',
+          daysRemaining: -2
+        },
+        {
+          id: '4',
+          invoiceNumber: 'INV-2024-004',
+          vendor: 'Volkswagen AG',
+          amount: 18900,
+          skontoRate: 2.5,
+          skontoAmount: 472.50,
+          skontoDeadline: '2024-01-20',
+          status: 'pending',
+          daysRemaining: 10
+        }
+      ];
+
+      setMetrics(mockMetrics);
+      setInvoices(mockInvoices);
+      setError(null);
+      
+    } catch (error) {
+      console.error('Error fetching Skonto data:', error);
+      setError('Failed to load Skonto data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Action handlers for Skonto management
+  const handleSendReminder = async (invoiceId: string) => {
+    try {
+      setActionLoading(invoiceId);
+      const response = await fetch(`/api/invoices/${invoiceId}/send-skonto-reminder`, {
+        method: 'POST',
+      });
+      
+      if (response.ok) {
+        // Refresh data after action
+        await fetchData();
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to send reminder');
+      }
+    } catch (error) {
+      console.error('Error sending reminder:', error);
+      alert('Failed to send reminder: ' + (error as Error).message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleMarkAsTaken = async (invoiceId: string) => {
+    try {
+      setActionLoading(invoiceId);
+      const response = await fetch(`/api/invoices/${invoiceId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          skonto_decision: 'taken'
+        }),
+      });
+      
+      if (response.ok) {
+        // Refresh data after action
+        await fetchData();
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to mark as taken');
+      }
+    } catch (error) {
+      console.error('Error marking as taken:', error);
+      alert('Failed to mark as taken: ' + (error as Error).message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleMarkAsMissed = async (invoiceId: string) => {
+    try {
+      setActionLoading(invoiceId);
+      const response = await fetch(`/api/invoices/${invoiceId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          skonto_decision: 'missed'
+        }),
+      });
+      
+      if (response.ok) {
+        // Refresh data after action
+        await fetchData();
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to mark as missed');
+      }
+    } catch (error) {
+      console.error('Error marking as missed:', error);
+      alert('Failed to mark as missed: ' + (error as Error).message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        
-        // Mock data for demonstration - replace with actual API calls
-        const mockMetrics: SkontoMetrics = {
-          totalInvoices: 847,
-          totalSkontoAmount: 89750,
-          capturedSkonto: 67320,
-          missedSkonto: 12450,
-          pendingReview: 23,
-          averageProcessingTime: 2.3
-        };
-
-        const mockInvoices: SkontoInvoice[] = [
-          {
-            id: '1',
-            invoiceNumber: 'INV-2024-001',
-            vendor: 'Siemens AG',
-            amount: 15420,
-            skontoRate: 2.5,
-            skontoAmount: 385.50,
-            skontoDeadline: '2024-01-15',
-            status: 'pending',
-            daysRemaining: 5
-          },
-          {
-            id: '2',
-            invoiceNumber: 'INV-2024-002',
-            vendor: 'BMW Group',
-            amount: 28750,
-            skontoRate: 3.0,
-            skontoAmount: 862.50,
-            skontoDeadline: '2024-01-12',
-            status: 'captured',
-            processedDate: '2024-01-10'
-          },
-          {
-            id: '3',
-            invoiceNumber: 'INV-2024-003',
-            vendor: 'Mercedes-Benz',
-            amount: 12300,
-            skontoRate: 2.0,
-            skontoAmount: 246.00,
-            skontoDeadline: '2024-01-08',
-            status: 'missed',
-            daysRemaining: -3
-          },
-          {
-            id: '4',
-            invoiceNumber: 'INV-2024-004',
-            vendor: 'SAP SE',
-            amount: 45600,
-            skontoRate: 2.5,
-            skontoAmount: 1140.00,
-            skontoDeadline: '2024-01-20',
-            status: 'pending',
-            daysRemaining: 10
-          },
-          {
-            id: '5',
-            invoiceNumber: 'INV-2024-005',
-            vendor: 'Volkswagen AG',
-            amount: 33280,
-            skontoRate: 3.5,
-            skontoAmount: 1164.80,
-            skontoDeadline: '2024-01-18',
-            status: 'pending',
-            daysRemaining: 8
-          }
-        ];
-
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        setMetrics(mockMetrics);
-        setInvoices(mockInvoices);
-        
-        // Uncomment below for actual API calls:
-        /*
-        // Fetch metrics
-        const metricsResponse = await fetch('/api/skonto/metrics');
-        if (!metricsResponse.ok) throw new Error('Failed to fetch metrics');
-        const metricsData = await metricsResponse.json();
-        setMetrics(metricsData);
-
-        // Fetch invoices
-        const invoicesResponse = await fetch('/api/skonto/invoices');
-        if (!invoicesResponse.ok) throw new Error('Failed to fetch invoices');
-        const invoicesData = await invoicesResponse.json();
-        setInvoices(invoicesData);
-        */
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchData();
   }, []);
 
@@ -425,9 +479,46 @@ export default function PrufberichtPage() {
                           {getStatusBadge(invoice.status)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <button className="text-purple-600 hover:text-purple-800 hover:bg-purple-50 px-3 py-1 rounded-md text-sm transition-colors">
-                            View Details
-                          </button>
+                          <div className="flex space-x-2">
+                            {/* Send Reminder Button */}
+                            <button 
+                              onClick={() => handleSendReminder(invoice.id)}
+                              disabled={actionLoading === invoice.id || invoice.status === 'captured' || invoice.status === 'missed'}
+                              className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md text-blue-600 bg-blue-50 hover:bg-blue-100 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              title="Send Skonto Reminder"
+                            >
+                              <Mail className="h-3 w-3 mr-1" />
+                              Reminder
+                            </button>
+                            
+                            {/* Mark as Taken Button */}
+                            <button 
+                              onClick={() => handleMarkAsTaken(invoice.id)}
+                              disabled={actionLoading === invoice.id || invoice.status === 'captured' || invoice.status === 'missed'}
+                              className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md text-green-600 bg-green-50 hover:bg-green-100 hover:text-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              title="Mark Skonto as Taken"
+                            >
+                              <ThumbsUp className="h-3 w-3 mr-1" />
+                              Taken
+                            </button>
+                            
+                            {/* Mark as Missed Button */}
+                            <button 
+                              onClick={() => handleMarkAsMissed(invoice.id)}
+                              disabled={actionLoading === invoice.id || invoice.status === 'captured' || invoice.status === 'missed'}
+                              className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md text-red-600 bg-red-50 hover:bg-red-100 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              title="Mark Skonto as Missed"
+                            >
+                              <ThumbsDown className="h-3 w-3 mr-1" />
+                              Missed
+                            </button>
+                            
+                            {actionLoading === invoice.id && (
+                              <div className="inline-flex items-center px-2 py-1">
+                                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-purple-600"></div>
+                              </div>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
