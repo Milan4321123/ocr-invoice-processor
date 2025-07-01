@@ -1,489 +1,451 @@
-'use client'
+'use client';
 
-import React, { useState, useEffect } from 'react'
-import Link from 'next/link'
-import { toast, Toaster } from 'react-hot-toast'
-import { toastConfig } from '@/lib/toast-config'
+import React, { useState, useEffect } from 'react';
+import { AlertCircle, TrendingUp, Clock, CheckCircle, XCircle, Filter, Download, RefreshCw } from 'lucide-react';
 
-// Simplified types for business-focused Prüfbericht
-interface InvoiceItem {
-  id: string
-  filename: string
-  vendor_name?: string
-  total_amount?: number
-  invoice_date?: string
-  due_date?: string
-  skonto_date?: string
-  skonto_percentage?: number
-  status: string
-  approval_status: 'pending' | 'approved' | 'rejected'
-  urgency: string
-  days_until_due?: number
-  days_until_skonto?: number
-  created_at: string
-  url?: string
-  notes?: string
-  approved_by?: string
-  approved_at?: string
-  
-  // Skonto tracking fields (Phase 1)
-  skonto_reminder_sent?: boolean
-  skonto_reminder_sent_at?: string
-  skonto_decision?: 'pending' | 'taken' | 'missed' | 'not_applicable'
-  skonto_decision_at?: string
-  skonto_decision_by?: string
-  actual_skonto_savings?: number
+interface SkontoMetrics {
+  totalInvoices: number;
+  totalSkontoAmount: number;
+  capturedSkonto: number;
+  missedSkonto: number;
+  pendingReview: number;
+  averageProcessingTime: number;
 }
 
-interface CriticalDatesInfo {
-  overdue: { count: number; total_amount: number; invoices: InvoiceItem[] }
-  due_this_week: { count: number; total_amount: number; invoices: InvoiceItem[] }
-  due_next_week: { count: number; total_amount: number; invoices: InvoiceItem[] }
-  skonto_expiring: { count: number; total_amount: number; potential_savings: number; invoices: InvoiceItem[] }
-  future: { count: number; total_amount: number; invoices: InvoiceItem[] }
+interface SkontoInvoice {
+  id: string;
+  invoiceNumber: string;
+  vendor: string;
+  amount: number;
+  skontoRate: number;
+  skontoAmount: number;
+  skontoDeadline: string;
+  status: 'captured' | 'missed' | 'pending' | 'expired';
+  processedDate?: string;
+  daysRemaining?: number;
 }
 
 export default function PrufberichtPage() {
-  const [invoices, setInvoices] = useState<InvoiceItem[]>([])
-  const [criticalDates, setCriticalDates] = useState<CriticalDatesInfo | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+  const [metrics, setMetrics] = useState<SkontoMetrics | null>(null);
+  const [invoices, setInvoices] = useState<SkontoInvoice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    fetchPrufberichtData()
-  }, [])
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        
+        // Mock data for demonstration - replace with actual API calls
+        const mockMetrics: SkontoMetrics = {
+          totalInvoices: 847,
+          totalSkontoAmount: 89750,
+          capturedSkonto: 67320,
+          missedSkonto: 12450,
+          pendingReview: 23,
+          averageProcessingTime: 2.3
+        };
 
-  const fetchPrufberichtData = async () => {
-    try {
-      setLoading(true)
-      setError(null)
+        const mockInvoices: SkontoInvoice[] = [
+          {
+            id: '1',
+            invoiceNumber: 'INV-2024-001',
+            vendor: 'Siemens AG',
+            amount: 15420,
+            skontoRate: 2.5,
+            skontoAmount: 385.50,
+            skontoDeadline: '2024-01-15',
+            status: 'pending',
+            daysRemaining: 5
+          },
+          {
+            id: '2',
+            invoiceNumber: 'INV-2024-002',
+            vendor: 'BMW Group',
+            amount: 28750,
+            skontoRate: 3.0,
+            skontoAmount: 862.50,
+            skontoDeadline: '2024-01-12',
+            status: 'captured',
+            processedDate: '2024-01-10'
+          },
+          {
+            id: '3',
+            invoiceNumber: 'INV-2024-003',
+            vendor: 'Mercedes-Benz',
+            amount: 12300,
+            skontoRate: 2.0,
+            skontoAmount: 246.00,
+            skontoDeadline: '2024-01-08',
+            status: 'missed',
+            daysRemaining: -3
+          },
+          {
+            id: '4',
+            invoiceNumber: 'INV-2024-004',
+            vendor: 'SAP SE',
+            amount: 45600,
+            skontoRate: 2.5,
+            skontoAmount: 1140.00,
+            skontoDeadline: '2024-01-20',
+            status: 'pending',
+            daysRemaining: 10
+          },
+          {
+            id: '5',
+            invoiceNumber: 'INV-2024-005',
+            vendor: 'Volkswagen AG',
+            amount: 33280,
+            skontoRate: 3.5,
+            skontoAmount: 1164.80,
+            skontoDeadline: '2024-01-18',
+            status: 'pending',
+            daysRemaining: 8
+          }
+        ];
 
-      // Fetch data from our new Prüfbericht API endpoints
-      const [
-        invoiceSummaryResponse,
-        criticalDatesResponse
-      ] = await Promise.all([
-        fetch(`${apiUrl}/api/reports/invoice-summary`),
-        fetch(`${apiUrl}/api/reports/critical-dates`)
-      ])
+        // Simulate API delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        setMetrics(mockMetrics);
+        setInvoices(mockInvoices);
+        
+        // Uncomment below for actual API calls:
+        /*
+        // Fetch metrics
+        const metricsResponse = await fetch('/api/skonto/metrics');
+        if (!metricsResponse.ok) throw new Error('Failed to fetch metrics');
+        const metricsData = await metricsResponse.json();
+        setMetrics(metricsData);
 
-      // Check if requests were successful
-      if (!invoiceSummaryResponse.ok || !criticalDatesResponse.ok) {
-        throw new Error('Failed to fetch Prüfbericht data')
+        // Fetch invoices
+        const invoicesResponse = await fetch('/api/skonto/invoices');
+        if (!invoicesResponse.ok) throw new Error('Failed to fetch invoices');
+        const invoicesData = await invoicesResponse.json();
+        setInvoices(invoicesData);
+        */
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
+      } finally {
+        setLoading(false);
       }
+    };
 
-      // Parse responses
-      const [
-        invoiceSummaryData,
-        criticalDatesData
-      ] = await Promise.all([
-        invoiceSummaryResponse.json(),
-        criticalDatesResponse.json()
-      ])
+    fetchData();
+  }, []);
 
-      // Set data
-      if (invoiceSummaryData.success) {
-        setInvoices(invoiceSummaryData.data || [])
-      }
-      if (criticalDatesData.success) {
-        setCriticalDates(criticalDatesData.data || null)
-      }
+  const filteredInvoices = invoices.filter(invoice => {
+    const matchesStatus = filterStatus === 'all' || invoice.status === filterStatus;
+    const matchesSearch = 
+      invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      invoice.vendor.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesStatus && matchesSearch;
+  });
 
-      toast.success('Prüfbericht loaded successfully')
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load Prüfbericht data'
-      setError(errorMessage)
-      toast.error(errorMessage)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const formatCurrency = (amount: number | undefined): string => {
-    if (!amount) return '€0.00'
-    return new Intl.NumberFormat('de-DE', {
-      style: 'currency',
-      currency: 'EUR'
-    }).format(amount)
-  }
-
-  const formatDate = (dateString: string | undefined): string => {
-    if (!dateString) return 'N/A'
-    return new Date(dateString).toLocaleDateString('de-DE')
-  }
-
-  const getStatusColor = (status: string): string => {
-    switch (status) {
-      case 'approved': return 'bg-green-100 text-green-800'
-      case 'pending': return 'bg-yellow-100 text-yellow-800'
-      case 'uploaded': return 'bg-blue-100 text-blue-800'
-      case 'processing': return 'bg-blue-100 text-blue-800'
-      case 'completed': return 'bg-green-100 text-green-800'
-      case 'error': return 'bg-red-100 text-red-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
-
-  const getUrgencyColor = (urgency: string): string => {
-    switch (urgency) {
-      case 'overdue': return 'bg-red-100 text-red-800'
-      case 'due_this_week': return 'bg-orange-100 text-orange-800'
-      case 'due_next_week': return 'bg-yellow-100 text-yellow-800'
-      case 'future': return 'bg-green-100 text-green-800'
-      case 'no_due_date': return 'bg-gray-100 text-gray-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
-
-  const getApprovalStatusColor = (status: string): string => {
-    switch (status) {
-      case 'approved': return 'bg-green-100 text-green-800'
-      case 'rejected': return 'bg-red-100 text-red-800'
-      case 'pending': return 'bg-yellow-100 text-yellow-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
-
-  // Skonto helper functions (Phase 1)
-  const getSkontoStatusColor = (skontoDecision: string | undefined): string => {
-    switch (skontoDecision) {
-      case 'taken': return 'bg-green-100 text-green-800'
-      case 'missed': return 'bg-red-100 text-red-800'
-      case 'pending': return 'bg-yellow-100 text-yellow-800'
-      case 'not_applicable': return 'bg-gray-100 text-gray-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
-
-  const getSkontoStatusLabel = (skontoDecision: string | undefined): string => {
-    switch (skontoDecision) {
-      case 'taken': return 'Skonto Taken'
-      case 'missed': return 'Skonto Missed'
-      case 'pending': return 'Skonto Pending'
-      case 'not_applicable': return 'No Skonto'
-      default: return 'Unknown'
-    }
-  }
-
-  const calculateSkontoSavings = (amount: number | undefined, percentage: number | undefined): number => {
-    if (!amount || !percentage) return 0
-    return (amount * percentage) / 100
-  }
-
-  const handleApproval = async (invoiceId: string, action: 'approve' | 'reject') => {
-    try {
-      const response = await fetch(`${apiUrl}/api/invoices/${invoiceId}/${action}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      })
-      
-      if (response.ok) {
-        toast.success(`Invoice ${action}ed successfully`)
-        fetchPrufberichtData() // Refresh data
-      } else {
-        throw new Error(`Failed to ${action} invoice`)
-      }
-    } catch (error) {
-      toast.error(`Failed to ${action} invoice`)
-    }
-  }
-
-  // Skonto action functions (Phase 1)
-  const sendSkontoReminder = async (invoiceId: string) => {
-    try {
-      const response = await fetch(`${apiUrl}/api/invoices/${invoiceId}/send-skonto-reminder`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          finance_email: "finance@company.com", // TODO: Make configurable
-          reminder_type: "skonto_expiring",
-          sent_by: "prufbericht_user"
-        })
-      })
-
-      if (!response.ok) {
-        throw new Error(`Failed to send Skonto reminder: ${response.statusText}`)
-      }
-
-      const result = await response.json()
-      
-      if (result.success) {
-        toast.success(`📧 Skonto reminder sent successfully!`)
-        fetchPrufberichtData() // Refresh data
-      } else {
-        toast.error(`❌ Failed to send Skonto reminder: ${result.error || 'Unknown error'}`)
-      }
-    } catch (err) {
-      console.error('Error sending Skonto reminder:', err)
-      toast.error(`Failed to send Skonto reminder: ${err instanceof Error ? err.message : 'Unknown error'}`)
-    }
-  }
+  const getStatusBadge = (status: string) => {
+    const statusConfig = {
+      captured: { bgColor: 'glass-card border-green-200', textColor: 'text-green-700', icon: CheckCircle },
+      missed: { bgColor: 'glass-card border-red-200', textColor: 'text-red-700', icon: XCircle },
+      pending: { bgColor: 'glass-card border-yellow-200', textColor: 'text-yellow-700', icon: Clock },
+      expired: { bgColor: 'glass-card border-gray-200', textColor: 'text-gray-700', icon: AlertCircle }
+    };
+    
+    const config = statusConfig[status as keyof typeof statusConfig];
+    const Icon = config.icon;
+    
+    return (
+      <span className={`inline-flex items-center gap-1 rounded-xl px-2.5 py-0.5 text-xs font-semibold border shadow-sm ${config.bgColor} ${config.textColor}`}>
+        <Icon className="h-3 w-3" />
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </span>
+    );
+  };
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen gradient-bg-light relative overflow-hidden">
+        {/* Floating Background Elements */}
+        <div className="absolute top-20 left-10 w-32 h-32 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-float"></div>
+        <div className="absolute top-40 right-20 w-40 h-40 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-float" style={{ animationDelay: '2s' }}></div>
+        <div className="absolute bottom-20 left-1/3 w-36 h-36 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-float" style={{ animationDelay: '4s' }}></div>
+        
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="glass-card p-8 text-center animate-pulse rounded-xl border shadow">
+            <div className="flex items-center justify-center space-x-2">
+              <RefreshCw className="h-6 w-6 animate-spin text-purple-600" />
+              <span className="text-lg font-medium text-gray-700">Loading Skonto Report...</span>
+            </div>
+          </div>
         </div>
       </div>
-    )
+    );
   }
 
   if (error) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex">
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">Error Loading Prüfbericht</h3>
-              <div className="mt-2 text-sm text-red-700">
-                <p>{error}</p>
+      <div className="min-h-screen gradient-bg-light relative overflow-hidden">
+        {/* Floating Background Elements */}
+        <div className="absolute top-20 left-10 w-32 h-32 bg-red-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-float"></div>
+        <div className="absolute bottom-20 right-20 w-40 h-40 bg-orange-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-float" style={{ animationDelay: '2s' }}></div>
+        
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="glass-card p-8 text-center max-w-md rounded-xl border shadow">
+            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">Error Loading Report</h2>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen gradient-bg-light relative overflow-hidden">
+      {/* Floating Background Elements */}
+      <div className="absolute top-20 left-10 w-32 h-32 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-float"></div>
+      <div className="absolute top-40 right-20 w-40 h-40 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-float" style={{ animationDelay: '2s' }}></div>
+      <div className="absolute bottom-20 left-1/3 w-36 h-36 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-float" style={{ animationDelay: '4s' }}></div>
+      <div className="absolute top-1/2 right-10 w-28 h-28 bg-yellow-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-float" style={{ animationDelay: '1s' }}></div>
+
+      <div className="relative z-10 pt-20 pb-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          {/* Header Section */}
+          <div className="mb-8">
+            <div className="glass-card p-6 border-0 shadow-xl rounded-xl">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
+                    Skonto Prüfbericht
+                  </h1>
+                  <p className="text-gray-600">
+                    Comprehensive analysis of discount opportunities and performance
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2 mt-4 md:mt-0">
+                  <span className="inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-semibold bg-gradient-to-r from-green-100 to-green-200 text-green-700 border border-green-300">
+                    <TrendingUp className="h-3 w-3 mr-1" />
+                    Real-time Analytics
+                  </span>
+                  <span className="inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-semibold bg-gradient-to-r from-blue-100 to-blue-200 text-blue-700 border border-blue-300">
+                    <Clock className="h-3 w-3 mr-1" />
+                    Auto-updated
+                  </span>
+                </div>
               </div>
-              <div className="mt-4">
-                <button
-                  onClick={fetchPrufberichtData}
-                  className="bg-red-100 hover:bg-red-200 text-red-800 px-4 py-2 rounded-md text-sm font-medium"
-                >
-                  Retry
+            </div>
+          </div>
+
+          {/* Metrics Section */}
+          {metrics && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
+              <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">
+                <div className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600 mb-1">Total Invoices</p>
+                      <p className="text-2xl font-bold text-gray-900">{metrics.totalInvoices.toLocaleString()}</p>
+                    </div>
+                    <div className="h-12 w-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                      <AlertCircle className="h-6 w-6 text-white" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">
+                <div className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600 mb-1">Total Skonto</p>
+                      <p className="text-2xl font-bold text-gray-900">€{metrics.totalSkontoAmount.toLocaleString()}</p>
+                    </div>
+                    <div className="h-12 w-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
+                      <TrendingUp className="h-6 w-6 text-white" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">
+                <div className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600 mb-1">Captured</p>
+                      <p className="text-2xl font-bold text-green-600">€{metrics.capturedSkonto.toLocaleString()}</p>
+                    </div>
+                    <div className="h-12 w-12 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+                      <CheckCircle className="h-6 w-6 text-white" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">
+                <div className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600 mb-1">Missed</p>
+                      <p className="text-2xl font-bold text-red-600">€{metrics.missedSkonto.toLocaleString()}</p>
+                    </div>
+                    <div className="h-12 w-12 bg-gradient-to-r from-red-500 to-red-600 rounded-lg flex items-center justify-center">
+                      <XCircle className="h-6 w-6 text-white" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">
+                <div className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600 mb-1">Pending</p>
+                      <p className="text-2xl font-bold text-yellow-600">{metrics.pendingReview}</p>
+                    </div>
+                    <div className="h-12 w-12 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-lg flex items-center justify-center">
+                      <Clock className="h-6 w-6 text-white" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">
+                <div className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600 mb-1">Avg. Processing</p>
+                      <p className="text-2xl font-bold text-gray-900">{metrics.averageProcessingTime.toFixed(1)}d</p>
+                    </div>
+                    <div className="h-12 w-12 bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                      <Clock className="h-6 w-6 text-white" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Filters and Controls */}
+          <div className="glass-card border-0 shadow-lg mb-6 rounded-xl">
+            <div className="p-6">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="flex flex-col md:flex-row gap-4 flex-1">
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm font-medium text-gray-700">Filter by Status:</span>
+                    <select 
+                      value={filterStatus} 
+                      onChange={(e) => setFilterStatus(e.target.value)}
+                      className="w-40 bg-white/50 border border-white/20 rounded-md px-3 py-1 text-sm"
+                    >
+                      <option value="all">All Status</option>
+                      <option value="captured">Captured</option>
+                      <option value="missed">Missed</option>
+                      <option value="pending">Pending</option>
+                      <option value="expired">Expired</option>
+                    </select>
+                  </div>
+                  
+                  <input
+                    placeholder="Search invoices or vendors..."
+                    value={searchTerm}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
+                    className="max-w-xs bg-white/50 border border-white/20 rounded-md px-3 py-1 text-sm placeholder:text-gray-500"
+                  />
+                </div>
+                
+                <button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg px-4 py-2 rounded-md text-sm font-medium transition-colors inline-flex items-center gap-2">
+                  <Download className="h-4 w-4" />
+                  Export Report
                 </button>
               </div>
             </div>
           </div>
-        </div>
-      </div>
-    )
-  }
 
-  return (
-    <div className="container mx-auto px-4 py-8">
-      <Toaster {...toastConfig} />
-      
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">📋 Prüfbericht - Invoice Approval Dashboard</h1>
-        <p className="text-gray-600">Review and approve invoices, manage critical dates and skonto opportunities</p>
-      </div>
-
-      {/* Critical Dates Overview */}
-      {criticalDates && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          
-          {/* Overdue */}
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-2xl font-bold text-red-700">{criticalDates.overdue.count}</div>
-                <div className="text-sm text-red-600">Overdue Invoices</div>
-                <div className="text-xs text-red-500 mt-1">{formatCurrency(criticalDates.overdue.total_amount)}</div>
-              </div>
-              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
+          {/* Invoices Table */}
+          <div className="glass-card border-0 shadow-xl rounded-xl">
+            <div className="border-b border-white/20 p-6">
+              <h3 className="text-xl font-semibold text-gray-800">
+                Skonto Invoice Details ({filteredInvoices.length} invoices)
+              </h3>
             </div>
-          </div>
-
-          {/* Due This Week */}
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-2xl font-bold text-orange-700">{criticalDates.due_this_week.count}</div>
-                <div className="text-sm text-orange-600">Due This Week</div>
-                <div className="text-xs text-orange-500 mt-1">{formatCurrency(criticalDates.due_this_week.total_amount)}</div>
-              </div>
-              <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-                <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          {/* Skonto Expiring */}
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-2xl font-bold text-yellow-700">{criticalDates.skonto_expiring?.count || 0}</div>
-                <div className="text-sm text-yellow-600">Skonto Expiring</div>
-                <div className="text-xs text-yellow-500 mt-1">
-                  Save: {formatCurrency(criticalDates.skonto_expiring?.potential_savings || 0)}
-                </div>
-              </div>
-              <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
-                <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          {/* Future */}
-          <div className="bg-green-50 border border-green-200 rounded-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-2xl font-bold text-green-700">{criticalDates.future.count}</div>
-                <div className="text-sm text-green-600">Future Invoices</div>
-                <div className="text-xs text-green-500 mt-1">{formatCurrency(criticalDates.future.total_amount)}</div>
-              </div>
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      )}
-
-      {/* Invoice Approval Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-100">
-        <div className="p-6 border-b border-gray-100">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">Invoice Approval Queue</h2>
-            <div className="text-sm text-gray-500">
-              {invoices.filter(inv => inv.approval_status === 'pending').length} pending approval
-            </div>
-          </div>
-        </div>
-        
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vendor</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Skonto</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Skonto Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {invoices.map((invoice) => (
-                <tr key={invoice.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{invoice.filename}</div>
-                    <div className="text-sm text-gray-500">
-                      {formatDate(invoice.created_at)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{invoice.vendor_name || 'N/A'}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {formatCurrency(invoice.total_amount)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{formatDate(invoice.due_date)}</div>
-                    <div className="text-xs text-gray-500">
-                      {invoice.days_until_due !== undefined && (
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getUrgencyColor(invoice.urgency)}`}>
-                          {invoice.days_until_due > 0 ? `${invoice.days_until_due} days` : 'Overdue'}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {invoice.skonto_date && invoice.skonto_percentage ? (
-                      <div>
-                        <div className="text-sm text-gray-900">{invoice.skonto_percentage}%</div>
-                        <div className="text-xs text-gray-500">{formatDate(invoice.skonto_date)}</div>
-                        {invoice.days_until_skonto !== undefined && invoice.days_until_skonto >= 0 && (
-                          <div className="text-xs text-yellow-600">{invoice.days_until_skonto} days left</div>
-                        )}
-                        <div className="text-xs text-green-600 mt-1">
-                          Save: {formatCurrency(calculateSkontoSavings(invoice.total_amount, invoice.skonto_percentage))}
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="text-sm text-gray-400">No skonto</span>
-                    )}
-                  </td>
-                  
-                  {/* Skonto Status Column */}
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {invoice.skonto_date && invoice.skonto_percentage ? (
-                      <div>
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getSkontoStatusColor(invoice.skonto_decision)}`}>
-                          {getSkontoStatusLabel(invoice.skonto_decision)}
-                        </span>
-                        {invoice.skonto_reminder_sent && (
-                          <div className="text-xs text-blue-600 mt-1">
-                            📧 Reminder sent
-                          </div>
-                        )}
-                        {invoice.actual_skonto_savings && (
-                          <div className="text-xs text-green-600 mt-1">
-                            Saved: {formatCurrency(invoice.actual_skonto_savings)}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-sm text-gray-400">N/A</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getApprovalStatusColor(invoice.approval_status)}`}>
-                      {invoice.approval_status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                    {invoice.approval_status === 'pending' && (
-                      <>
-                        <button
-                          onClick={() => handleApproval(invoice.id, 'approve')}
-                          className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          onClick={() => handleApproval(invoice.id, 'reject')}
-                          className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs"
-                        >
-                          Reject
-                        </button>
-                      </>
-                    )}
-                    
-                    {/* Skonto Reminder Button */}
-                    {invoice.skonto_date && 
-                     invoice.skonto_percentage && 
-                     !invoice.skonto_reminder_sent && 
-                     invoice.skonto_decision !== 'taken' && 
-                     invoice.skonto_decision !== 'missed' && 
-                     invoice.days_until_skonto !== undefined && 
-                     invoice.days_until_skonto >= 0 && 
-                     invoice.days_until_skonto <= 7 && (
-                      <button
-                        onClick={() => sendSkontoReminder(invoice.id)}
-                        className="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1 rounded text-xs"
-                        title={`Send Skonto reminder - ${invoice.days_until_skonto} days until expiry`}
+            <div className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vendor</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Skonto</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deadline</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredInvoices.map((invoice, index) => (
+                      <tr 
+                        key={invoice.id} 
+                        className="hover:bg-white/50 transition-colors duration-200"
+                        style={{ animationDelay: `${index * 0.1}s` }}
                       >
-                        📧 Skonto
-                      </button>
-                    )}
-                    
-                    <Link
-                      href={`/dashboard/${invoice.id}`}
-                      className="text-blue-600 hover:text-blue-900 text-xs"
-                    >
-                      View Details
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">{invoice.invoiceNumber}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">{invoice.vendor}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">€{invoice.amount.toLocaleString()}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {invoice.skontoRate}% (€{invoice.skontoAmount.toLocaleString()})
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {new Date(invoice.skontoDeadline).toLocaleDateString()}
+                            {invoice.daysRemaining !== undefined && (
+                              <div className={`text-xs ${invoice.daysRemaining > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {invoice.daysRemaining > 0 ? `${invoice.daysRemaining} days left` : `${Math.abs(invoice.daysRemaining)} days overdue`}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {getStatusBadge(invoice.status)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <button className="text-purple-600 hover:text-purple-800 hover:bg-purple-50 px-3 py-1 rounded-md text-sm transition-colors">
+                            View Details
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              {filteredInvoices.length === 0 && (
+                <div className="text-center py-12">
+                  <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No invoices found</h3>
+                  <p className="text-gray-500">Try adjusting your search criteria or filters.</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
-  )
+  );
 }

@@ -53,11 +53,11 @@ export default function InvoiceEditorPage() {
   // Show loading state while validating
   if (isValidating) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <h2 className="text-xl font-semibold text-gray-700 mb-2">Validating Invoice</h2>
-          <p className="text-gray-500">Please wait...</p>
+      <div className="flex items-center justify-center h-screen gradient-bg-light">
+        <div className="text-center glass-card rounded-2xl p-8 animate-fade-in">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <h2 className="text-xl font-semibold gradient-text mb-2">Validating Invoice</h2>
+          <p className="text-gray-600">Please wait...</p>
         </div>
       </div>
     );
@@ -66,13 +66,15 @@ export default function InvoiceEditorPage() {
   // Show error state if validation failed
   if (!isValid || error) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-50">
-        <div className="text-center max-w-md">
-          <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-700 mb-2">
+      <div className="flex items-center justify-center h-screen gradient-bg-light">
+        <div className="text-center max-w-md glass-card rounded-2xl p-8 animate-fade-in">
+          <div className="w-16 h-16 bg-gradient-to-r from-red-500 to-red-600 rounded-xl flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle className="h-8 w-8 text-white" />
+          </div>
+          <h2 className="text-xl font-semibold gradient-text mb-2">
             {error || 'Invalid Invoice'}
           </h2>
-          <p className="text-gray-500 mb-6">
+          <p className="text-gray-600 mb-6">
             {error === 'Invoice not found' 
               ? 'The invoice you\'re looking for doesn\'t exist or has been removed.'
               : 'There was a problem loading this invoice. Please try again or contact support.'
@@ -81,14 +83,14 @@ export default function InvoiceEditorPage() {
           <div className="space-y-3">
             <button
               onClick={handleGoBack}
-              className="flex items-center justify-center space-x-2 w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="flex items-center justify-center space-x-2 w-full px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all transform hover:scale-105 shadow-lg"
             >
               <ArrowLeft className="h-4 w-4" />
               <span>Back to Dashboard</span>
             </button>
             <button
               onClick={() => window.location.reload()}
-              className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+              className="w-full px-4 py-2 glass-card text-gray-700 rounded-xl hover:bg-white/20 transition-all transform hover:scale-105 border border-gray-200"
             >
               Try Again
             </button>

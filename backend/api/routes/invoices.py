@@ -742,3 +742,74 @@ async def send_skonto_reminder(
             status_code=500,
             detail=f"Failed to send Skonto reminder: {str(e)}"
         )
+
+@router.put("/invoices/{invoice_id}")
+async def update_invoice(
+    invoice_id: str = Path(..., description="Invoice ID"),
+    update_data: Dict[str, Any] = None
+):
+    """
+    Update invoice fields including Skonto decisions.
+    Supports updating any invoice field, with special handling for Skonto decisions.
+    """
+    try:
+        logger.info(f"🔄 Updating invoice {invoice_id} with data: {update_data}")
+        
+        if not update_data:
+            raise HTTPException(status_code=400, detail="No update data provided")
+        
+        # Get current invoice data
+        current_invoice = db_service.get_invoice_by_id(invoice_id)
+        if not current_invoice["success"]:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+        
+        invoice_data = current_invoice["data"]
+        
+        # Special handling for Skonto decisions
+        if "skonto_decision" in update_data:
+            skonto_decision = update_data["skonto_decision"]
+            
+            # Validate Skonto decision
+            valid_decisions = ["pending", "taken", "missed", "not_applicable"]
+            if skonto_decision not in valid_decisions:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid skonto_decision. Must be one of: {valid_decisions}"
+                )
+            
+            # If marking as taken, ensure actual_skonto_savings is set
+            if skonto_decision == "taken" and "actual_skonto_savings" not in update_data:
+                # Calculate potential savings if not provided
+                amount = invoice_data.get("rechnungsbetrag", 0)
+                percentage = invoice_data.get("skonto_prozent", 0)
+                if amount and percentage:
+                    update_data["actual_skonto_savings"] = float(amount) * float(percentage) / 100
+            
+            logger.info(f"📊 Marking Skonto as {skonto_decision} for invoice {invoice_id}")
+        
+        # Update invoice in database
+        result = db_service.update_invoice(invoice_id, update_data)
+        
+        if result["success"]:
+            logger.info(f"✅ Invoice {invoice_id} updated successfully")
+            return {
+                "success": True,
+                "message": "Invoice updated successfully",
+                "invoice_id": invoice_id,
+                "updated_fields": list(update_data.keys()),
+                "updated_at": datetime.utcnow().isoformat()
+            }
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to update invoice: {result.get('error')}"
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to update invoice {invoice_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update invoice: {str(e)}"
+        )

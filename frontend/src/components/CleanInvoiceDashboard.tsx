@@ -337,36 +337,38 @@ export default function CleanInvoiceDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <h2 className="text-xl font-semibold text-gray-700 mb-2">Rechnungen werden geladen</h2>
-          <p className="text-gray-500">Bitte warten...</p>
+      <div className="min-h-screen gradient-bg-light flex items-center justify-center">
+        <div className="text-center glass-card rounded-2xl p-8 animate-fade-in">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <h2 className="text-xl font-semibold gradient-text mb-2">Rechnungen werden geladen</h2>
+          <p className="text-gray-600">Bitte warten...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-16"> {/* Added pt-16 for fixed navigation */}
+    <div className="min-h-screen gradient-bg-light pt-16"> {/* Added pt-16 for fixed navigation */}
       <Toaster position="top-right" />
       
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="glass-card border-0 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center space-x-4">
-              <FileText className="h-8 w-8 text-blue-600" />
+              <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl flex items-center justify-center shadow-lg animate-glow">
+                <FileText className="h-6 w-6 text-white" />
+              </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Rechnungsverwaltung</h1>
-                <p className="text-gray-500">Verwalten und bearbeiten Sie Ihre Rechnungen</p>
+                <h1 className="text-2xl font-bold gradient-text">Rechnungsverwaltung</h1>
+                <p className="text-gray-600">Verwalten und bearbeiten Sie Ihre Rechnungen</p>
               </div>
             </div>
             
             <div className="flex items-center space-x-4">
               <a 
                 href="/bauleiter"
-                className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 transition-all transform hover:scale-105 shadow-lg"
               >
                 <span>👨‍💼</span>
                 <span>Bauleiter Dashboard</span>
@@ -374,7 +376,7 @@ export default function CleanInvoiceDashboard() {
               
               <button
                 onClick={fetchInvoices}
-                className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all transform hover:scale-105 shadow-lg"
               >
                 <RefreshCw className="h-4 w-4" />
                 <span>Aktualisieren</span>
@@ -388,7 +390,7 @@ export default function CleanInvoiceDashboard() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="mb-6 glass-card border border-red-200 rounded-xl p-4 animate-fade-in">
             <div className="flex items-center space-x-2">
               <AlertTriangle className="h-5 w-5 text-red-600" />
               <span className="text-red-700 font-medium">{error}</span>
@@ -398,46 +400,54 @@ export default function CleanInvoiceDashboard() {
 
         {/* Enhanced Stats with Bauleiter Workflow */}
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-8">
-          <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
             <div className="flex items-center space-x-3">
-              <FileText className="h-8 w-8 text-blue-600" />
+              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+                <FileText className="h-6 w-6 text-white" />
+              </div>
               <div>
                 <p className="text-sm font-medium text-gray-600">Rechnungen gesamt</p>
-                <p className="text-2xl font-bold text-gray-900">{invoices.length}</p>
+                <p className="text-2xl font-bold gradient-text">{invoices.length}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
             <div className="flex items-center space-x-3">
-              <CheckCircle className="h-8 w-8 text-green-600" />
+              <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center">
+                <CheckCircle className="h-6 w-6 text-white" />
+              </div>
               <div>
                 <p className="text-sm font-medium text-gray-600">Genehmigt</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-2xl font-bold gradient-text">
                   {invoices.filter(inv => inv.status === 'approved_by_bauleiter').length}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
             <div className="flex items-center space-x-3">
-              <Clock className="h-8 w-8 text-purple-600" />
+              <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
+                <Clock className="h-6 w-6 text-white" />
+              </div>
               <div>
                 <p className="text-sm font-medium text-gray-600">Bei Bauleiter</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-2xl font-bold gradient-text">
                   {invoices.filter(inv => inv.status === 'in_review_by_bauleiter').length}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
             <div className="flex items-center space-x-3">
-              <Clock className="h-8 w-8 text-blue-600" />
+              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                <Clock className="h-6 w-6 text-white" />
+              </div>
               <div>
                 <p className="text-sm font-medium text-gray-600">In Bearbeitung</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-2xl font-bold gradient-text">
                   {invoices.filter(inv => 
                     (inv.status === 'edited' && inv.review_status === 'under_review') ||
                     (inv.status === 'completed' && inv.review_status === 'completed_review' && 
@@ -448,12 +458,14 @@ export default function CleanInvoiceDashboard() {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
             <div className="flex items-center space-x-3">
-              <Clock className="h-8 w-8 text-orange-600" />
+              <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
+                <Clock className="h-6 w-6 text-white" />
+              </div>
               <div>
                 <p className="text-sm font-medium text-gray-600">Nicht begonnen</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-2xl font-bold gradient-text">
                   {invoices.filter(inv => 
                     !['completed', 'edited', 'in_review_by_bauleiter', 'approved_by_bauleiter', 'rejected_by_bauleiter'].includes(inv.status || '')
                   ).length}
@@ -462,12 +474,14 @@ export default function CleanInvoiceDashboard() {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
             <div className="flex items-center space-x-3">
-              <DollarSign className="h-8 w-8 text-purple-600" />
+              <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center">
+                <DollarSign className="h-6 w-6 text-white" />
+              </div>
               <div>
                 <p className="text-sm font-medium text-gray-600">Gesamtbetrag</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-2xl font-bold gradient-text">
                   {formatCurrency(
                     invoices.reduce((sum, inv) => sum + (inv.rechnungsbetrag || 0), 0)
                   )}
@@ -483,11 +497,11 @@ export default function CleanInvoiceDashboard() {
         </div>
 
         {/* Invoice List */}
-        <div className="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
+        <div className="glass-card border-0 shadow-xl rounded-xl overflow-hidden animate-fade-in">
+          <div className="px-6 py-4 border-b border-white/20 bg-gradient-to-r from-purple-50 to-blue-50">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">Rechnungen</h2>
-              <div className="text-sm text-gray-500 bg-blue-50 px-3 py-1 rounded-full">
+              <h2 className="text-lg font-semibold gradient-text">Rechnungen</h2>
+              <div className="text-sm text-gray-600 glass-dark px-3 py-1 rounded-full">
                 ← → Horizontal scrollen für alle Felder
               </div>
             </div>
@@ -495,79 +509,83 @@ export default function CleanInvoiceDashboard() {
 
           {invoices.length === 0 ? (
             <div className="text-center py-12">
-              <FileText className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Keine Rechnungen gefunden</h3>
-              <p className="text-gray-500">Laden Sie Rechnungen hoch, um zu beginnen.</p>
+              <div className="w-16 h-16 bg-gradient-to-r from-gray-300 to-gray-400 rounded-xl flex items-center justify-center mx-auto mb-4">
+                <FileText className="h-8 w-8 text-white" />
+              </div>
+              <h3 className="text-lg font-medium gradient-text mb-2">Keine Rechnungen gefunden</h3>
+              <p className="text-gray-600">Laden Sie Rechnungen hoch, um zu beginnen.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200" style={{ minWidth: '1800px' }}>
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-white/20" style={{ minWidth: '1800px' }}>
+                <thead className="glass-dark">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10 min-w-[200px]">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider sticky left-0 glass-dark z-10 min-w-[200px]">
                       Rechnungsdetails
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[120px]">
                       Status
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px]">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[150px]">
                       Rechnungsempfänger
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px]">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[150px]">
                       Rechnungssteller
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[120px]">
                       Projekt
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[100px]">
                       Gewerk
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[120px]">
                       Rechnungsbetrag
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[120px]">
                       Rechnungseingang
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[120px]">
                       Fälligkeit
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[120px]">
                       Skonto Datum
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[100px]">
                       Skonto %
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[120px]">
                       Rechnungsart
                     </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[100px]">
                       KfW Kosten
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px]">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[150px]">
                       Rechnungsprüfung
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px]">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[150px]">
                       Weiter berechnen an
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 z-10 min-w-[160px]">
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider sticky right-0 glass-dark z-10 min-w-[160px]">
                       Aktionen
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="divide-y divide-white/10">
                   {invoices.map((invoice) => (
-                    <tr key={invoice.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-4 whitespace-nowrap sticky left-0 bg-white z-10 min-w-[200px]">
+                    <tr key={invoice.id} className="hover:bg-white/5 transition-colors">
+                      <td className="px-4 py-4 whitespace-nowrap sticky left-0 glass-card z-10 min-w-[200px]">
                         <div className="flex items-center space-x-3">
-                          <FileText className="h-5 w-5 text-gray-400" />
+                          <div className="w-8 h-8 bg-gradient-to-r from-gray-400 to-gray-500 rounded-lg flex items-center justify-center">
+                            <FileText className="h-4 w-4 text-white" />
+                          </div>
                           <div>
                             <div className="text-sm font-medium text-gray-900 truncate max-w-[140px]">
                               {invoice.file_name}
                             </div>
-                            <div className="text-sm text-gray-500">
+                            <div className="text-sm text-gray-600">
                               {formatFileSize(invoice.file_size)}
                             </div>
-                            <div className="text-xs text-gray-400">
+                            <div className="text-xs text-gray-500">
                               {new Date(invoice.created_at).toLocaleDateString('de-DE', {
                                 year: 'numeric',
                                 month: '2-digit',
@@ -666,11 +684,11 @@ export default function CleanInvoiceDashboard() {
                         </div>
                       </td>
                       
-                      <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium sticky right-0 bg-white z-10 min-w-[220px]">
+                      <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium sticky right-0 glass-card z-10 min-w-[220px]">
                         <div className="flex items-center justify-end space-x-2">
                           <Link
                             href={`/invoice-editor/${invoice.id}`}
-                            className="flex items-center space-x-1 px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                            className="flex items-center space-x-1 px-3 py-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all transform hover:scale-105 shadow-lg"
                           >
                             <Edit3 className="h-4 w-4" />
                             <span>Bearbeiten</span>
@@ -681,7 +699,7 @@ export default function CleanInvoiceDashboard() {
                            !['in_review_by_bauleiter', 'approved_by_bauleiter', 'rejected_by_bauleiter'].includes(invoice.status || '') && (
                             <button
                               onClick={() => sendToBauleiter(invoice)}
-                              className="flex items-center space-x-1 px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                              className="flex items-center space-x-1 px-3 py-1 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all transform hover:scale-105 shadow-lg"
                               title="Rechnung zur Genehmigung an Bauleiter senden"
                             >
                               <User className="h-4 w-4" />
@@ -691,7 +709,7 @@ export default function CleanInvoiceDashboard() {
                           
                           <button
                             onClick={() => openDeleteDialog(invoice)}
-                            className="flex items-center space-x-1 px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+                            className="flex items-center space-x-1 px-3 py-1 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-all transform hover:scale-105 shadow-lg"
                           >
                             <Trash2 className="h-4 w-4" />
                             <span>Löschen</span>

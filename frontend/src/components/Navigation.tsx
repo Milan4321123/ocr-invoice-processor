@@ -1,96 +1,209 @@
-'use client'
+'use client';
 
-import React from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { useRouter, usePathname } from 'next/navigation';
+import React, { useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { 
+  Home,
+  LayoutDashboard, 
+  FileText, 
+  BarChart3, 
+  Activity,
+  Upload,
+  FolderOpen,
+  Menu, 
+  X,
+  ChevronDown,
+  LogOut,
+  User,
+  Bell,
+  Settings
+} from 'lucide-react';
 
-const Navigation: React.FC = () => {
-  const { isAuthenticated, user, logout } = useAuth();
-  const router = useRouter();
+const Navigation = () => {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const pathname = usePathname();
 
-  // Don't show navigation on login page or if not authenticated
-  if (!isAuthenticated || pathname === '/login') {
-    return null;
-  }
+  const navItems = [
+    { href: '/', label: 'Home', icon: Home },
+    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/upload', label: 'Upload', icon: Upload },
+    { href: '/dashboard/folder-watcher', label: 'Folder Watcher', icon: FolderOpen },
+    { href: '/prufbericht', label: 'Prüfbericht', icon: BarChart3 },
+    { href: '/health', label: 'Health', icon: Activity },
+    { href: '/invoices', label: 'Invoices', icon: FileText },
+  ];
 
-  const handleLogout = () => {
-    logout();
-    router.push('/login');
+  const isActiveRoute = (href: string) => {
+    return pathname === href || pathname.startsWith(href + '/');
   };
 
   return (
-    <nav className="bg-white shadow-sm border-b border-gray-200 fixed top-0 left-0 right-0 z-50">
+    <nav className="fixed top-0 left-0 right-0 z-50 glass-nav">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex items-center space-x-8">
-            <Link href="/dashboard" className="text-xl font-bold text-blue-600">
-              📄 Invoice Manager
+        <div className="flex justify-between items-center h-16">
+          {/* Logo and Brand */}
+          <div className="flex items-center">
+            <Link href="/dashboard" className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg flex items-center justify-center shadow-lg">
+                <FileText className="h-6 w-6 text-white" />
+              </div>
+              <div className="hidden md:block">
+                <h1 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                  OCR Invoice
+                </h1>
+                <p className="text-xs text-gray-500">Processor</p>
+              </div>
             </Link>
-            
-            {/* Navigation Links */}
-            <div className="hidden md:flex items-center space-x-6">
-              <Link 
-                href="/" 
-                className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                  pathname === '/' 
-                    ? 'bg-blue-100 text-blue-700' 
-                    : 'text-gray-700 hover:text-blue-600 hover:bg-gray-100'
-                }`}
-              >
-                🏠 Home
-              </Link>
-              
-              <Link 
-                href="/dashboard" 
-                className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                  pathname === '/dashboard' 
-                    ? 'bg-blue-100 text-blue-700' 
-                    : 'text-gray-700 hover:text-blue-600 hover:bg-gray-100'
-                }`}
-              >
-                � Dashboard
-              </Link>
-              
-              <Link 
-                href="/prufbericht" 
-                className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                  pathname === '/prufbericht' 
-                    ? 'bg-blue-100 text-blue-700' 
-                    : 'text-gray-700 hover:text-blue-600 hover:bg-gray-100'
-                }`}
-              >
-                � Prüfbericht
-              </Link>
-              
-              <Link 
-                href="/health" 
-                className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                  pathname === '/health' 
-                    ? 'bg-green-100 text-green-700' 
-                    : 'text-gray-700 hover:text-green-600 hover:bg-gray-100'
-                }`}
-              >
-                � Health
-              </Link>
-            </div>
           </div>
-          
+
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center space-x-1">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = isActiveRoute(item.href);
+              
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`
+                    relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200
+                    flex items-center space-x-2 group
+                    ${isActive 
+                      ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg' 
+                      : 'text-gray-700 hover:bg-white/50 hover:shadow-md'
+                    }
+                  `}
+                >
+                  <Icon className={`h-4 w-4 ${isActive ? 'text-white' : 'text-gray-500 group-hover:text-gray-700'}`} />
+                  <span>{item.label}</span>
+                  {isActive && (
+                    <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-white rounded-full"></div>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* User Menu and Mobile Toggle */}
           <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-3">
-              <span className="text-sm text-gray-700">
-                Hallo, {user?.full_name || user?.username}
-              </span>
+            {/* Notifications */}
+            <button className="relative p-2 text-gray-600 hover:text-gray-800 hover:bg-white/50 rounded-lg transition-all duration-200">
+              <Bell className="h-5 w-5" />
+              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+            </button>
+
+            {/* User Profile Dropdown */}
+            <div className="relative">
               <button
-                onClick={handleLogout}
-                className="bg-red-600 hover:bg-red-700 text-white text-sm px-4 py-2 rounded-md transition-colors"
+                onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
+                className="flex items-center space-x-3 p-2 rounded-lg text-gray-700 hover:bg-white/50 transition-all duration-200"
               >
-                🚪 Abmelden
+                <div className="w-8 h-8 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center">
+                  <User className="h-4 w-4 text-white" />
+                </div>
+                <div className="hidden md:block text-left">
+                  <p className="text-sm font-medium">Admin User</p>
+                  <p className="text-xs text-gray-500">admin@company.com</p>
+                </div>
+                <ChevronDown className="h-4 w-4 text-gray-500" />
+              </button>
+
+              {/* Profile Dropdown */}
+              {isProfileDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-48 glass-card rounded-lg shadow-xl border-0 py-2">
+                  <Link
+                    href="/profile"
+                    className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-white/50 transition-colors"
+                  >
+                    <User className="h-4 w-4 mr-3" />
+                    Profile Settings
+                  </Link>
+                  <Link
+                    href="/settings"
+                    className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-white/50 transition-colors"
+                  >
+                    <Settings className="h-4 w-4 mr-3" />
+                    System Settings
+                  </Link>
+                  <hr className="my-2 border-gray-200" />
+                  <button className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                    <LogOut className="h-4 w-4 mr-3" />
+                    Sign Out
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Mobile menu button */}
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="md:hidden p-2 text-gray-600 hover:text-gray-800 hover:bg-white/50 rounded-lg transition-all duration-200"
+            >
+              {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Navigation */}
+        {isMobileMenuOpen && (
+          <div className="md:hidden mt-2 pb-4">
+            <div className="glass-card rounded-lg p-4 space-y-2">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = isActiveRoute(item.href);
+                
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`
+                      flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200
+                      ${isActive 
+                        ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg' 
+                        : 'text-gray-700 hover:bg-white/50'
+                      }
+                    `}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <Icon className={`h-5 w-5 ${isActive ? 'text-white' : 'text-gray-500'}`} />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+              
+              <hr className="my-4 border-gray-200" />
+              
+              <div className="px-4 py-2">
+                <p className="text-sm font-medium text-gray-700">Admin User</p>
+                <p className="text-xs text-gray-500">admin@company.com</p>
+              </div>
+              
+              <Link
+                href="/profile"
+                className="flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-white/50 rounded-lg transition-colors"
+              >
+                <User className="h-4 w-4" />
+                <span>Profile Settings</span>
+              </Link>
+              
+              <Link
+                href="/settings"
+                className="flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-white/50 rounded-lg transition-colors"
+              >
+                <Settings className="h-4 w-4" />
+                <span>System Settings</span>
+              </Link>
+              
+              <button className="flex items-center space-x-3 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                <LogOut className="h-4 w-4" />
+                <span>Sign Out</span>
               </button>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </nav>
   );

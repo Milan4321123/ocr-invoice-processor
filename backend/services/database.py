@@ -256,6 +256,32 @@ class DatabaseService:
             logger.error(f"❌ Database error fetching filtered invoices: {e}")
             return {"success": False, "error": str(e)}
     
+    def get_invoice_by_id(self, invoice_id: str) -> Dict[str, Any]:
+        """Get a specific invoice by ID from invoices_clean table"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            response = (self._client.table(self.table_name)
+                       .select("*")
+                       .eq("id", invoice_id)
+                       .execute())
+            
+            if response.data and len(response.data) > 0:
+                # Add URL field for file access
+                invoice = response.data[0]
+                if invoice.get("file_path"):
+                    invoice["url"] = f"https://bdtcfypvadryfeabqnlc.supabase.co/storage/v1/object/public/invoices/{invoice['file_path']}"
+                
+                logger.info(f"✅ Retrieved invoice: {invoice_id}")
+                return {"success": True, "data": invoice}
+            else:
+                return {"success": False, "error": "Invoice not found"}
+                
+        except Exception as e:
+            logger.error(f"❌ Database error fetching invoice {invoice_id}: {e}")
+            return {"success": False, "error": str(e)}
+    
     def update_invoice(self, invoice_id: str, update_data: Dict[str, Any]) -> Dict[str, Any]:
         """Update an invoice record in invoices_clean table"""
         if not self.is_available:

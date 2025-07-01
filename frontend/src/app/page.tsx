@@ -1,88 +1,183 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { useRouter } from 'next/navigation'
+import React, { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
+import { 
+  LayoutDashboard, 
+  FileText, 
+  BarChart3, 
+  Activity,
+  Upload,
+  FolderOpen,
+  ArrowRight,
+  Sparkles
+} from 'lucide-react';
 
 export default function HomePage() {
-  const router = useRouter()
+  const { isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
 
-  const navigateToUpload = () => {
-    router.push('/upload')
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push('/login');
+    }
+  }, [isAuthenticated, isLoading, router]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen gradient-bg-light flex items-center justify-center">
+        <div className="text-center glass-card rounded-2xl p-8 animate-fade-in">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <h2 className="text-xl font-semibold gradient-text mb-2">Loading...</h2>
+          <p className="text-gray-600">Please wait...</p>
+        </div>
+      </div>
+    );
   }
 
-  const navigateToFolderWatcher = () => {
-    router.push('/dashboard') // For now, linking to dashboard until you have a specific folder watcher page
+  if (!isAuthenticated) {
+    return null; // Will redirect to login
   }
+
+  const navigationCards = [
+    {
+      title: 'Dashboard',
+      description: 'Manage and process your invoices',
+      icon: LayoutDashboard,
+      href: '/dashboard',
+      gradient: 'from-blue-500 to-blue-600',
+      bgGradient: 'from-blue-50 to-blue-100'
+    },
+    {
+      title: 'Upload',
+      description: 'Upload invoices with drag & drop',
+      icon: Upload,
+      href: '/upload',
+      gradient: 'from-emerald-500 to-emerald-600',
+      bgGradient: 'from-emerald-50 to-emerald-100'
+    },
+    {
+      title: 'Folder Watcher',
+      description: 'Configure automatic file monitoring',
+      icon: FolderOpen,
+      href: '/dashboard/folder-watcher',
+      gradient: 'from-orange-500 to-orange-600',
+      bgGradient: 'from-orange-50 to-orange-100'
+    },
+    {
+      title: 'Prüfbericht',
+      description: 'View Skonto reports and analytics',
+      icon: BarChart3,
+      href: '/prufbericht',
+      gradient: 'from-purple-500 to-purple-600',
+      bgGradient: 'from-purple-50 to-purple-100'
+    },
+    {
+      title: 'Health',
+      description: 'Monitor system health and status',
+      icon: Activity,
+      href: '/health',
+      gradient: 'from-green-500 to-green-600',
+      bgGradient: 'from-green-50 to-green-100'
+    },
+    {
+      title: 'Invoices',
+      description: 'Quick access to invoice management',
+      icon: FileText,
+      href: '/dashboard',
+      gradient: 'from-indigo-500 to-indigo-600',
+      bgGradient: 'from-indigo-50 to-indigo-100'
+    }
+  ];
 
   return (
-    <div className="container mx-auto px-4 py-8 pt-20">
-      <div className="max-w-4xl mx-auto">
-        {/* Welcome Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Willkommen
-          </h1>
-          <p className="text-xl text-gray-600">
-            OCR Invoice Processor - Wählen Sie eine Option
-          </p>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-2xl mx-auto">
-          {/* Upload Button */}
-          <div 
-            onClick={navigateToUpload}
-            className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1 border-2 border-transparent hover:border-blue-200"
-          >
-            <div className="p-8 text-center">
-              <div className="bg-blue-100 rounded-full p-4 w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-                <svg className="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
+    <div className="min-h-screen gradient-bg-light relative overflow-hidden">
+      {/* Floating Background Elements */}
+      <div className="absolute top-20 left-10 w-32 h-32 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-float"></div>
+      <div className="absolute top-40 right-20 w-40 h-40 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-float" style={{ animationDelay: '2s' }}></div>
+      <div className="absolute bottom-20 left-1/3 w-36 h-36 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-float" style={{ animationDelay: '4s' }}></div>
+      
+      <div className="relative z-10 pt-24 pb-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          {/* Header Section */}
+          <div className="text-center mb-16">
+            <div className="glass-card rounded-2xl p-8 mb-8 border-0 shadow-xl animate-fade-in">
+              <div className="flex items-center justify-center mb-4">
+                <div className="w-16 h-16 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl flex items-center justify-center shadow-lg animate-glow">
+                  <FileText className="h-8 w-8 text-white" />
+                </div>
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-3">
-                Datei hochladen
-              </h2>
-              <p className="text-gray-600">
-                PDF-Rechnungen einzeln hochladen und verarbeiten
+              <h1 className="text-4xl font-bold mb-4">
+                <span className="bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                  Welcome to OCR Invoice Processor
+                </span>
+              </h1>
+              <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+                Streamline your invoice processing with AI-powered OCR technology and automated workflows
               </p>
+              <div className="flex items-center justify-center mt-4">
+                <span className="inline-flex items-center rounded-full px-3 py-1 text-sm font-medium glass-card text-purple-700 border border-purple-200">
+                  <Sparkles className="h-4 w-4 mr-1" />
+                  Modern Glass UI Design
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* Folder Watcher Button */}
-          <div 
-            onClick={navigateToFolderWatcher}
-            className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1 border-2 border-transparent hover:border-green-200"
-          >
-            <div className="p-8 text-center">
-              <div className="bg-green-100 rounded-full p-4 w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-                <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2v0a2 2 0 002-2h6l2 2h6a2 2 0 012 2v1" />
-                </svg>
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-3">
-                Ordner überwachen
-              </h2>
-              <p className="text-gray-600">
-                Automatische Verarbeitung von Dateien aus überwachten Ordnern
-              </p>
-            </div>
+          {/* Navigation Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {navigationCards.map((card, index) => (
+              <Link
+                key={card.title}
+                href={card.href}
+                className="group glass-card rounded-2xl p-6 border-0 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-105 animate-fade-in"
+                style={{ animationDelay: `${index * 0.1}s` }}
+              >
+                <div className="text-center">
+                  <div className={`w-16 h-16 bg-gradient-to-r ${card.gradient} rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300 shadow-lg`}>
+                    <card.icon className="h-8 w-8 text-white" />
+                  </div>
+                  <h3 className="text-xl font-semibold gradient-text mb-2 group-hover:scale-105 transition-transform duration-300">
+                    {card.title}
+                  </h3>
+                  <p className="text-gray-600 mb-4 text-sm">
+                    {card.description}
+                  </p>
+                  <div className="flex items-center justify-center text-purple-600 group-hover:text-purple-700 transition-colors">
+                    <span className="text-sm font-medium">Get Started</span>
+                    <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform duration-300" />
+                  </div>
+                </div>
+              </Link>
+            ))}
           </div>
-        </div>
 
-        {/* Info Section */}
-        <div className="mt-12 bg-gray-50 rounded-lg p-6 max-w-2xl mx-auto">
-          <div className="text-center">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              🔄 Automatisierte Rechnungsverarbeitung
-            </h3>
-            <p className="text-gray-600">
-              Laden Sie PDF-Rechnungen hoch oder überwachen Sie Ordner für die automatische Verarbeitung. 
-              Das System extrahiert Daten, ermöglicht manuelle Bearbeitung und versendet Benachrichtigungen.
-            </p>
+          {/* Quick Stats Section */}
+          <div className="mt-16">
+            <div className="glass-card rounded-2xl p-8 border-0 shadow-xl animate-fade-in">
+              <h2 className="text-2xl font-bold gradient-text text-center mb-8">
+                System Overview
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="text-center">
+                  <div className="text-3xl font-bold gradient-text mb-2">AI-Powered</div>
+                  <div className="text-gray-600">OCR Technology</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold gradient-text mb-2">Automated</div>
+                  <div className="text-gray-600">Workflow Processing</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold gradient-text mb-2">Real-time</div>
+                  <div className="text-gray-600">Status Tracking</div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  )
+  );
 }
