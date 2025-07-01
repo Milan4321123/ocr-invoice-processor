@@ -49,11 +49,11 @@ from api.routes import (
     approval, 
     approval_workflow,
     email_workflow,
-    email_test,
+    # email_test,  # Removed - not needed for production
     reports,
     folder_watcher,
     debug,
-    multi_layer_approval,
+    # multi_layer_approval,  # Removed - using simple single Bauleiter approval only
     auth
 )
 
@@ -66,11 +66,10 @@ app.include_router(dropdowns.router, prefix="/api", tags=["dropdowns"])
 app.include_router(approval.router, prefix="/api/approval", tags=["approval"])
 app.include_router(approval_workflow.router, prefix="/api", tags=["workflow"])
 app.include_router(email_workflow.router, prefix="/api", tags=["email"])
-app.include_router(email_test.router, tags=["email-testing"])
 app.include_router(reports.router, prefix="/api", tags=["reports"])
 app.include_router(folder_watcher.router, prefix="/api/folder-watcher", tags=["folder-watcher"])
 app.include_router(debug.router, prefix="/api", tags=["debug"])
-app.include_router(multi_layer_approval.router, tags=["multi-layer-approval"])
+# Removed multi_layer_approval.router - using simple single Bauleiter approval only
 
 @app.get("/")
 async def root():
