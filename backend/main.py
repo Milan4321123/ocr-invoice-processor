@@ -49,20 +49,28 @@ from api.routes import (
     approval, 
     approval_workflow,
     email_workflow,
+    email_test,
     reports,
-    folder_watcher
+    folder_watcher,
+    debug,
+    multi_layer_approval,
+    auth
 )
 
 # Register routes
+app.include_router(auth.router, tags=["authentication"])
 app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(upload.router, prefix="/api", tags=["upload"])
 app.include_router(invoices.router, prefix="/api", tags=["invoices"])
 app.include_router(dropdowns.router, prefix="/api", tags=["dropdowns"])
-app.include_router(approval.router, prefix="/api", tags=["approval"])
+app.include_router(approval.router, prefix="/api/approval", tags=["approval"])
 app.include_router(approval_workflow.router, prefix="/api", tags=["workflow"])
 app.include_router(email_workflow.router, prefix="/api", tags=["email"])
+app.include_router(email_test.router, tags=["email-testing"])
 app.include_router(reports.router, prefix="/api", tags=["reports"])
 app.include_router(folder_watcher.router, prefix="/api/folder-watcher", tags=["folder-watcher"])
+app.include_router(debug.router, prefix="/api", tags=["debug"])
+app.include_router(multi_layer_approval.router, tags=["multi-layer-approval"])
 
 @app.get("/")
 async def root():
@@ -72,6 +80,24 @@ async def root():
         "status": "running",
         "features": ["manual_entry", "searchable_dropdowns", "workflow", "email"]
     }
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize application on startup"""
+    logger.info("🚀 Starting Invoice Management API...")
+    
+    # Initialize authentication system
+    try:
+        from services.auth_service import auth_service
+        result = await auth_service.initialize_default_user()
+        if result["success"]:
+            logger.info(f"🔐 {result['message']}")
+        else:
+            logger.error(f"❌ Auth initialization failed: {result.get('error', 'Unknown error')}")
+    except Exception as e:
+        logger.error(f"❌ Auth initialization error: {e}")
+    
+    logger.info("✅ Application startup complete")
 
 if __name__ == "__main__":
     import uvicorn

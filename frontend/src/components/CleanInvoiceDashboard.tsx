@@ -119,6 +119,73 @@ export default function CleanInvoiceDashboard() {
     }
   }
 
+  const sendToBauleiter = async (invoice: CleanInvoice) => {
+    try {
+      // Get Bauleiter email from user
+      const bauleiterEmail = prompt(
+        `Rechnung "${invoice.file_name}" an Bauleiter senden.\n\nBitte geben Sie die E-Mail-Adresse des Bauleiters ein:`,
+        "bauleiter@company.com"
+      );
+      
+      if (!bauleiterEmail) {
+        toast.error("Abgebrochen: Bauleiter E-Mail ist erforderlich");
+        return;
+      }
+      
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(bauleiterEmail)) {
+        toast.error("Ungültige E-Mail-Adresse");
+        return;
+      }
+      
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      
+      // Use the new send-to-bauleiter endpoint for better status tracking
+      const requestData = {
+        bauleiter_email: bauleiterEmail,
+        sent_by: "dashboard_user",
+        editor_name: "Dashboard User",
+        editor_email: "dashboard_user@company.de",
+        changes_summary: [
+          {
+            field: "Status",
+            old_value: "Bearbeitung abgeschlossen", 
+            new_value: "An Bauleiter gesendet",
+            timestamp: new Date().toLocaleString('de-DE')
+          }
+        ]
+      };
+
+      const response = await fetch(`${apiUrl}/api/invoices/${invoice.id}/send-to-bauleiter`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Senden fehlgeschlagen: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      // Show success message with email status
+      if (result.email_sent) {
+        toast.success(`✅ E-Mail erfolgreich an ${bauleiterEmail} gesendet!`);
+        // Refresh the list to show updated status
+        await fetchInvoices();
+      } else {
+        toast.error(`❌ E-Mail konnte nicht gesendet werden: ${result.email_error || 'Unbekannter Fehler'}`);
+      }
+      
+    } catch (err) {
+      console.error('Error sending to Bauleiter:', err);
+      toast.error(`Fehler beim Senden: ${err instanceof Error ? err.message : 'Unbekannter Fehler'}`);
+    }
+  }
+
   const openDeleteDialog = (invoice: CleanInvoice) => {
     // Detect upload source from file_path or other indicators
     let uploadSource: 'drag-drop' | 'folder-watcher' | 'manual' | 'unknown' = 'unknown'
@@ -188,24 +255,36 @@ export default function CleanInvoiceDashboard() {
   }
 
   const getWorkflowStatusColor = (status: string | undefined, reviewStatus: string | undefined): string => {
-    // 3-stage workflow: nicht begonnen -> in Bearbeitung -> abgeschlossen
-    if (status === 'completed' && reviewStatus === 'completed_review') {
-      return 'text-green-600 bg-green-50'  // abgeschlossen
+    // Enhanced 5-stage workflow with Bauleiter approval
+    if (status === 'approved_by_bauleiter') {
+      return 'text-green-600 bg-green-50'  // Final approval
+    } else if (status === 'rejected_by_bauleiter') {
+      return 'text-red-600 bg-red-50'      // Rejected by Bauleiter
+    } else if (status === 'in_review_by_bauleiter') {
+      return 'text-purple-600 bg-purple-50' // With Bauleiter for approval
+    } else if (status === 'completed' && reviewStatus === 'completed_review') {
+      return 'text-green-600 bg-green-50'  // Ready for Bauleiter
     } else if (status === 'edited' && reviewStatus === 'under_review') {
-      return 'text-blue-600 bg-blue-50'    // in Bearbeitung  
+      return 'text-blue-600 bg-blue-50'    // In editing
     } else {
-      return 'text-orange-600 bg-orange-50' // nicht begonnen (uploaded/pending)
+      return 'text-orange-600 bg-orange-50' // Not started
     }
   }
 
   const getWorkflowStatusLabel = (status: string | undefined, reviewStatus: string | undefined): string => {
-    // 3-stage workflow: nicht begonnen -> in Bearbeitung -> abgeschlossen
-    if (status === 'completed' && reviewStatus === 'completed_review') {
-      return 'abgeschlossen'
+    // Enhanced 5-stage workflow with Bauleiter approval
+    if (status === 'approved_by_bauleiter') {
+      return 'Von Bauleiter genehmigt'
+    } else if (status === 'rejected_by_bauleiter') {
+      return 'Von Bauleiter abgelehnt'
+    } else if (status === 'in_review_by_bauleiter') {
+      return 'Bei Bauleiter zur Prüfung'
+    } else if (status === 'completed' && reviewStatus === 'completed_review') {
+      return 'Bereit für Bauleiter'
     } else if (status === 'edited' && reviewStatus === 'under_review') {
-      return 'in Bearbeitung'
+      return 'In Bearbeitung'
     } else {
-      return 'nicht begonnen'
+      return 'Nicht begonnen'
     }
   }
 
@@ -269,7 +348,7 @@ export default function CleanInvoiceDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pt-16"> {/* Added pt-16 for fixed navigation */}
       <Toaster position="top-right" />
       
       {/* Header */}
@@ -285,6 +364,14 @@ export default function CleanInvoiceDashboard() {
             </div>
             
             <div className="flex items-center space-x-4">
+              <a 
+                href="/bauleiter"
+                className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+              >
+                <span>👨‍💼</span>
+                <span>Bauleiter Dashboard</span>
+              </a>
+              
               <button
                 onClick={fetchInvoices}
                 className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -299,6 +386,7 @@ export default function CleanInvoiceDashboard() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
         {error && (
           <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
             <div className="flex items-center space-x-2">
@@ -308,8 +396,8 @@ export default function CleanInvoiceDashboard() {
           </div>
         )}
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
+        {/* Enhanced Stats with Bauleiter Workflow */}
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-8">
           <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
             <div className="flex items-center space-x-3">
               <FileText className="h-8 w-8 text-blue-600" />
@@ -324,9 +412,21 @@ export default function CleanInvoiceDashboard() {
             <div className="flex items-center space-x-3">
               <CheckCircle className="h-8 w-8 text-green-600" />
               <div>
-                <p className="text-sm font-medium text-gray-600">Abgeschlossen</p>
+                <p className="text-sm font-medium text-gray-600">Genehmigt</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {invoices.filter(inv => inv.status === 'completed' && inv.review_status === 'completed_review').length}
+                  {invoices.filter(inv => inv.status === 'approved_by_bauleiter').length}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+            <div className="flex items-center space-x-3">
+              <Clock className="h-8 w-8 text-purple-600" />
+              <div>
+                <p className="text-sm font-medium text-gray-600">Bei Bauleiter</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {invoices.filter(inv => inv.status === 'in_review_by_bauleiter').length}
                 </p>
               </div>
             </div>
@@ -338,7 +438,11 @@ export default function CleanInvoiceDashboard() {
               <div>
                 <p className="text-sm font-medium text-gray-600">In Bearbeitung</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {invoices.filter(inv => inv.status === 'edited' && inv.review_status === 'under_review').length}
+                  {invoices.filter(inv => 
+                    (inv.status === 'edited' && inv.review_status === 'under_review') ||
+                    (inv.status === 'completed' && inv.review_status === 'completed_review' && 
+                     !['in_review_by_bauleiter', 'approved_by_bauleiter', 'rejected_by_bauleiter'].includes(inv.status || ''))
+                  ).length}
                 </p>
               </div>
             </div>
@@ -351,8 +455,7 @@ export default function CleanInvoiceDashboard() {
                 <p className="text-sm font-medium text-gray-600">Nicht begonnen</p>
                 <p className="text-2xl font-bold text-gray-900">
                   {invoices.filter(inv => 
-                    !(inv.status === 'completed' && inv.review_status === 'completed_review') &&
-                    !(inv.status === 'edited' && inv.review_status === 'under_review')
+                    !['completed', 'edited', 'in_review_by_bauleiter', 'approved_by_bauleiter', 'rejected_by_bauleiter'].includes(inv.status || '')
                   ).length}
                 </p>
               </div>
@@ -563,7 +666,7 @@ export default function CleanInvoiceDashboard() {
                         </div>
                       </td>
                       
-                      <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium sticky right-0 bg-white z-10 min-w-[160px]">
+                      <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium sticky right-0 bg-white z-10 min-w-[220px]">
                         <div className="flex items-center justify-end space-x-2">
                           <Link
                             href={`/invoice-editor/${invoice.id}`}
@@ -572,6 +675,19 @@ export default function CleanInvoiceDashboard() {
                             <Edit3 className="h-4 w-4" />
                             <span>Bearbeiten</span>
                           </Link>
+                          
+                          {/* Show "Send to Bauleiter" button for completed invoices that haven't been sent yet */}
+                          {(invoice.status === 'completed' || invoice.review_status === 'completed_review') && 
+                           !['in_review_by_bauleiter', 'approved_by_bauleiter', 'rejected_by_bauleiter'].includes(invoice.status || '') && (
+                            <button
+                              onClick={() => sendToBauleiter(invoice)}
+                              className="flex items-center space-x-1 px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                              title="Rechnung zur Genehmigung an Bauleiter senden"
+                            >
+                              <User className="h-4 w-4" />
+                              <span>An Bauleiter</span>
+                            </button>
+                          )}
                           
                           <button
                             onClick={() => openDeleteDialog(invoice)}

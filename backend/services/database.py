@@ -9,6 +9,7 @@ import os
 import logging
 from datetime import datetime
 from dotenv import load_dotenv
+import json
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -82,45 +83,65 @@ class DatabaseService:
     async def create_approval_token(self, token_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Create approval token record for email workflow.
-        Uses Supabase table operations instead of raw SQL.
+        Uses your actual approval_tokens table.
         """
         if not self.is_available:
             return {"success": False, "error": "Database unavailable"}
         
         try:
-            # For now, just log the token creation
-            logger.info(f"Approval token would be created: {token_data.get('action')} for invoice {token_data.get('invoice_id')}")
-            
-            return {
-                "success": True,
-                "token_id": "mock-token-id",
-                "message": "Token creation logged - approval_tokens table needed"
+            token_record = {
+                "token_hash": token_data["token_hash"],
+                "invoice_id": token_data["invoice_id"],
+                "action": token_data["action"],
+                "user_email": token_data["user_email"],
+                "expires_at": token_data["expires_at"],
+                "nonce": token_data["nonce"],
+                "is_revoked": False
             }
             
+            response = self._client.table("approval_tokens").insert(token_record).execute()
+            
+            if response.data:
+                logger.info(f"✅ Created approval token for invoice {token_data['invoice_id']}")
+                return {"success": True, "data": response.data[0]}
+            else:
+                return {"success": False, "error": "Failed to create approval token"}
+            
         except Exception as e:
-            logger.error(f"Failed to create approval token: {e}")
+            logger.error(f"❌ Failed to create approval token: {e}")
             return {"success": False, "error": str(e)}
 
     async def log_email_attempt(self, email_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Log email attempt for audit purposes.
-        Uses Supabase table operations instead of raw SQL.
+        Uses your actual email_audit_log table.
         """
         if not self.is_available:
             return {"success": False, "error": "Database unavailable"}
         
         try:
-            # For now, just log the email attempt
-            logger.info(f"Email attempt logged: {email_data.get('email_type')} to {email_data.get('recipient_email')}")
-            
-            return {
-                "success": True,
-                "log_id": "mock-log-id",
-                "message": "Email attempt logged - email_audit_log table needed"
+            log_record = {
+                "invoice_id": email_data["invoice_id"],
+                "email_type": email_data["email_type"],
+                "recipient_email": email_data["recipient_email"],
+                "subject": email_data["subject"],
+                "send_success": email_data["send_success"],
+                "provider_message_id": email_data.get("provider_message_id"),
+                "provider_response": email_data.get("provider_response", {}),
+                "template_used": email_data.get("template_used"),
+                "email_size_bytes": email_data.get("email_size_bytes")
             }
             
+            response = self._client.table("email_audit_log").insert(log_record).execute()
+            
+            if response.data:
+                logger.info(f"✅ Logged email attempt: {email_data['email_type']} to {email_data['recipient_email']}")
+                return {"success": True, "data": response.data[0]}
+            else:
+                return {"success": False, "error": "Failed to log email attempt"}
+            
         except Exception as e:
-            logger.error(f"Failed to log email attempt: {e}")
+            logger.error(f"❌ Failed to log email attempt: {e}")
             return {"success": False, "error": str(e)}
 
     
@@ -137,6 +158,9 @@ class DatabaseService:
             return {"success": False, "error": "Database unavailable"}
         
         try:
+            # Debug logging
+            logger.info(f"🔍 Creating invoice with data: {invoice_data}")
+            
             # Add timestamps
             now = datetime.utcnow().isoformat()
             invoice_data.update({
@@ -148,7 +172,11 @@ class DatabaseService:
             invoice_data.setdefault("status", "uploaded")
             invoice_data.setdefault("kfw_anrechenbare_kosten", False)
             
+            logger.info(f"🔍 Final invoice data being inserted: {invoice_data}")
+            
             response = self._client.table(self.table_name).insert(invoice_data).execute()
+            
+            logger.info(f"🔍 Supabase response: {response}")
             
             if response.data:
                 logger.info(f"✅ Created invoice: {response.data[0]['id']}")
@@ -159,6 +187,8 @@ class DatabaseService:
                 
         except Exception as e:
             logger.error(f"❌ Database error creating invoice: {e}")
+            logger.error(f"❌ Exception type: {type(e)}")
+            logger.error(f"❌ Exception args: {e.args}")
             return {"success": False, "error": str(e)}
     
     def get_invoice(self, invoice_id: str) -> Dict[str, Any]:
@@ -377,6 +407,110 @@ class DatabaseService:
             logger.error(f"❌ Database error completing invoice {invoice_id}: {e}")
             return {"success": False, "error": str(e)}
     
+    def update_invoice_sent_to_bauleiter(self, invoice_id: str, bauleiter_email: str, sent_by: str = None) -> Dict[str, Any]:
+        """
+        Update invoice status when sent to Bauleiter for approval.
+        Uses your actual database schema columns.
+        """
+        try:
+            now_iso = datetime.utcnow().isoformat()
+            
+            update_data = {
+                "status": "in_review_by_bauleiter",
+                "review_status": "under_review",
+                "bauleiter_email": bauleiter_email,
+                "bauleiter_review_sent_at": now_iso,  # Your actual column!
+                "approval_status": "pending",
+                "updated_at": now_iso
+            }
+            
+            # Add audit trail in review_notes
+            if sent_by:
+                update_data["review_notes"] = f"Sent to Bauleiter {bauleiter_email} by {sent_by} at {now_iso}"
+            
+            logger.info(f"📧 Sending invoice {invoice_id} to Bauleiter: {bauleiter_email}")
+            
+            return self.update_invoice(invoice_id, update_data)
+            
+        except Exception as e:
+            logger.error(f"❌ Error updating invoice sent to Bauleiter {invoice_id}: {e}")
+            return {"success": False, "error": str(e)}
+
+    def update_invoice_bauleiter_decision(self, invoice_id: str, decision: str, decided_by: str = None, decision_notes: str = None) -> Dict[str, Any]:
+        """
+        Update invoice with Bauleiter's approval/rejection decision.
+        Uses your actual database schema columns.
+        """
+        if decision not in ["approved", "rejected"]:
+            return {"success": False, "error": f"Invalid decision: {decision}. Must be 'approved' or 'rejected'"}
+        
+        try:
+            now_iso = datetime.utcnow().isoformat()
+            new_status = f"{decision}_by_bauleiter"
+            new_review_status = "completed_review" if decision == "approved" else "needs_attention"
+            
+            update_data = {
+                "status": new_status,
+                "review_status": new_review_status,
+                "approval_status": decision,  # 'approved' or 'rejected'
+                "approved_at": now_iso,       # Your actual column!
+                "approval_method": "email_link",  # Your actual column!
+                "updated_at": now_iso
+            }
+            
+            if decided_by:
+                update_data["reviewed_by"] = decided_by
+                update_data["reviewed_at"] = now_iso
+            
+            if decision_notes:
+                update_data["review_notes"] = decision_notes
+            
+            logger.info(f"⚖️ Bauleiter decision for invoice {invoice_id}: {decision.upper()}")
+            
+            return self.update_invoice(invoice_id, update_data)
+            
+        except Exception as e:
+            logger.error(f"❌ Error updating Bauleiter decision for invoice {invoice_id}: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_invoices_by_status(self, status: str, limit: int = 100) -> Dict[str, Any]:
+        """
+        Get invoices filtered by status using existing query patterns.
+        Useful for dashboard filtering and reports.
+        """
+        try:
+            filters = {"status": status}
+            return self.get_invoices(limit=limit, filters=filters)
+            
+        except Exception as e:
+            logger.error(f"❌ Error getting invoices by status {status}: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_pending_bauleiter_approvals(self, bauleiter_email: str = None, limit: int = 50) -> Dict[str, Any]:
+        """
+        Get invoices pending Bauleiter approval using existing query patterns.
+        Optionally filter by specific Bauleiter email.
+        """
+        try:
+            filters = {"status": "in_review_by_bauleiter"}
+            
+            if bauleiter_email:
+                filters["bauleiter_email"] = bauleiter_email
+            
+            logger.info(f"🔍 Looking for pending approvals with filters: {filters}")
+            result = self.get_invoices(limit=limit, filters=filters)
+            
+            if result["success"]:
+                logger.info(f"📋 Found {len(result['data'])} invoices pending Bauleiter approval")
+            else:
+                logger.warning(f"⚠️ Failed to query pending approvals: {result.get('error')}")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"❌ Error getting pending Bauleiter approvals: {e}")
+            return {"success": False, "error": str(e)}
+    
     def delete_invoice(self, invoice_id: str) -> Dict[str, Any]:
         """Delete an invoice record from invoices_clean table"""
         if not self.is_available:
@@ -592,6 +726,233 @@ class DatabaseService:
         except Exception as e:
             logger.error(f"❌ Database error updating dropdown option: {e}")
             return {"success": False, "error": str(e)}
+
+    def log_email_send(self, invoice_id: str, email_type: str, log_entry: str) -> Dict[str, Any]:
+        """Log email send event without changing status (email service helper)"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            update_data = {
+                "email_logs": f"COALESCE(email_logs, '[]'::jsonb) || '{log_entry}'::jsonb",
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            
+            if email_type == "editor_notification":
+                update_data["edit_bericht_sent_at"] = datetime.utcnow().isoformat()
+            
+            response = (self._client.table(self.table_name)
+                       .update(update_data)
+                       .eq("id", invoice_id)
+                       .execute())
+            
+            if response.data:
+                logger.info(f"✅ Email log updated for invoice: {invoice_id}")
+                return {"success": True, "data": response.data[0]}
+            else:
+                return {"success": False, "error": "Email log update failed"}
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to log email send: {e}")
+            return {"success": False, "error": str(e)}
+
+    def update_bauleiter_email_sent(self, invoice_id: str, bauleiter_email: str, log_entry: str) -> Dict[str, Any]:
+        """Update Bauleiter email fields without changing status (email service helper)"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            update_data = {
+                "bauleiter_email": bauleiter_email,
+                "bauleiter_review_sent_at": datetime.utcnow().isoformat(),
+                "email_logs": f"COALESCE(email_logs, '[]'::jsonb) || '{log_entry}'::jsonb",
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            
+            response = (self._client.table(self.table_name)
+                       .update(update_data)
+                       .eq("id", invoice_id)
+                       .execute())
+            
+            if response.data:
+                logger.info(f"✅ Bauleiter email fields updated for invoice: {invoice_id}")
+                return {"success": True, "data": response.data[0]}
+            else:
+                return {"success": False, "error": "Bauleiter email update failed"}
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to update Bauleiter email fields: {e}")
+            return {"success": False, "error": str(e)}
+
+    def create_approval_token(self, token_hash: str, invoice_id: str, action: str, 
+                            user_email: str, expires_at: datetime, nonce: str) -> Dict[str, Any]:
+        """Create approval token (email service helper)"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            token_data = {
+                "token_hash": token_hash,
+                "invoice_id": invoice_id,
+                "action": action,
+                "user_email": user_email,
+                "expires_at": expires_at.isoformat(),
+                "nonce": nonce,
+                "created_at": datetime.utcnow().isoformat()
+            }
+            
+            response = self._client.table("approval_tokens").insert(token_data).execute()
+            
+            if response.data:
+                logger.info(f"✅ Approval token created for invoice: {invoice_id}")
+                return {"success": True, "data": response.data[0]}
+            else:
+                return {"success": False, "error": "Token creation failed"}
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to create approval token: {e}")
+            return {"success": False, "error": str(e)}
+
+    def create_email_audit_log(self, invoice_id: str, email_type: str, recipient_email: str,
+                             subject: str, send_success: bool, provider_message_id: str = None,
+                             provider_response: dict = None, template_used: str = None,
+                             email_size_bytes: int = None) -> Dict[str, Any]:
+        """Create email audit log entry (email service helper)"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            audit_data = {
+                "invoice_id": invoice_id,
+                "email_type": email_type,
+                "recipient_email": recipient_email,
+                "subject": subject,
+                "send_success": send_success,
+                "provider_message_id": provider_message_id,
+                "provider_response": json.dumps(provider_response) if provider_response else None,
+                "template_used": template_used,
+                "email_size_bytes": email_size_bytes,
+                "created_at": datetime.utcnow().isoformat()
+            }
+            
+            response = self._client.table("email_audit_log").insert(audit_data).execute()
+            
+            if response.data:
+                logger.info(f"✅ Email audit log created for invoice: {invoice_id}")
+                return {"success": True, "data": response.data[0]}
+            else:
+                return {"success": False, "error": "Email audit log creation failed"}
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to create email audit log: {e}")
+            return {"success": False, "error": str(e)}
+
+    def update_approval_status(self, invoice_id: str, status: str, approval_status: str, 
+                             approval_method: str) -> Dict[str, Any]:
+        """Update invoice approval status (workflow service helper)"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            update_data = {
+                "status": status,
+                "approval_status": approval_status,
+                "approved_at": datetime.utcnow().isoformat(),
+                "approval_method": approval_method,
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            
+            response = (self._client.table(self.table_name)
+                       .update(update_data)
+                       .eq("id", invoice_id)
+                       .execute())
+            
+            if response.data:
+                logger.info(f"✅ Approval status updated for invoice: {invoice_id}")
+                return {"success": True, "data": response.data[0]}
+            else:
+                return {"success": False, "error": "Approval status update failed"}
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to update approval status: {e}")
+            return {"success": False, "error": str(e)}
+
+    def mark_approval_token_used(self, token_hash: str, ip_address: str) -> Dict[str, Any]:
+        """Mark approval token as used (workflow service helper)"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            update_data = {
+                "used_at": datetime.utcnow().isoformat(),
+                "used_by_ip": ip_address
+            }
+            
+            response = (self._client.table("approval_tokens")
+                       .update(update_data)
+                       .eq("token_hash", token_hash)
+                       .execute())
+            
+            if response.data:
+                logger.info(f"✅ Approval token marked as used: {token_hash[:8]}...")
+                return {"success": True, "data": response.data[0]}
+            else:
+                return {"success": False, "error": "Token update failed"}
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to mark token as used: {e}")
+            return {"success": False, "error": str(e)}
+
+    def create_security_event(self, event_type: str, ip_address: str, user_email: str = None,
+                            invoice_id: str = None, event_data: dict = None, 
+                            risk_level: str = "low") -> Dict[str, Any]:
+        """Create security event log (workflow service helper)"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            security_data = {
+                "event_type": event_type,
+                "ip_address": ip_address,
+                "user_email": user_email,
+                "invoice_id": invoice_id,
+                "event_data": json.dumps(event_data) if event_data else None,
+                "risk_level": risk_level,
+                "created_at": datetime.utcnow().isoformat()
+            }
+            
+            response = self._client.table("security_events").insert(security_data).execute()
+            
+            if response.data:
+                logger.info(f"✅ Security event logged: {event_type}")
+                return {"success": True, "data": response.data[0]}
+            else:
+                return {"success": False, "error": "Security event creation failed"}
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to create security event: {e}")
+            return {"success": False, "error": str(e)}
+
+    # =============================================================================
+    # USER MANAGEMENT (for authentication)
+    # =============================================================================
+    
+    async def ensure_users_table_exists(self) -> Dict[str, Any]:
+        """Ensure users table exists in database"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            # Check if users table exists by trying to query it
+            response = self._client.table("users").select("*").limit(1).execute()
+            logger.info("✅ Users table exists")
+            return {"success": True, "message": "Users table exists"}
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Users table may not exist: {e}")
+            # In Supabase, tables are typically created through the web interface
+            # For development, we'll note this and continue
+            return {"success": False, "error": f"Users table not found: {e}"}
 
 # =============================================================================
 # GLOBAL INSTANCE - Single database service for entire application

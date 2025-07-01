@@ -79,54 +79,297 @@ async def handle_approval_action(token: str, request: Request):
         )
 
 async def process_approval(invoice_id: str, user_email: str, client_ip: str, user_agent: str, token_hash: str) -> Dict[str, Any]:
-    """Process invoice approval"""
+    """Process invoice approval - Supports both single-layer and multi-layer approvals"""
     try:
-        # Update invoice status to approved
-        # For now, just log the approval since we need the actual database tables
-        logger.info(f"✅ INVOICE APPROVED: {invoice_id} by {user_email} from IP {client_ip}")
+        logger.info(f"✅ PROCESSING INVOICE APPROVAL: {invoice_id} by {user_email} from IP {client_ip}")
         
-        # In a real implementation, this would:
-        # 1. Update invoices table: status = 'approved'
-        # 2. Log approval in audit table
-        # 3. Mark token as used
-        # 4. Send confirmation email
-        # 5. Trigger next workflow step
+        # Check if this invoice has multi-layer approval hierarchy
+        hierarchy_result = db_service.get_approval_hierarchy(invoice_id)
+        
+        if hierarchy_result["success"] and hierarchy_result["data"]:
+            # Multi-layer approval process
+            logger.info(f"🔄 Processing multi-layer approval for invoice {invoice_id}")
+            return await process_multi_layer_approval(invoice_id, user_email, client_ip, user_agent, token_hash)
+        else:
+            # Traditional single-layer approval
+            logger.info(f"📝 Processing single-layer approval for invoice {invoice_id}")
+            return await process_single_layer_approval(invoice_id, user_email, client_ip, user_agent, token_hash)
+            
+    except Exception as e:
+        logger.error(f"❌ Failed to process approval for invoice {invoice_id}: {e}")
+        raise e
+
+async def process_single_layer_approval(invoice_id: str, user_email: str, client_ip: str, user_agent: str, token_hash: str) -> Dict[str, Any]:
+    """Process traditional single-layer approval - Updates database through centralized service"""
+    try:
+        # Update invoice status through centralized database service
+        approval_result = db_service.update_invoice_bauleiter_decision(
+            invoice_id=invoice_id,
+            decision="approved",
+            decided_by=user_email,
+            decision_notes=f"Approved via email link from IP {client_ip}"
+        )
+        
+        if not approval_result["success"]:
+            logger.error(f"❌ Failed to approve invoice {invoice_id}: {approval_result['error']}")
+            raise Exception(f"Database update failed: {approval_result['error']}")
+        
+        # Log approval in audit trail
+        audit_result = await db_service.log_email_audit(
+            invoice_id=invoice_id,
+            event_type="approval_decision",
+            recipient_email=user_email,
+            success=True,
+            details={
+                "action": "approved",
+                "approval_type": "single_layer",
+                "ip_address": client_ip,
+                "user_agent": user_agent,
+                "token_hash": token_hash
+            }
+        )
+        
+        if not audit_result["success"]:
+            logger.warning(f"⚠️ Failed to log approval audit for invoice {invoice_id}: {audit_result['error']}")
+        
+        logger.info(f"✅ SINGLE-LAYER INVOICE APPROVED: {invoice_id} by {user_email}")
         
         return {
             "success": True,
             "action": "approved",
+            "approval_type": "single_layer",
             "invoice_id": invoice_id,
             "approved_by": user_email,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "status": approval_result["data"].get("status"),
+            "approval_status": approval_result["data"].get("approval_status")
         }
         
     except Exception as e:
-        logger.error(f"Failed to process approval: {e}")
+        logger.error(f"❌ Failed to process single-layer approval for invoice {invoice_id}: {e}")
+        raise e
+
+async def process_multi_layer_approval(invoice_id: str, user_email: str, client_ip: str, user_agent: str, token_hash: str) -> Dict[str, Any]:
+    """Process multi-layer approval - Updates database through centralized service only"""
+    try:
+        # Get current approval layer for this user
+        current_layer_result = db_service.get_current_approval_layer(invoice_id)
+        
+        if not current_layer_result["success"]:
+            logger.error(f"❌ Failed to get current approval layer for invoice {invoice_id}: {current_layer_result['error']}")
+            raise Exception(f"Could not determine approval layer: {current_layer_result['error']}")
+        
+        current_layer = current_layer_result["data"]
+        layer_order = current_layer["layer_order"]
+        
+        # Validate that this user is the current approver
+        if current_layer["approver_email"] != user_email:
+            logger.error(f"❌ User {user_email} is not authorized to approve layer {layer_order} for invoice {invoice_id}")
+            raise Exception(f"User {user_email} is not the designated approver for this layer")
+        
+        logger.info(f"🔄 Processing approval for layer {layer_order} by {user_email}")
+        
+        # Process the approval through centralized database service
+        layer_result = db_service.process_approval_layer_decision(
+            invoice_id=invoice_id,
+            layer_order=layer_order,
+            decision="approved",
+            decided_by=user_email,
+            decision_notes=f"Approved via email link from IP {client_ip}"
+        )
+        
+        if not layer_result["success"]:
+            logger.error(f"❌ Failed to process approval layer {layer_order} for invoice {invoice_id}: {layer_result['error']}")
+            raise Exception(f"Layer approval failed: {layer_result['error']}")
+        
+        # Log approval in audit trail
+        audit_result = await db_service.log_email_audit(
+            invoice_id=invoice_id,
+            event_type="approval_decision",
+            recipient_email=user_email,
+            success=True,
+            details={
+                "action": "approved",
+                "approval_type": "multi_layer",
+                "layer_order": layer_order,
+                "layer_name": current_layer.get("layer_name"),
+                "approver_role": current_layer.get("approver_role"),
+                "ip_address": client_ip,
+                "user_agent": user_agent,
+                "token_hash": token_hash
+            }
+        )
+        
+        if not audit_result["success"]:
+            logger.warning(f"⚠️ Failed to log multi-layer approval audit for invoice {invoice_id}: {audit_result['error']}")
+        
+        # Determine response based on approval action
+        action = layer_result["action"]
+        if action == "final_approval":
+            logger.info(f"🎉 INVOICE FULLY APPROVED: {invoice_id} completed all approval layers")
+        elif action == "layer_approved":
+            logger.info(f"⏭️ LAYER APPROVED: {invoice_id} layer {layer_order} approved, moving to layer {layer_result['next_layer']}")
+        
+        return {
+            "success": True,
+            "action": action,
+            "approval_type": "multi_layer",
+            "invoice_id": invoice_id,
+            "approved_by": user_email,
+            "layer_order": layer_order,
+            "layer_name": current_layer.get("layer_name"),
+            "timestamp": datetime.now().isoformat(),
+            "status": layer_result["invoice_status"],
+            "next_layer": layer_result.get("next_layer"),
+            "is_final": action == "final_approval"
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to process multi-layer approval for invoice {invoice_id}: {e}")
         raise e
 
 async def process_rejection(invoice_id: str, user_email: str, client_ip: str, user_agent: str, token_hash: str) -> Dict[str, Any]:
-    """Process invoice rejection"""
+    """Process invoice rejection - Supports both single-layer and multi-layer approvals"""
     try:
-        # Update invoice status to rejected
-        logger.info(f"❌ INVOICE REJECTED: {invoice_id} by {user_email} from IP {client_ip}")
+        logger.info(f"❌ PROCESSING INVOICE REJECTION: {invoice_id} by {user_email} from IP {client_ip}")
         
-        # In a real implementation, this would:
-        # 1. Update invoices table: status = 'rejected'
-        # 2. Log rejection in audit table
-        # 3. Mark token as used
-        # 4. Send notification email to editor
-        # 5. Trigger rejection workflow
+        # Check if this invoice has multi-layer approval hierarchy
+        hierarchy_result = db_service.get_approval_hierarchy(invoice_id)
+        
+        if hierarchy_result["success"] and hierarchy_result["data"]:
+            # Multi-layer approval process
+            logger.info(f"🔄 Processing multi-layer rejection for invoice {invoice_id}")
+            return await process_multi_layer_rejection(invoice_id, user_email, client_ip, user_agent, token_hash)
+        else:
+            # Traditional single-layer rejection
+            logger.info(f"📝 Processing single-layer rejection for invoice {invoice_id}")
+            return await process_single_layer_rejection(invoice_id, user_email, client_ip, user_agent, token_hash)
+            
+    except Exception as e:
+        logger.error(f"❌ Failed to process rejection for invoice {invoice_id}: {e}")
+        raise e
+
+async def process_single_layer_rejection(invoice_id: str, user_email: str, client_ip: str, user_agent: str, token_hash: str) -> Dict[str, Any]:
+    """Process traditional single-layer rejection - Updates database through centralized service"""
+    try:
+        # Update invoice status through centralized database service
+        rejection_result = db_service.update_invoice_bauleiter_decision(
+            invoice_id=invoice_id,
+            decision="rejected",
+            decided_by=user_email,
+            decision_notes=f"Rejected via email link from IP {client_ip}"
+        )
+        
+        if not rejection_result["success"]:
+            logger.error(f"❌ Failed to reject invoice {invoice_id}: {rejection_result['error']}")
+            raise Exception(f"Database update failed: {rejection_result['error']}")
+        
+        # Log rejection in audit trail
+        audit_result = await db_service.log_email_audit(
+            invoice_id=invoice_id,
+            event_type="approval_decision",
+            recipient_email=user_email,
+            success=True,
+            details={
+                "action": "rejected",
+                "approval_type": "single_layer",
+                "ip_address": client_ip,
+                "user_agent": user_agent,
+                "token_hash": token_hash
+            }
+        )
+        
+        if not audit_result["success"]:
+            logger.warning(f"⚠️ Failed to log rejection audit for invoice {invoice_id}: {audit_result['error']}")
+        
+        logger.info(f"❌ SINGLE-LAYER INVOICE REJECTED: {invoice_id} by {user_email}")
         
         return {
             "success": True,
             "action": "rejected",
+            "approval_type": "single_layer",
             "invoice_id": invoice_id,
             "rejected_by": user_email,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "status": rejection_result["data"].get("status"),
+            "approval_status": rejection_result["data"].get("approval_status")
         }
         
     except Exception as e:
-        logger.error(f"Failed to process rejection: {e}")
+        logger.error(f"❌ Failed to process single-layer rejection for invoice {invoice_id}: {e}")
+        raise e
+
+async def process_multi_layer_rejection(invoice_id: str, user_email: str, client_ip: str, user_agent: str, token_hash: str) -> Dict[str, Any]:
+    """Process multi-layer rejection - Updates database through centralized service only"""
+    try:
+        # Get current approval layer for this user
+        current_layer_result = db_service.get_current_approval_layer(invoice_id)
+        
+        if not current_layer_result["success"]:
+            logger.error(f"❌ Failed to get current approval layer for invoice {invoice_id}: {current_layer_result['error']}")
+            raise Exception(f"Could not determine approval layer: {current_layer_result['error']}")
+        
+        current_layer = current_layer_result["data"]
+        layer_order = current_layer["layer_order"]
+        
+        # Validate that this user is the current approver
+        if current_layer["approver_email"] != user_email:
+            logger.error(f"❌ User {user_email} is not authorized to reject layer {layer_order} for invoice {invoice_id}")
+            raise Exception(f"User {user_email} is not the designated approver for this layer")
+        
+        logger.info(f"🔄 Processing rejection for layer {layer_order} by {user_email}")
+        
+        # Process the rejection through centralized database service
+        layer_result = db_service.process_approval_layer_decision(
+            invoice_id=invoice_id,
+            layer_order=layer_order,
+            decision="rejected",
+            decided_by=user_email,
+            decision_notes=f"Rejected via email link from IP {client_ip}"
+        )
+        
+        if not layer_result["success"]:
+            logger.error(f"❌ Failed to process rejection layer {layer_order} for invoice {invoice_id}: {layer_result['error']}")
+            raise Exception(f"Layer rejection failed: {layer_result['error']}")
+        
+        # Log rejection in audit trail
+        audit_result = await db_service.log_email_audit(
+            invoice_id=invoice_id,
+            event_type="approval_decision",
+            recipient_email=user_email,
+            success=True,
+            details={
+                "action": "rejected",
+                "approval_type": "multi_layer",
+                "layer_order": layer_order,
+                "layer_name": current_layer.get("layer_name"),
+                "approver_role": current_layer.get("approver_role"),
+                "ip_address": client_ip,
+                "user_agent": user_agent,
+                "token_hash": token_hash
+            }
+        )
+        
+        if not audit_result["success"]:
+            logger.warning(f"⚠️ Failed to log multi-layer rejection audit for invoice {invoice_id}: {audit_result['error']}")
+        
+        logger.info(f"❌ INVOICE REJECTED AT LAYER {layer_order}: {invoice_id} rejected by {user_email}")
+        
+        return {
+            "success": True,
+            "action": "rejected",
+            "approval_type": "multi_layer",
+            "invoice_id": invoice_id,
+            "rejected_by": user_email,
+            "layer_order": layer_order,
+            "layer_name": current_layer.get("layer_name"),
+            "timestamp": datetime.now().isoformat(),
+            "status": layer_result["invoice_status"],
+            "rejection_layer": layer_order
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to process multi-layer rejection for invoice {invoice_id}: {e}")
         raise e
 
 def get_success_page(action: str, invoice_id: str, user_email: str) -> str:

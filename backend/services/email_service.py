@@ -140,63 +140,263 @@ class EmailService:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rechnung zur Genehmigung</title>
+    <title>Rechnung zur Genehmigung - {{ invoice_number or 'N/A' }}</title>
     <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
-        .header { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
-        .content { background: white; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; }
-        .invoice-details { background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 15px 0; }
-        .action-buttons { margin: 30px 0; text-align: center; }
-        .approve-btn { display: inline-block; padding: 15px 30px; background: #28a745; color: white; text-decoration: none; border-radius: 5px; margin: 10px; font-weight: bold; }
-        .reject-btn { display: inline-block; padding: 15px 30px; background: #dc3545; color: white; text-decoration: none; border-radius: 5px; margin: 10px; font-weight: bold; }
-        .footer { margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px; font-size: 0.9em; color: #666; }
-        .security-notice { background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; border-radius: 5px; margin: 15px 0; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 900px; margin: 0 auto; padding: 20px; background-color: #f5f7fa; }
+        .container { background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; }
+        .header h1 { margin: 0; font-size: 28px; font-weight: 300; }
+        .header p { margin: 10px 0 0 0; opacity: 0.9; }
+        .content { padding: 30px; }
+        .invoice-summary { background: #f8f9fc; border-left: 4px solid #667eea; padding: 20px; margin: 20px 0; border-radius: 8px; }
+        .invoice-details { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 25px 0; }
+        .detail-section { background: #ffffff; border: 1px solid #e1e5e9; border-radius: 8px; padding: 20px; }
+        .detail-section h3 { color: #667eea; margin-top: 0; margin-bottom: 15px; font-size: 16px; font-weight: 600; border-bottom: 2px solid #f0f2f7; padding-bottom: 8px; }
+        .detail-row { display: flex; justify-content: space-between; margin-bottom: 12px; padding: 8px 0; border-bottom: 1px solid #f5f7fa; }
+        .detail-label { font-weight: 600; color: #4a5568; min-width: 140px; }
+        .detail-value { color: #2d3748; flex: 1; text-align: right; }
+        .amount-highlight { background: #e6fffa; border: 2px solid #38b2ac; border-radius: 8px; padding: 15px; text-align: center; margin: 20px 0; }
+        .amount-highlight .amount { font-size: 24px; font-weight: bold; color: #38b2ac; }
+        .changes-section { background: #fff5f5; border: 1px solid #fed7d7; border-radius: 8px; padding: 20px; margin: 20px 0; }
+        .change-item { background: white; padding: 12px; margin: 8px 0; border-left: 4px solid #4299e1; border-radius: 4px; }
+        .pdf-link { background: #e6f7ff; border: 1px solid #91d5ff; border-radius: 8px; padding: 15px; margin: 20px 0; text-align: center; }
+        .pdf-link a { color: #1890ff; text-decoration: none; font-weight: 600; }
+        .action-buttons { background: #f7fafc; border-radius: 12px; padding: 30px; text-align: center; margin: 30px 0; }
+        .action-buttons h3 { color: #2d3748; margin-bottom: 20px; }
+        .approve-btn { display: inline-block; padding: 16px 32px; background: linear-gradient(135deg, #48bb78 0%, #38a169 100%); color: white; text-decoration: none; border-radius: 8px; margin: 10px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(72, 187, 120, 0.3); transition: all 0.3s ease; }
+        .approve-btn:hover { box-shadow: 0 6px 8px rgba(72, 187, 120, 0.4); transform: translateY(-2px); }
+        .reject-btn { display: inline-block; padding: 16px 32px; background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%); color: white; text-decoration: none; border-radius: 8px; margin: 10px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(245, 101, 101, 0.3); transition: all 0.3s ease; }
+        .reject-btn:hover { box-shadow: 0 6px 8px rgba(245, 101, 101, 0.4); transform: translateY(-2px); }
+        .view-btn { display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%); color: white; text-decoration: none; border-radius: 6px; margin: 10px; font-weight: 500; font-size: 14px; }
+        .footer { background: #f7fafc; padding: 25px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #718096; }
+        .security-notice { background: #fffbeb; border: 1px solid #f6e05e; border-radius: 8px; padding: 15px; margin: 20px 0; }
+        .security-notice strong { color: #744210; }
+        .status-badge { display: inline-block; padding: 4px 12px; background: #48bb78; color: white; border-radius: 20px; font-size: 12px; font-weight: 600; }
+        .priority-high { border-left-color: #f56565; }
+        .priority-medium { border-left-color: #ed8936; }
+        .priority-low { border-left-color: #48bb78; }
+        @media (max-width: 768px) {
+            .invoice-details { grid-template-columns: 1fr; }
+            .detail-row { flex-direction: column; }
+            .detail-value { text-align: left; margin-top: 5px; }
+            .action-buttons { padding: 20px; }
+            .approve-btn, .reject-btn { display: block; margin: 10px 0; }
+        }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>📋 Rechnung zur Genehmigung</h1>
-        <p><strong>Eingereicht am:</strong> {{ submission_date }}</p>
-        <p><strong>Bearbeitet von:</strong> {{ editor_name }} ({{ editor_email }})</p>
-    </div>
-    
-    <div class="content">
-        <h2>Rechnung Details</h2>
-        <div class="invoice-details">
-            <p><strong>Rechnungsnummer:</strong> {{ invoice_number or 'Nicht verfügbar' }}</p>
-            <p><strong>Lieferant:</strong> {{ supplier_name or 'Nicht verfügbar' }}</p>
-            <p><strong>Rechnungsdatum:</strong> {{ invoice_date or 'Nicht verfügbar' }}</p>
-            <p><strong>Betrag:</strong> {{ total_amount or 'Nicht verfügbar' }}{% if currency %} {{ currency }}{% endif %}</p>
+    <div class="container">
+        <div class="header">
+            <h1>📋 Rechnung zur Genehmigung</h1>
+            <p><strong>Eingereicht am:</strong> {{ submission_date }}</p>
+            <p><strong>Bearbeitet von:</strong> {{ editor_name }} ({{ editor_email }})</p>
         </div>
         
-        {% if changes_summary and changes_summary|length > 0 %}
-        <h3>Durchgeführte Bearbeitungen</h3>
-        <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
-            {% for change in changes_summary %}
-            <p><strong>{{ change.field }}:</strong> 
-               {% if change.old_value %}Von "{{ change.old_value }}" zu "{{ change.new_value }}"{% else %}Neu: "{{ change.new_value }}"{% endif %}</p>
-            {% endfor %}
+        <div class="content">
+            <!-- Invoice Summary -->
+            <div class="invoice-summary">
+                <h2 style="margin: 0 0 15px 0; color: #2d3748;">📄 {{ invoice_number or 'Rechnung ohne Nummer' }}</h2>
+                <p style="margin: 0; font-size: 16px;"><strong>Lieferant:</strong> {{ supplier_name or 'Nicht verfügbar' }}</p>
+                <p style="margin: 5px 0 0 0; color: #718096;">Status: <span class="status-badge">Zur Genehmigung</span></p>
+            </div>
+
+            <!-- Amount Highlight -->
+            {% if total_amount %}
+            <div class="amount-highlight">
+                <div style="color: #4a5568; margin-bottom: 5px;">Rechnungsbetrag</div>
+                <div class="amount">{{ total_amount }}{% if currency %} {{ currency }}{% else %} EUR{% endif %}</div>
+                {% if skonto_prozent and skonto_datum %}
+                <div style="color: #718096; font-size: 14px; margin-top: 8px;">
+                    Skonto: {{ skonto_prozent }}% bis {{ skonto_datum }}
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Detailed Invoice Information -->
+            <div class="invoice-details">
+                <!-- Basic Information -->
+                <div class="detail-section">
+                    <h3>📋 Grunddaten</h3>
+                    <div class="detail-row">
+                        <span class="detail-label">Rechnungsnummer:</span>
+                        <span class="detail-value">{{ invoice_number or 'Nicht verfügbar' }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Rechnungsempfänger:</span>
+                        <span class="detail-value">{{ rechnungsempfaenger or 'Nicht verfügbar' }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Rechnungssteller:</span>
+                        <span class="detail-value">{{ rechnungssteller or supplier_name or 'Nicht verfügbar' }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Rechnungsdatum:</span>
+                        <span class="detail-value">{{ invoice_date or 'Nicht verfügbar' }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Rechnungseingang:</span>
+                        <span class="detail-value">{{ rechnungseingang or 'Nicht verfügbar' }}</span>
+                    </div>
+                </div>
+
+                <!-- Project & Trade Information -->
+                <div class="detail-section">
+                    <h3>🏗️ Projekt & Gewerk</h3>
+                    <div class="detail-row">
+                        <span class="detail-label">Projekt:</span>
+                        <span class="detail-value">{{ projekt or 'Nicht zugeordnet' }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Gewerk:</span>
+                        <span class="detail-value">{{ gewerk or 'Nicht zugeordnet' }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Kostenstelle:</span>
+                        <span class="detail-value">{{ kostenstelle or 'Nicht zugeordnet' }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Weiter berechnen an:</span>
+                        <span class="detail-value">{{ weiter_berechnen_an or 'Nicht festgelegt' }}</span>
+                    </div>
+                </div>
+
+                <!-- Financial Information -->
+                <div class="detail-section">
+                    <h3>💰 Finanzdaten</h3>
+                    <div class="detail-row">
+                        <span class="detail-label">Rechnungsbetrag:</span>
+                        <span class="detail-value"><strong>{{ total_amount or rechnungsbetrag or 'Nicht verfügbar' }}{% if currency %} {{ currency }}{% else %} EUR{% endif %}</strong></span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Fälligkeit:</span>
+                        <span class="detail-value">{{ faelligkeit or 'Nicht festgelegt' }}</span>
+                    </div>
+                    {% if skonto_datum %}
+                    <div class="detail-row">
+                        <span class="detail-label">Skonto Datum:</span>
+                        <span class="detail-value">{{ skonto_datum }}</span>
+                    </div>
+                    {% endif %}
+                    {% if skonto_prozent %}
+                    <div class="detail-row">
+                        <span class="detail-label">Skonto Prozent:</span>
+                        <span class="detail-value">{{ skonto_prozent }}%</span>
+                    </div>
+                    {% endif %}
+                    {% if kfw_anrechenbare_kosten %}
+                    <div class="detail-row">
+                        <span class="detail-label">KfW anrechenbare Kosten:</span>
+                        <span class="detail-value">{{ kfw_anrechenbare_kosten }}{% if currency %} {{ currency }}{% else %} EUR{% endif %}</span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Additional Information -->
+                <div class="detail-section">
+                    <h3>📝 Zusatzinformationen</h3>
+                    {% if liefertermin %}
+                    <div class="detail-row">
+                        <span class="detail-label">Liefertermin:</span>
+                        <span class="detail-value">{{ liefertermin }}</span>
+                    </div>
+                    {% endif %}
+                    {% if aufmass_datum %}
+                    <div class="detail-row">
+                        <span class="detail-label">Aufmaß Datum:</span>
+                        <span class="detail-value">{{ aufmass_datum }}</span>
+                    </div>
+                    {% endif %}
+                    {% if bestellnummer %}
+                    <div class="detail-row">
+                        <span class="detail-label">Bestellnummer:</span>
+                        <span class="detail-value">{{ bestellnummer }}</span>
+                    </div>
+                    {% endif %}
+                    {% if material_kosten %}
+                    <div class="detail-row">
+                        <span class="detail-label">Materialkosten:</span>
+                        <span class="detail-value">{{ material_kosten }}{% if currency %} {{ currency }}{% else %} EUR{% endif %}</span>
+                    </div>
+                    {% endif %}
+                    {% if lohn_kosten %}
+                    <div class="detail-row">
+                        <span class="detail-label">Lohnkosten:</span>
+                        <span class="detail-value">{{ lohn_kosten }}{% if currency %} {{ currency }}{% else %} EUR{% endif %}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- PDF Link -->
+            {% if pdf_url %}
+            <div class="pdf-link">
+                <strong>📄 Original Rechnung anzeigen:</strong><br>
+                <a href="{{ pdf_url }}" target="_blank" class="view-btn">PDF öffnen</a>
+                <p style="font-size: 12px; color: #718096; margin: 10px 0 0 0;">
+                    Klicken Sie hier, um die Original-Rechnung als PDF zu öffnen
+                </p>
+            </div>
+            {% endif %}
+
+            <!-- Changes Summary -->
+            {% if changes_summary and changes_summary|length > 0 %}
+            <div class="changes-section">
+                <h3 style="color: #e53e3e; margin-top: 0;">🔄 Durchgeführte Bearbeitungen</h3>
+                <p style="color: #4a5568; margin-bottom: 15px;">
+                    Folgende Änderungen wurden an der Rechnung vorgenommen:
+                </p>
+                {% for change in changes_summary %}
+                <div class="change-item">
+                    <strong>{{ change.field }}:</strong>
+                    {% if change.old_value %}
+                        Von "<span style="color: #e53e3e;">{{ change.old_value }}</span>" zu "<span style="color: #48bb78;">{{ change.new_value }}</span>"
+                    {% else %}
+                        Neu hinzugefügt: "<span style="color: #48bb78;">{{ change.new_value }}</span>"
+                    {% endif %}
+                    {% if change.timestamp %}
+                    <br><small style="color: #718096;">Geändert am: {{ change.timestamp }}</small>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <h3>🎯 Genehmigung erforderlich</h3>
+                <p style="color: #4a5568; margin-bottom: 25px;">
+                    Bitte prüfen Sie die Rechnung sorgfältig und treffen Sie eine Entscheidung:
+                </p>
+                <a href="{{ approve_url }}" class="approve-btn">
+                    ✅ RECHNUNG GENEHMIGEN
+                </a>
+                <a href="{{ reject_url }}" class="reject-btn">
+                    ❌ RECHNUNG ABLEHNEN
+                </a>
+                <br><br>
+                <p style="font-size: 14px; color: #718096;">
+                    Nach Ihrer Entscheidung wird das System automatisch die nächsten Schritte einleiten.
+                </p>
+            </div>
+
+            <!-- Security Notice -->
+            <div class="security-notice">
+                <strong>🔒 Sicherheitshinweis:</strong> Diese Genehmigungslinks sind verschlüsselt und verfallen automatisch in 7 Tagen. 
+                Klicken Sie nur auf Links in E-Mails, die Sie erwartet haben. Bei Verdacht auf Manipulation kontaktieren Sie sofort den System-Administrator.
+            </div>
         </div>
-        {% endif %}
         
-        <div class="action-buttons">
-            <h3>Genehmigung erforderlich</h3>
-            <p>Bitte prüfen Sie die Rechnung und wählen Sie eine Option:</p>
-            <a href="{{ approve_url }}" class="approve-btn">✅ GENEHMIGEN</a>
-            <a href="{{ reject_url }}" class="reject-btn">❌ ABLEHNEN</a>
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>🤖 Automatisch generiert vom Rechnungsverarbeitungssystem</strong></p>
+            <p><strong>Zeitstempel:</strong> {{ timestamp }}</p>
+            <p><strong>Token gültig bis:</strong> {{ token_expires }}</p>
+            <p><strong>E-Mail ID:</strong> {{ email_id or 'N/A' }}</p>
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 15px 0;">
+            <p>Diese E-Mail wurde automatisch versendet. Bei Fragen oder Problemen wenden Sie sich an den System-Administrator.</p>
+            <p><strong>Technischer Support:</strong> Für Unterstützung bei der Rechnungsverarbeitung kontaktieren Sie das IT-Team.</p>
         </div>
-        
-        <div class="security-notice">
-            <strong>🔒 Sicherheitshinweis:</strong> Diese Links sind verschlüsselt und verfallen in 7 Tagen. 
-            Klicken Sie nur auf Links in E-Mails, die Sie erwartet haben.
-        </div>
-    </div>
-    
-    <div class="footer">
-        <p><strong>Automatisch generiert vom Rechnungssystem</strong></p>
-        <p>Zeitstempel: {{ timestamp }}</p>
-        <p>Token gültig bis: {{ token_expires }}</p>
-        <p>Diese E-Mail wurde automatisch versendet. Bei Fragen wenden Sie sich an den System-Administrator.</p>
     </div>
 </body>
 </html>
@@ -367,21 +567,57 @@ class EmailService:
             approve_url = f"{self.base_url}/api/approval/{approve_token}"
             reject_url = f"{self.base_url}/api/approval/{reject_token}"
             
-            # Prepare template context
+            # Generate PDF URL if file path exists
+            pdf_url = None
+            if invoice_data.get("file_path"):
+                pdf_url = f"https://bdtcfypvadryfeabqnlc.supabase.co/storage/v1/object/public/invoices/{invoice_data['file_path']}"
+            
+            # Prepare comprehensive template context with ALL invoice fields
             context = {
+                # Email metadata
                 "submission_date": datetime.now().strftime("%d.%m.%Y um %H:%M"),
                 "editor_name": editor_name,
                 "editor_email": editor_email,
                 "timestamp": datetime.now().isoformat(),
+                "email_id": f"INV-{invoice_data.get('id', 'N/A')}-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+                "changes_summary": changes_summary or [],
+                "approve_url": approve_url,
+                "reject_url": reject_url,
+                "token_expires": (datetime.now() + timedelta(days=7)).strftime("%d.%m.%Y um %H:%M"),
+                "pdf_url": pdf_url,
+                
+                # Basic invoice information
                 "invoice_number": invoice_data.get("rechnungsnummer"),
                 "supplier_name": invoice_data.get("lieferant"),
                 "invoice_date": invoice_data.get("rechnungsdatum"),
                 "total_amount": invoice_data.get("rechnungsbetrag"),
                 "currency": invoice_data.get("currency", "EUR"),
-                "changes_summary": changes_summary or [],
-                "approve_url": approve_url,
-                "reject_url": reject_url,
-                "token_expires": (datetime.now() + timedelta(days=7)).strftime("%d.%m.%Y")
+                
+                # German business fields - comprehensive invoice data
+                "rechnungsempfaenger": invoice_data.get("rechnungsempfaenger"),
+                "rechnungssteller": invoice_data.get("rechnungssteller"),
+                "projekt": invoice_data.get("projekt"),
+                "gewerk": invoice_data.get("gewerk"),
+                "kostenstelle": invoice_data.get("kostenstelle"),
+                "rechnungseingang": invoice_data.get("rechnungseingang"),
+                "faelligkeit": invoice_data.get("faelligkeit"),
+                "skonto_datum": invoice_data.get("skonto_datum"),
+                "skonto_prozent": invoice_data.get("skonto_prozent"),
+                "kfw_anrechenbare_kosten": invoice_data.get("kfw_anrechenbare_kosten"),
+                "weiter_berechnen_an": invoice_data.get("weiter_berechnen_an"),
+                
+                # Additional financial information
+                "material_kosten": invoice_data.get("material_kosten"),
+                "lohn_kosten": invoice_data.get("lohn_kosten"),
+                "bestellnummer": invoice_data.get("bestellnummer"),
+                "liefertermin": invoice_data.get("liefertermin"),
+                "aufmass_datum": invoice_data.get("aufmass_datum"),
+                
+                # Status and workflow information
+                "status": invoice_data.get("status", "zur_genehmigung"),
+                "review_status": invoice_data.get("review_status", "pending"),
+                "created_at": invoice_data.get("created_at"),
+                "updated_at": invoice_data.get("updated_at")
             }
             
             # Render template
@@ -687,19 +923,21 @@ class EmailService:
             # Hash token for database storage
             token_hash = hashlib.sha256(jwt_token.encode()).hexdigest()
             
-            # Store in database
+            # Store in database using database service method
             expires_at = datetime.now() + timedelta(days=7)
             
-            query = """
-            INSERT INTO approval_tokens 
-            (token_hash, invoice_id, action, user_email, expires_at, nonce)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            """
-            
-            await db_service.execute_query(
-                query,
-                (token_hash, str(invoice_id), action, user_email, expires_at, token_data["nonce"])
+            # Use database service to create approval token
+            token_result = db_service.create_approval_token(
+                token_hash=token_hash,
+                invoice_id=str(invoice_id),
+                action=action,
+                user_email=user_email,
+                expires_at=expires_at,
+                nonce=token_data["nonce"]
             )
+            
+            if not token_result.get("success"):
+                raise Exception(f"Failed to store approval token: {token_result.get('error')}")
             
             return jwt_token
             
@@ -708,18 +946,10 @@ class EmailService:
             raise e
     
     async def _update_invoice_after_email_send(self, invoice_id: UUID, email_type: str, result: Dict[str, Any]):
-        """Update invoice status after successful email send"""
+        """Update invoice email-related fields after successful email send (NO status changes)"""
         try:
             if email_type == "editor_notification":
-                query = """
-                UPDATE invoices_clean 
-                SET 
-                    status = 'edit_completed',
-                    edit_bericht_sent_at = NOW(),
-                    email_logs = COALESCE(email_logs, '[]'::jsonb) || %s::jsonb
-                WHERE id = %s
-                """
-                
+                # Use database service to update ONLY email-related fields, not status
                 email_log_entry = json.dumps([{
                     "type": "editor_notification",
                     "sent_at": datetime.now().isoformat(),
@@ -727,25 +957,24 @@ class EmailService:
                     "message_id": result.get("message_id")
                 }])
                 
-                await db_service.execute_query(query, (email_log_entry, str(invoice_id)))
+                # Call database service method for email logging (no status change)
+                update_result = db_service.log_email_send(
+                    invoice_id=str(invoice_id),
+                    email_type=email_type,
+                    log_entry=email_log_entry
+                )
+                
+                if not update_result.get("success"):
+                    logger.warning(f"Failed to log email send: {update_result.get('error')}")
                 
         except Exception as e:
             logger.error(f"Failed to update invoice after email send: {str(e)}")
             raise e
     
     async def _update_invoice_after_bauleiter_email(self, invoice_id: UUID, bauleiter_email: str, result: Dict[str, Any]):
-        """Update invoice status after Bau-Leiter email send"""
+        """Update invoice email-related fields after Bau-Leiter email send (NO status changes)"""
         try:
-            query = """
-            UPDATE invoices_clean 
-            SET 
-                status = 'in_review_by_bauleiter',
-                bauleiter_email = %s,
-                bauleiter_review_sent_at = NOW(),
-                email_logs = COALESCE(email_logs, '[]'::jsonb) || %s::jsonb
-            WHERE id = %s
-            """
-            
+            # Use database service to update ONLY email-related fields, not status
             email_log_entry = json.dumps([{
                 "type": "bauleiter_approval",
                 "sent_at": datetime.now().isoformat(),
@@ -753,7 +982,15 @@ class EmailService:
                 "message_id": result.get("message_id")
             }])
             
-            await db_service.execute_query(query, (bauleiter_email, email_log_entry, str(invoice_id)))
+            # Call database service method to update email fields only
+            update_result = db_service.update_bauleiter_email_sent(
+                invoice_id=str(invoice_id),
+                bauleiter_email=bauleiter_email,
+                log_entry=email_log_entry
+            )
+            
+            if not update_result.get("success"):
+                logger.warning(f"Failed to log Bauleiter email send: {update_result.get('error')}")
             
         except Exception as e:
             logger.error(f"Failed to update invoice after Bau-Leiter email: {str(e)}")
@@ -773,27 +1010,21 @@ class EmailService:
     ):
         """Log email send attempt to audit table"""
         try:
-            query = """
-            INSERT INTO email_audit_log 
-            (invoice_id, email_type, recipient_email, subject, send_success, 
-             provider_message_id, provider_response, template_used, email_size_bytes)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """
-            
-            await db_service.execute_query(
-                query,
-                (
-                    str(invoice_id) if invoice_id else None,
-                    email_type,
-                    recipient_email,
-                    subject,
-                    send_success,
-                    provider_message_id,
-                    json.dumps(provider_response) if provider_response else None,
-                    template_used,
-                    email_size_bytes
-                )
+            # Use database service to create email audit log
+            audit_result = db_service.create_email_audit_log(
+                invoice_id=str(invoice_id) if invoice_id else None,
+                email_type=email_type,
+                recipient_email=recipient_email,
+                subject=subject,
+                send_success=send_success,
+                provider_message_id=provider_message_id,
+                provider_response=provider_response,
+                template_used=template_used,
+                email_size_bytes=email_size_bytes
             )
+            
+            if not audit_result.get("success"):
+                logger.warning(f"Failed to log email audit: {audit_result.get('error')}")
             
         except Exception as e:
             logger.error(f"Failed to log email send: {str(e)}")

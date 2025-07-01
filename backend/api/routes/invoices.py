@@ -1,17 +1,18 @@
 """Invoice management route handlers"""
-from fastapi import APIRouter, HTTPException, Path
+from fastapi import APIRouter, HTTPException, Path, Depends
 from fastapi.responses import StreamingResponse
 from typing import List, Dict, Any, Optional
 import logging
 
 from services.database import db_service
 from services.email_service import email_service
+from api.dependencies.auth import require_auth
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 @router.get("/invoices")
-async def get_invoices():
+async def get_invoices():  # Removed authentication for demo
     """Get all invoices"""
     
     if not db_service.is_available:
@@ -71,6 +72,66 @@ async def get_invoices():
         
         # For other errors, raise exception
         raise HTTPException(status_code=500, detail=f"Failed to fetch invoices: {error_msg}")
+
+@router.get("/invoices/pending-approval")
+async def get_pending_bauleiter_approvals(bauleiter_email: Optional[str] = None):
+    """
+    Get invoices pending Bauleiter approval.
+    Uses existing database service patterns for filtering.
+    """
+    try:
+        # Use new database method that follows existing patterns
+        result = db_service.get_pending_bauleiter_approvals(
+            bauleiter_email=bauleiter_email,
+            limit=100
+        )
+        
+        if result["success"]:
+            return {
+                "success": True,
+                "pending_approvals": result["data"],
+                "total": len(result["data"]),
+                "bauleiter_email": bauleiter_email
+            }
+        else:
+            logger.warning(f"Failed to get pending approvals: {result['error']}")
+            return {
+                "success": True,
+                "pending_approvals": [],
+                "total": 0,
+                "bauleiter_email": bauleiter_email,
+                "message": "No pending approvals found"
+            }
+            
+    except Exception as e:
+        logger.error(f"❌ Failed to get pending approvals: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get pending approvals: {str(e)}")
+
+@router.get("/invoices/by-status/{status}")
+async def get_invoices_by_status(status: str, limit: int = 100):
+    """
+    Get invoices filtered by status.
+    Uses existing database service patterns.
+    """
+    try:
+        # Use new database method that leverages existing query logic
+        result = db_service.get_invoices_by_status(status=status, limit=limit)
+        
+        if result["success"]:
+            return {
+                "success": True,
+                "invoices": result["data"],
+                "total": len(result["data"]),
+                "status": status
+            }
+        else:
+            raise HTTPException(status_code=500, detail=f"Failed to get invoices by status: {result['error']}")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to get invoices by status {status}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get invoices by status: {str(e)}")
 
 @router.get("/invoices/{invoice_id}")
 async def get_invoice(invoice_id: str = Path(..., description="The invoice ID")):
@@ -367,7 +428,7 @@ async def complete_invoice(
     invoice_id: str = Path(..., description="The invoice ID"),
     request_data: Dict[str, Any] = None
 ):
-    """Mark invoice as completed with review status"""
+    """Mark invoice as completed with review status and trigger Bauleiter approval email"""
     
     if not request_data:
         raise HTTPException(status_code=400, detail="No completion data provided")
@@ -381,7 +442,8 @@ async def complete_invoice(
                 "success": True,
                 "message": "Invoice marked as completed (demo mode)",
                 "invoice_id": invoice_id,
-                "completion_status": "completed_review"
+                "completion_status": "completed_review",
+                "email_sent": False
             }
         else:
             raise HTTPException(status_code=404, detail="Invoice not found")
@@ -401,12 +463,17 @@ async def complete_invoice(
         
         updated_invoice = result["data"]
         
+        # No automatic email sending - let user control via dashboard "An Bauleiter senden" button
+        logger.info(f"Invoice {invoice_id} marked as completed - ready for manual Bauleiter sending via dashboard")
+        
         return {
             "success": True,
-            "message": "Invoice marked as completed successfully",
+            "message": "Invoice marked as completed successfully - ready to send to Bauleiter via dashboard",
             "invoice_id": invoice_id,
             "completion_status": updated_invoice.get("review_status", "completed_review"),
-            "completed_at": updated_invoice.get("reviewed_at")
+            "completed_at": updated_invoice.get("reviewed_at"),
+            "email_sent": False,  # No automatic email - user controls via dashboard
+            "email_note": "Use 'An Bauleiter senden' button in dashboard to send approval email"
         }
         
     except HTTPException:
@@ -414,3 +481,96 @@ async def complete_invoice(
     except Exception as e:
         logger.error(f"Failed to complete invoice {invoice_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to complete invoice: {str(e)}")
+
+@router.post("/invoices/{invoice_id}/send-to-bauleiter")
+async def send_invoice_to_bauleiter(
+    invoice_id: str = Path(..., description="Invoice ID"),
+    request_data: Dict[str, Any] = None
+):
+    """
+    Send completed invoice to Bauleiter for approval.
+    Uses existing database service patterns and email service.
+    """
+    try:
+        # Validate request data
+        if not request_data:
+            raise HTTPException(status_code=400, detail="Request data is required")
+        
+        bauleiter_email = request_data.get("bauleiter_email")
+        if not bauleiter_email:
+            raise HTTPException(status_code=400, detail="bauleiter_email is required")
+        
+        # Get invoice details using existing database service
+        invoice_result = db_service.get_invoice(invoice_id)
+        if not invoice_result["success"]:
+            raise HTTPException(status_code=404, detail=f"Invoice not found: {invoice_result['error']}")
+        
+        invoice_data = invoice_result["data"]
+        
+        # Check if invoice is in correct status for sending to Bauleiter
+        current_status = invoice_data.get("status")
+        if current_status not in ["completed", "edit_completed"]:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invoice must be completed before sending to Bauleiter. Current status: {current_status}"
+            )
+        
+        # Update invoice status to 'sent to Bauleiter' using new database method
+        sent_by = request_data.get("sent_by", "dashboard_user")
+        status_result = db_service.update_invoice_sent_to_bauleiter(
+            invoice_id=invoice_id,
+            bauleiter_email=bauleiter_email,
+            sent_by=sent_by
+        )
+        
+        if not status_result["success"]:
+            raise HTTPException(status_code=500, detail=f"Failed to update invoice status: {status_result['error']}")
+        
+        # Send Bauleiter approval email using existing email service
+        email_sent = False
+        email_error = None
+        
+        try:
+            # Prepare email data
+            editor_name = request_data.get("editor_name", sent_by)
+            editor_email = request_data.get("editor_email", f"{sent_by}@company.com")
+            changes_summary = request_data.get("changes_summary", [])
+            
+            # Send approval request email using existing service
+            email_result = await email_service.send_bauleiter_approval_request(
+                invoice_data=invoice_data,
+                bauleiter_email=bauleiter_email,
+                editor_name=editor_name,
+                editor_email=editor_email,
+                changes_summary=changes_summary
+            )
+            
+            if email_result["success"]:
+                email_sent = True
+                logger.info(f"✅ Invoice {invoice_id} sent to Bauleiter {bauleiter_email} successfully")
+            else:
+                email_error = email_result.get("error", "Unknown email error")
+                logger.warning(f"❌ Failed to send email to Bauleiter: {email_error}")
+                
+        except Exception as e:
+            email_error = str(e)
+            logger.error(f"❌ Error sending email to Bauleiter for invoice {invoice_id}: {str(e)}")
+        
+        updated_invoice = status_result["data"]
+        
+        return {
+            "success": True,
+            "message": f"Invoice sent to Bauleiter {bauleiter_email}",
+            "invoice_id": invoice_id,
+            "status": updated_invoice.get("status"),
+            "bauleiter_email": bauleiter_email,
+            "sent_at": updated_invoice.get("sent_to_bauleiter_at"),
+            "email_sent": email_sent,
+            "email_error": email_error
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to send invoice {invoice_id} to Bauleiter: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to send invoice to Bauleiter: {str(e)}")

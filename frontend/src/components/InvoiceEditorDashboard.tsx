@@ -148,10 +148,10 @@ export default function InvoiceEditorDashboard({
       // First save the current changes
       await handleSave(fields);
       
-      // Then mark as completed
+      // Mark as completed - no automatic email sending
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       
-      // Prepare completion data with review status
+      // Prepare completion data (no Bauleiter email needed here)
       const completionData = {
         fields: {
           ...fields,
@@ -159,9 +159,19 @@ export default function InvoiceEditorDashboard({
         },
         completion_info: {
           completed_by: fields.rechnungspruefung_email || "editor@company.de",
+          editor_email: fields.rechnungspruefung_email || "editor@company.de",
+          editor_name: fields.rechnungspruefung_email?.split('@')[0] || "Editor",
           completed_at: new Date().toISOString(),
           review_status: "completed_review",
-          completion_notes: "Rechnung wurde vollständig bearbeitet und abgeschlossen"
+          completion_notes: "Rechnung wurde vollständig bearbeitet - bereit für Bauleiter-Genehmigung über Dashboard",
+          changes_summary: [
+            {
+              field: "Status",
+              old_value: "Bearbeitung",
+              new_value: "Bearbeitung abgeschlossen - bereit für Bauleiter",
+              timestamp: new Date().toLocaleString('de-DE')
+            }
+          ]
         }
       };
 
@@ -179,7 +189,8 @@ export default function InvoiceEditorDashboard({
 
       const result = await response.json();
       
-      alert('✅ Rechnung erfolgreich abgeschlossen! Status wurde auf "Bearbeitung abgeschlossen" gesetzt.');
+      // Show success message - no automatic email sent
+      alert(`✅ Rechnung erfolgreich abgeschlossen!\n\n📋 Status: "Bearbeitung abgeschlossen - bereit für Bauleiter"\n\n💡 Nächster Schritt: Verwenden Sie die "An Bauleiter senden" Schaltfläche im Dashboard, um die Genehmigung zu beantragen.`);
       
       // Redirect to dashboard after completion
       window.location.href = '/dashboard';

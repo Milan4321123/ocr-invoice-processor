@@ -1,5 +1,5 @@
 """File upload route handlers"""
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from fastapi.responses import Response
 import re
 import uuid
@@ -11,6 +11,7 @@ from typing import Dict, Any
 # Import upload service instead of direct database calls
 from services.upload_service import upload_service, UploadSource, FileData
 from services.database import db_service
+from api.dependencies.auth import require_auth
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -81,7 +82,9 @@ startxref
     )
 
 @router.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(
+    file: UploadFile = File(...)
+):  # Removed authentication for demo
     """Upload a PDF invoice file using the centralized upload service"""
     # Validate file type
     if file.content_type != "application/pdf":

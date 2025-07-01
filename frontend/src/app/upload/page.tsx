@@ -54,19 +54,19 @@ export default function UploadPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8 pt-20"> {/* Added pt-20 for fixed navigation */}
       <Toaster {...toastConfig} />
       
       <div className="max-w-2xl mx-auto">
         <div className="mb-8">
           <Link 
-            href="/" 
+            href="/dashboard" 
             className="text-blue-600 hover:text-blue-800 flex items-center gap-2 mb-4"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Zurück zur Startseite
+            Zurück zum Dashboard
           </Link>
           
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Rechnung hochladen</h1>
