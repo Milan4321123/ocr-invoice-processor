@@ -45,21 +45,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Load token from localStorage on mount
   useEffect(() => {
-    const savedToken = localStorage.getItem('authToken');
-    const savedUser = localStorage.getItem('authUser');
-    
-    if (savedToken && savedUser) {
+    const checkAuth = () => {
       try {
-        setToken(savedToken);
-        setUser(JSON.parse(savedUser));
+        const savedToken = localStorage.getItem('authToken');
+        const savedUser = localStorage.getItem('authUser');
+        
+        if (savedToken && savedUser) {
+          setToken(savedToken);
+          setUser(JSON.parse(savedUser));
+        }
       } catch (error) {
         console.error('Error loading saved auth data:', error);
         localStorage.removeItem('authToken');
         localStorage.removeItem('authUser');
+      } finally {
+        setIsLoading(false);
       }
-    }
-    
-    setIsLoading(false);
+    };
+
+    // Run immediately
+    checkAuth();
   }, []);
 
   // Handle redirects based on authentication state
@@ -68,11 +73,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const isLoginPage = pathname === '/login';
       
       if (!isAuthenticated && !isLoginPage) {
-        router.push('/login');
+        console.log('🔒 User not authenticated, redirecting to login');
+        router.replace('/login');
       } else if (isAuthenticated && isLoginPage) {
-        router.push('/'); // Redirect to home page after login
+        console.log('✅ User authenticated, redirecting to home');
+        router.replace('/dashboard');
       }
-      // Removed automatic redirect from home page - let users access home page
     }
   }, [isAuthenticated, isLoading, pathname, router]);
 
@@ -121,17 +127,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const logout = () => {
+    console.log('🚪 Logging out user');
+    const currentToken = token;
+    
+    // Immediately clear auth state
     setUser(null);
     setToken(null);
     localStorage.removeItem('authToken');
     localStorage.removeItem('authUser');
     
-    // Optional: Call logout endpoint
-    if (token) {
+    // Optional: Call logout endpoint (don't wait for it)
+    if (currentToken) {
       fetch('/api/auth/logout', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${currentToken}`,
         },
       }).catch(console.error);
     }

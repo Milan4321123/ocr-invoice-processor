@@ -29,9 +29,10 @@ const Navigation = () => {
   const { logout, user } = useAuth();
 
   const handleSignOut = () => {
+    console.log('🚪 Sign out button clicked');
     logout();
     setIsProfileDropdownOpen(false);
-    router.push('/login');
+    router.replace('/login');
   };
 
   const navItems = [
