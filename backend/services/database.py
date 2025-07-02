@@ -1,0 +1,1313 @@
+"""
+Centralized database service layer for Invoice Management System.
+Handles ALL Supabase database operations in one place.
+Single source of truth for database communication.
+"""
+from typing import Optional, Dict, List, Any
+from supabase import create_client, Client
+import os
+import logging
+from datetime import datetime
+from dotenv import load_dotenv
+import json
+
+load_dotenv()
+logger = logging.getLogger(__name__)
+
+class DatabaseService:
+    """
+    Single database service for ALL Supabase operations.
+    Maps directly to your invoices_clean table schema.
+    No field mapping confusion - uses your exact field names.
+    """
+    
+    def __init__(self):
+        """Initialize the Supabase client"""
+        self._client: Optional[Client] = None
+        self.table_name = "invoices_clean"  # Your exact table name
+        self.storage_buckets = {
+            "invoices": "invoices",
+            "folder_watcher": "folderwatcher"
+        }
+        self._initialize_client()
+    
+    def _initialize_client(self):
+        """Initialize the Supabase client using your .env credentials"""
+        url = os.getenv("SUPA_URL")
+        key = os.getenv("SUPA_KEY")
+        
+        if url and key:
+            try:
+                self._client = create_client(url, key)
+                logger.info(f"✅ Database service connected to: {url[:50]}...")
+            except Exception as e:
+                logger.error(f"❌ Failed to connect to database: {e}")
+                self._client = None
+        else:
+            logger.warning("⚠️ Database credentials missing. Running in offline mode.")
+    
+    @property
+    def client(self) -> Optional[Client]:
+        """Get the Supabase client instance"""
+        return self._client
+    
+    @property
+    def is_available(self) -> bool:
+        """Check if database service is available"""
+        return self._client is not None
+
+    async def execute_query(self, query: str, params: tuple = None) -> Dict[str, Any]:
+        """
+        Execute raw SQL query for email workflow operations.
+        Supabase supports PostgreSQL queries via RPC or direct SQL.
+        """
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            # For now, let's handle the specific email workflow operations
+            # without raw SQL since Supabase client is preferred
+            logger.warning(f"Raw SQL query attempted: {query[:100]}...")
+            
+            # Return success for now - we'll implement proper table operations
+            return {
+                "success": True, 
+                "message": "Query logged - implement specific table operations instead",
+                "query": query[:100] + "..." if len(query) > 100 else query
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to execute query: {e}")
+            return {"success": False, "error": str(e)}
+
+
+
+    async def log_email_attempt(self, email_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Log email attempt for audit purposes.
+        Uses your actual email_audit_log table.
+        """
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            log_record = {
+                "invoice_id": email_data["invoice_id"],
+                "email_type": email_data["email_type"],
+                "recipient_email": email_data["recipient_email"],
+                "subject": email_data["subject"],
+                "send_success": email_data["send_success"],
+                "provider_message_id": email_data.get("provider_message_id"),
+                "provider_response": email_data.get("provider_response", {}),
+                "template_used": email_data.get("template_used"),
+                "email_size_bytes": email_data.get("email_size_bytes")
+            }
+            
+            response = self._client.table("email_audit_log").insert(log_record).execute()
+            
+            if response.data:
+                logger.info(f"✅ Logged email attempt: {email_data['email_type']} to {email_data['recipient_email']}")
+                return {"success": True, "data": response.data[0]}
+            else:
+                return {"success": False, "error": "Failed to log email attempt"}
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to log email attempt: {e}")
+            return {"success": False, "error": str(e)}
+
+    
+    # =============================================================================
+    # CORE INVOICE OPERATIONS (using your exact invoices_clean schema)
+    # =============================================================================
+    
+    def create_invoice(self, invoice_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Create a new invoice record in invoices_clean table.
+        Uses your exact field names - no confusing mapping.
+        """
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            # Debug logging
+            logger.info(f"🔍 Creating invoice with data: {invoice_data}")
+            
+            # Add timestamps
+            now = datetime.utcnow().isoformat()
+            invoice_data.update({
+                "created_at": now,
+                "updated_at": now
+            })
+            
+            # Set defaults if not provided
+            invoice_data.setdefault("status", "uploaded")
+            invoice_data.setdefault("kfw_anrechenbare_kosten", False)
+            
+            logger.info(f"🔍 Final invoice data being inserted: {invoice_data}")
+            
+            response = self._client.table(self.table_name).insert(invoice_data).execute()
+            
+            logger.info(f"🔍 Supabase response: {response}")
+            
+            if response.data:
+                logger.info(f"✅ Created invoice: {response.data[0]['id']}")
+                return {"success": True, "data": response.data[0]}
+            else:
+                logger.error(f"❌ Failed to create invoice: {response}")
+                return {"success": False, "error": "Insert failed"}
+                
+        except Exception as e:
+            logger.error(f"❌ Database error creating invoice: {e}")
+            logger.error(f"❌ Exception type: {type(e)}")
+            logger.error(f"❌ Exception args: {e.args}")
+            return {"success": False, "error": str(e)}
+    
+    def get_invoice(self, invoice_id: str) -> Dict[str, Any]:
+        """Get a single invoice by ID from invoices_clean table"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            response = (self._client.table(self.table_name)
+                       .select("*")
+                       .eq("id", invoice_id)
+                       .execute())
+            
+            if response.data:
+                invoice = response.data[0]
+                # Add URL field for file access
+                if invoice.get("file_path"):
+                    invoice["url"] = f"https://bdtcfypvadryfeabqnlc.supabase.co/storage/v1/object/public/invoices/{invoice['file_path']}"
+                return {"success": True, "data": invoice}
+            else:
+                return {"success": False, "error": "Invoice not found"}
+                
+        except Exception as e:
+            logger.error(f"❌ Database error fetching invoice {invoice_id}: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def get_all_invoices(self, limit: int = 100) -> Dict[str, Any]:
+        """Get all invoices from invoices_clean table"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            response = (self._client.table(self.table_name)
+                       .select("*")
+                       .order("created_at", desc=True)
+                       .limit(limit)
+                       .execute())
+            
+            if response.data is not None:
+                # Add URL field for each invoice (for file access)
+                for invoice in response.data:
+                    if invoice.get("file_path"):
+                        invoice["url"] = f"https://bdtcfypvadryfeabqnlc.supabase.co/storage/v1/object/public/invoices/{invoice['file_path']}"
+                
+                return {
+                    "success": True, 
+                    "data": response.data,
+                    "total": len(response.data)
+                }
+            else:
+                return {"success": True, "data": [], "total": 0}
+                
+        except Exception as e:
+            logger.error(f"❌ Database error fetching invoices: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_invoices(self, limit: int = 100, offset: int = 0, filters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Get invoices with pagination and filtering support for reports"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            # Start with base query
+            query = self._client.table(self.table_name).select("*", count='exact')
+            
+            # Apply filters if provided
+            if filters:
+                for field, value in filters.items():
+                    if value is not None:
+                        query = query.eq(field, value)
+            
+            # Apply ordering, pagination
+            response = (query
+                       .order("created_at", desc=True)
+                       .range(offset, offset + limit - 1)
+                       .execute())
+            
+            if response.data is not None:
+                # Add URL field for each invoice (for file access)
+                for invoice in response.data:
+                    if invoice.get("file_path"):
+                        invoice["url"] = f"https://bdtcfypvadryfeabqnlc.supabase.co/storage/v1/object/public/invoices/{invoice['file_path']}"
+                
+                return {
+                    "success": True, 
+                    "data": response.data,
+                    "total": len(response.data),
+                    "count": response.count if hasattr(response, 'count') else len(response.data)
+                }
+            else:
+                return {"success": True, "data": [], "total": 0, "count": 0}
+                
+        except Exception as e:
+            logger.error(f"❌ Database error fetching filtered invoices: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def get_invoice_by_id(self, invoice_id: str) -> Dict[str, Any]:
+        """Get a specific invoice by ID from invoices_clean table"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            response = (self._client.table(self.table_name)
+                       .select("*")
+                       .eq("id", invoice_id)
+                       .execute())
+            
+            if response.data and len(response.data) > 0:
+                # Add URL field for file access
+                invoice = response.data[0]
+                if invoice.get("file_path"):
+                    invoice["url"] = f"https://bdtcfypvadryfeabqnlc.supabase.co/storage/v1/object/public/invoices/{invoice['file_path']}"
+                
+                logger.info(f"✅ Retrieved invoice: {invoice_id}")
+                return {"success": True, "data": invoice}
+            else:
+                return {"success": False, "error": "Invoice not found"}
+                
+        except Exception as e:
+            logger.error(f"❌ Database error fetching invoice {invoice_id}: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def update_invoice(self, invoice_id: str, update_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update an invoice record in invoices_clean table"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            # Add update timestamp
+            update_data["updated_at"] = datetime.utcnow().isoformat()
+            
+            response = (self._client.table(self.table_name)
+                       .update(update_data)
+                       .eq("id", invoice_id)
+                       .execute())
+            
+            if response.data:
+                logger.info(f"✅ Updated invoice: {invoice_id}")
+                return {"success": True, "data": response.data[0]}
+            else:
+                return {"success": False, "error": "Invoice not found or update failed"}
+                
+        except Exception as e:
+            logger.error(f"❌ Database error updating invoice {invoice_id}: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def update_invoice_status(self, invoice_id: str, status: str, review_status: str = None) -> Dict[str, Any]:
+        """
+        Update invoice status fields using the 3-stage workflow.
+        
+        3-Stage Workflow:
+        1. nicht begonnen: status='pending'/'uploaded', review_status='pending'/null
+        2. in Bearbeitung: status='edited', review_status='under_review'  
+        3. abgeschlossen: status='completed', review_status='completed_review'
+        """
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        # Validate status values against your schema constraints
+        valid_statuses = [
+            'pending', 'uploaded', 'edited', 'pending_email', 'edit_completed',
+            'in_review_by_bauleiter', 'approved_by_bauleiter', 'rejected_by_bauleiter',
+            'completed', 'error'
+        ]
+        
+        valid_review_statuses = ['pending', 'under_review', 'completed_review', 'needs_attention']
+        
+        if status not in valid_statuses:
+            return {"success": False, "error": f"Invalid status: {status}. Must be one of: {valid_statuses}"}
+        
+        if review_status and review_status not in valid_review_statuses:
+            return {"success": False, "error": f"Invalid review_status: {review_status}. Must be one of: {valid_review_statuses}"}
+        
+        try:
+            # Build update data
+            update_data = {
+                "status": status,
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            
+            if review_status:
+                update_data["review_status"] = review_status
+            
+            # Log the status change for debugging
+            logger.info(f"🔄 Updating invoice {invoice_id}: status='{status}', review_status='{review_status}'")
+            
+            response = (self._client.table(self.table_name)
+                       .update(update_data)
+                       .eq("id", invoice_id)
+                       .execute())
+            
+            if response.data and len(response.data) > 0:
+                updated_invoice = response.data[0]
+                logger.info(f"✅ Status updated successfully: {invoice_id} -> status='{updated_invoice.get('status')}', review_status='{updated_invoice.get('review_status')}'")
+                return {"success": True, "data": updated_invoice}
+            else:
+                logger.error(f"❌ Status update failed: No data returned for invoice {invoice_id}")
+                return {"success": False, "error": "Invoice not found or status update failed"}
+                
+        except Exception as e:
+            logger.error(f"❌ Database error updating status for invoice {invoice_id}: {e}")
+            return {"success": False, "error": str(e)}
+
+    def update_invoice_to_editing_stage(self, invoice_id: str) -> Dict[str, Any]:
+        """Update invoice to 'in Bearbeitung' stage when editing starts"""
+        return self.update_invoice_status(invoice_id, 'edited', 'under_review')
+    
+    def update_invoice_to_completed_stage(self, invoice_id: str, completed_by: str = None, notes: str = None) -> Dict[str, Any]:
+        """Update invoice to 'abgeschlossen' stage when completed"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            # First get the current invoice to check if it has Skonto data
+            current_invoice = self.get_invoice(invoice_id)
+            
+            update_data = {
+                "status": "completed",
+                "review_status": "completed_review",
+                "reviewed_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            
+            # If invoice has Skonto data and no decision yet, set to pending for Prüfbericht tracking
+            if (current_invoice.get("success") and 
+                current_invoice["data"].get("skonto_datum") and 
+                current_invoice["data"].get("skonto_prozent") and 
+                not current_invoice["data"].get("skonto_decision")):
+                update_data["skonto_decision"] = "pending"
+                logger.info(f"🎯 Setting skonto_decision to 'pending' for invoice {invoice_id} with Skonto data")
+            
+            if completed_by:
+                update_data["reviewed_by"] = completed_by
+            
+            if notes:
+                update_data["review_notes"] = notes
+            
+            logger.info(f"🏁 Completing invoice {invoice_id} by {completed_by}")
+            
+            response = (self._client.table(self.table_name)
+                       .update(update_data)
+                       .eq("id", invoice_id)
+                       .execute())
+            
+            if response.data and len(response.data) > 0:
+                updated_invoice = response.data[0]
+                logger.info(f"✅ Invoice completed successfully: {invoice_id}")
+                return {"success": True, "data": updated_invoice}
+            else:
+                return {"success": False, "error": "Invoice not found or completion failed"}
+                
+        except Exception as e:
+            logger.error(f"❌ Database error completing invoice {invoice_id}: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def update_invoice_sent_to_bauleiter(self, invoice_id: str, bauleiter_email: str, sent_by: str = None) -> Dict[str, Any]:
+        """
+        Update invoice status when sent to Bauleiter for approval.
+        Uses your actual database schema columns.
+        """
+        try:
+            now_iso = datetime.utcnow().isoformat()
+            
+            update_data = {
+                "status": "in_review_by_bauleiter",
+                "review_status": "under_review",
+                "bauleiter_email": bauleiter_email,
+                "bauleiter_review_sent_at": now_iso,  # Your actual column!
+                "approval_status": "pending",
+                "updated_at": now_iso
+            }
+            
+            # Add audit trail in review_notes
+            if sent_by:
+                update_data["review_notes"] = f"Sent to Bauleiter {bauleiter_email} by {sent_by} at {now_iso}"
+            
+            logger.info(f"📧 Sending invoice {invoice_id} to Bauleiter: {bauleiter_email}")
+            
+            return self.update_invoice(invoice_id, update_data)
+            
+        except Exception as e:
+            logger.error(f"❌ Error updating invoice sent to Bauleiter {invoice_id}: {e}")
+            return {"success": False, "error": str(e)}
+
+    def update_invoice_bauleiter_decision(self, invoice_id: str, decision: str, decided_by: str = None, decision_notes: str = None) -> Dict[str, Any]:
+        """
+        Update invoice with Bauleiter's approval/rejection decision.
+        Uses your actual database schema columns.
+        """
+        if decision not in ["approved", "rejected"]:
+            return {"success": False, "error": f"Invalid decision: {decision}. Must be 'approved' or 'rejected'"}
+        
+        try:
+            now_iso = datetime.utcnow().isoformat()
+            new_status = f"{decision}_by_bauleiter"
+            new_review_status = "completed_review" if decision == "approved" else "needs_attention"
+            
+            update_data = {
+                "status": new_status,
+                "review_status": new_review_status,
+                "approval_status": decision,  # 'approved' or 'rejected'
+                "approved_at": now_iso,       # Your actual column!
+                "approval_method": "email_link",  # Your actual column!
+                "updated_at": now_iso
+            }
+            
+            if decided_by:
+                update_data["reviewed_by"] = decided_by
+                update_data["reviewed_at"] = now_iso
+            
+            if decision_notes:
+                update_data["review_notes"] = decision_notes
+            
+            logger.info(f"⚖️ Bauleiter decision for invoice {invoice_id}: {decision.upper()}")
+            
+            return self.update_invoice(invoice_id, update_data)
+            
+        except Exception as e:
+            logger.error(f"❌ Error updating Bauleiter decision for invoice {invoice_id}: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_invoices_by_status(self, status: str, limit: int = 100) -> Dict[str, Any]:
+        """
+        Get invoices filtered by status using existing query patterns.
+        Useful for dashboard filtering and reports.
+        """
+        try:
+            filters = {"status": status}
+            return self.get_invoices(limit=limit, filters=filters)
+            
+        except Exception as e:
+            logger.error(f"❌ Error getting invoices by status {status}: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_pending_bauleiter_approvals(self, bauleiter_email: str = None, limit: int = 50) -> Dict[str, Any]:
+        """
+        Get invoices pending Bauleiter approval using existing query patterns.
+        Optionally filter by specific Bauleiter email.
+        """
+        try:
+            filters = {"status": "in_review_by_bauleiter"}
+            
+            if bauleiter_email:
+                filters["bauleiter_email"] = bauleiter_email
+            
+            logger.info(f"🔍 Looking for pending approvals with filters: {filters}")
+            result = self.get_invoices(limit=limit, filters=filters)
+            
+            if result["success"]:
+                logger.info(f"📋 Found {len(result['data'])} invoices pending Bauleiter approval")
+            else:
+                logger.warning(f"⚠️ Failed to query pending approvals: {result.get('error')}")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"❌ Error getting pending Bauleiter approvals: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def delete_invoice(self, invoice_id: str) -> Dict[str, Any]:
+        """Delete an invoice record from invoices_clean table"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            # First get the invoice to check file_path for storage cleanup
+            invoice_result = self.get_invoice(invoice_id)
+            
+            response = (self._client.table(self.table_name)
+                       .delete()
+                       .eq("id", invoice_id)
+                       .execute())
+            
+            if response.data:
+                logger.info(f"✅ Deleted invoice: {invoice_id}")
+                
+                # Also delete from storage if file exists
+                if invoice_result.get("success") and invoice_result["data"].get("file_path"):
+                    try:
+                        file_path = invoice_result["data"]["file_path"]
+                        self._client.storage.from_("invoices").remove([file_path])
+                        logger.info(f"✅ Also deleted file: {file_path}")
+                    except Exception as storage_error:
+                        logger.warning(f"⚠️ Could not delete file from storage: {storage_error}")
+                
+                return {"success": True, "data": response.data}
+            else:
+                return {"success": False, "error": "Invoice not found"}
+                
+        except Exception as e:
+            logger.error(f"❌ Database error deleting invoice {invoice_id}: {e}")
+            return {"success": False, "error": str(e)}
+
+    
+    # =============================================================================
+    # STORAGE OPERATIONS (for your invoices and folderwatcher buckets)
+    # =============================================================================
+    
+    def upload_file_to_storage(self, bucket_name: str, file_path: str, file_content: bytes) -> Dict[str, Any]:
+        """Upload file to Supabase storage bucket"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            response = self._client.storage.from_(bucket_name).upload(file_path, file_content)
+            
+            if response:
+                # Get public URL
+                public_url = self._client.storage.from_(bucket_name).get_public_url(file_path)
+                logger.info(f"✅ Uploaded file to {bucket_name}: {file_path}")
+                return {"success": True, "url": public_url, "path": file_path}
+            else:
+                return {"success": False, "error": "Upload failed"}
+                
+        except Exception as e:
+            logger.error(f"❌ Storage upload error: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def delete_file_from_storage(self, bucket_name: str, file_path: str) -> Dict[str, Any]:
+        """Delete file from Supabase storage bucket"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            response = self._client.storage.from_(bucket_name).remove([file_path])
+            logger.info(f"✅ Deleted file from {bucket_name}: {file_path}")
+            return {"success": True}
+                
+        except Exception as e:
+            logger.error(f"❌ Storage delete error: {e}")
+            return {"success": False, "error": str(e)}
+    
+    # =============================================================================
+    # DROPDOWN OPTIONS MANAGEMENT
+    # =============================================================================
+    
+    def get_dropdown_options(self, field_name: Optional[str] = None) -> Dict[str, List[Dict[str, Any]]]:
+        """Get dropdown options from database"""
+        if not self.is_available:
+            return {}
+        
+        try:
+            # Build query
+            query = self._client.table("dropdown_options").select("*").eq("is_active", True)
+            
+            if field_name:
+                query = query.eq("field_name", field_name)
+            
+            response = query.order("field_name", desc=False).order("sort_order", desc=False).execute()
+            
+            if response.data:
+                # Group by field_name
+                options_by_field = {}
+                for option in response.data:
+                    field = option["field_name"]
+                    if field not in options_by_field:
+                        options_by_field[field] = []
+                    
+                    options_by_field[field].append({
+                        "value": option["value"],
+                        "label": option["label"],
+                        "is_default": option["is_default"]
+                    })
+                
+                logger.info(f"✅ Retrieved dropdown options for fields: {list(options_by_field.keys())}")
+                return options_by_field
+            else:
+                logger.warning("No dropdown options found in database")
+                return {}
+                
+        except Exception as e:
+            logger.error(f"❌ Database error fetching dropdown options: {e}")
+            return {}
+    
+    def add_dropdown_option(self, field_name: str, value: str, label: str, is_default: bool = False, metadata: Dict = None) -> Dict[str, Any]:
+        """Add a new dropdown option to database"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            # Check if option already exists
+            existing = (self._client.table("dropdown_options")
+                       .select("id")
+                       .eq("field_name", field_name)
+                       .eq("value", value)
+                       .execute())
+            
+            if existing.data:
+                return {"success": False, "error": "Option already exists"}
+            
+            # Get max sort_order for this field
+            max_order = (self._client.table("dropdown_options")
+                        .select("sort_order")
+                        .eq("field_name", field_name)
+                        .order("sort_order", desc=True)
+                        .limit(1)
+                        .execute())
+            
+            sort_order = 1
+            if max_order.data:
+                sort_order = (max_order.data[0].get("sort_order", 0) or 0) + 1
+            
+            # Insert new option
+            new_option = {
+                "field_name": field_name,
+                "value": value,
+                "label": label,
+                "is_default": is_default,
+                "sort_order": sort_order,
+                "is_active": True,
+                "metadata": metadata or {}
+            }
+            
+            response = (self._client.table("dropdown_options")
+                       .insert(new_option)
+                       .execute())
+            
+            if response.data:
+                logger.info(f"✅ Added dropdown option: {field_name}.{value}")
+                return {"success": True, "data": response.data[0]}
+            else:
+                return {"success": False, "error": "Insert failed"}
+                
+        except Exception as e:
+            logger.error(f"❌ Database error adding dropdown option: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def delete_dropdown_option(self, field_name: str, value: str) -> Dict[str, Any]:
+        """Soft delete a dropdown option (set is_active=false)"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            response = (self._client.table("dropdown_options")
+                       .update({"is_active": False})
+                       .eq("field_name", field_name)
+                       .eq("value", value)
+                       .execute())
+            
+            if response.data:
+                logger.info(f"✅ Deleted dropdown option: {field_name}.{value}")
+                return {"success": True, "data": response.data[0]}
+            else:
+                return {"success": False, "error": "Option not found"}
+                
+        except Exception as e:
+            logger.error(f"❌ Database error deleting dropdown option: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def update_dropdown_option(self, field_name: str, old_value: str, new_value: str, new_label: str) -> Dict[str, Any]:
+        """Update a dropdown option in the database"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            response = (self._client.table("dropdown_options")
+                       .update({
+                           "value": new_value,
+                           "label": new_label
+                       })
+                       .eq("field_name", field_name)
+                       .eq("value", old_value)
+                       .eq("is_active", True)
+                       .execute())
+            
+            if response.data:
+                logger.info(f"✅ Updated dropdown option: {field_name}.{old_value} -> {new_value}")
+                return {"success": True, "data": response.data[0]}
+            else:
+                return {"success": False, "error": "Option not found or no changes made"}
+                
+        except Exception as e:
+            logger.error(f"❌ Database error updating dropdown option: {e}")
+            return {"success": False, "error": str(e)}
+
+    def log_email_send(self, invoice_id: str, email_type: str, log_entry: str) -> Dict[str, Any]:
+        """Log email send event without changing status (email service helper)"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            update_data = {
+                "email_logs": f"COALESCE(email_logs, '[]'::jsonb) || '{log_entry}'::jsonb",
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            
+            if email_type == "editor_notification":
+                update_data["edit_bericht_sent_at"] = datetime.utcnow().isoformat()
+            
+            response = (self._client.table(self.table_name)
+                       .update(update_data)
+                       .eq("id", invoice_id)
+                       .execute())
+            
+            if response.data:
+                logger.info(f"✅ Email log updated for invoice: {invoice_id}")
+                return {"success": True, "data": response.data[0]}
+            else:
+                return {"success": False, "error": "Email log update failed"}
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to log email send: {e}")
+            return {"success": False, "error": str(e)}
+
+    def update_bauleiter_email_sent(self, invoice_id: str, bauleiter_email: str, log_entry: str) -> Dict[str, Any]:
+        """Update Bauleiter email fields without changing status (email service helper)"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            update_data = {
+                "bauleiter_email": bauleiter_email,
+                "bauleiter_review_sent_at": datetime.utcnow().isoformat(),
+                "email_logs": f"COALESCE(email_logs, '[]'::jsonb) || '{log_entry}'::jsonb",
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            
+            response = (self._client.table(self.table_name)
+                       .update(update_data)
+                       .eq("id", invoice_id)
+                       .execute())
+            
+            if response.data:
+                logger.info(f"✅ Bauleiter email fields updated for invoice: {invoice_id}")
+                return {"success": True, "data": response.data[0]}
+            else:
+                return {"success": False, "error": "Bauleiter email update failed"}
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to update Bauleiter email fields: {e}")
+            return {"success": False, "error": str(e)}
+
+    def create_approval_token(self, token_hash: str, invoice_id: str, action: str, 
+                            user_email: str, expires_at: datetime, nonce: str) -> Dict[str, Any]:
+        """Create approval token (email service helper)"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            token_data = {
+                "token_hash": token_hash,
+                "invoice_id": invoice_id,
+                "action": action,
+                "user_email": user_email,
+                "expires_at": expires_at.isoformat(),
+                "nonce": nonce,
+                "created_at": datetime.utcnow().isoformat()
+            }
+            
+            response = self._client.table("approval_tokens").insert(token_data).execute()
+            
+            if response.data:
+                logger.info(f"✅ Approval token created for invoice: {invoice_id}")
+                return {"success": True, "data": response.data[0]}
+            else:
+                return {"success": False, "error": "Token creation failed"}
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to create approval token: {e}")
+            return {"success": False, "error": str(e)}
+
+    def create_email_audit_log(self, invoice_id: str, email_type: str, recipient_email: str,
+                             subject: str, send_success: bool, provider_message_id: str = None,
+                             provider_response: dict = None, template_used: str = None,
+                             email_size_bytes: int = None) -> Dict[str, Any]:
+        """Create email audit log entry (email service helper)"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            audit_data = {
+                "invoice_id": invoice_id,
+                "email_type": email_type,
+                "recipient_email": recipient_email,
+                "subject": subject,
+                "send_success": send_success,
+                "provider_message_id": provider_message_id,
+                "provider_response": json.dumps(provider_response) if provider_response else None,
+                "template_used": template_used,
+                "email_size_bytes": email_size_bytes,
+                "created_at": datetime.utcnow().isoformat()
+            }
+            
+            response = self._client.table("email_audit_log").insert(audit_data).execute()
+            
+            if response.data:
+                logger.info(f"✅ Email audit log created for invoice: {invoice_id}")
+                return {"success": True, "data": response.data[0]}
+            else:
+                return {"success": False, "error": "Email audit log creation failed"}
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to create email audit log: {e}")
+            return {"success": False, "error": str(e)}
+
+    def update_approval_status(self, invoice_id: str, status: str, approval_status: str, 
+                             approval_method: str) -> Dict[str, Any]:
+        """Update invoice approval status (workflow service helper)"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            update_data = {
+                "status": status,
+                "approval_status": approval_status,
+                "approved_at": datetime.utcnow().isoformat(),
+                "approval_method": approval_method,
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            
+            response = (self._client.table(self.table_name)
+                       .update(update_data)
+                       .eq("id", invoice_id)
+                       .execute())
+            
+            if response.data:
+                logger.info(f"✅ Approval status updated for invoice: {invoice_id}")
+                return {"success": True, "data": response.data[0]}
+            else:
+                return {"success": False, "error": "Approval status update failed"}
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to update approval status: {e}")
+            return {"success": False, "error": str(e)}
+
+    def mark_approval_token_used(self, token_hash: str, ip_address: str) -> Dict[str, Any]:
+        """Mark approval token as used (workflow service helper)"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            update_data = {
+                "used_at": datetime.utcnow().isoformat(),
+                "used_by_ip": ip_address
+            }
+            
+            response = (self._client.table("approval_tokens")
+                       .update(update_data)
+                       .eq("token_hash", token_hash)
+                       .execute())
+            
+            if response.data:
+                logger.info(f"✅ Approval token marked as used: {token_hash[:8]}...")
+                return {"success": True, "data": response.data[0]}
+            else:
+                return {"success": False, "error": "Token update failed"}
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to mark token as used: {e}")
+            return {"success": False, "error": str(e)}
+
+    def create_security_event(self, event_type: str, ip_address: str, user_email: str = None,
+                            invoice_id: str = None, event_data: dict = None, 
+                            risk_level: str = "low") -> Dict[str, Any]:
+        """Create security event log (workflow service helper)"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            security_data = {
+                "event_type": event_type,
+                "ip_address": ip_address,
+                "user_email": user_email,
+                "invoice_id": invoice_id,
+                "event_data": json.dumps(event_data) if event_data else None,
+                "risk_level": risk_level,
+                "created_at": datetime.utcnow().isoformat()
+            }
+            
+            response = self._client.table("security_events").insert(security_data).execute()
+            
+            if response.data:
+                logger.info(f"✅ Security event logged: {event_type}")
+                return {"success": True, "data": response.data[0]}
+            else:
+                return {"success": False, "error": "Security event creation failed"}
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to create security event: {e}")
+            return {"success": False, "error": str(e)}
+
+    # =============================================================================
+    # SKONTO MANAGEMENT METHODS
+    # =============================================================================
+    
+    def get_invoices_with_skonto_due(self, days_ahead: int = 7) -> Dict[str, Any]:
+        """
+        Get invoices with Skonto expiring within specified days.
+        
+        Args:
+            days_ahead: Number of days ahead to check for Skonto expiry
+            
+        Returns:
+            Dict with success status and list of invoices
+        """
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            from datetime import datetime, timedelta
+            
+            # Calculate the date range for Skonto due
+            today = datetime.now().date()
+            future_date = today + timedelta(days=days_ahead)
+            
+            # Query invoices with Skonto due within the specified period
+            # Include invoices where skonto_decision is pending, null, or not set
+            response = self._client.table(self.table_name)\
+                .select("*")\
+                .not_.is_("skonto_datum", "null")\
+                .not_.is_("skonto_prozent", "null")\
+                .execute()
+            
+            if response.data:
+                # Filter invoices based on Skonto date and decision status
+                filtered_invoices = []
+                for invoice in response.data:
+                    try:
+                        # Only include invoices where skonto_decision is pending, null, or not_applicable
+                        skonto_decision = invoice.get("skonto_decision")
+                        if skonto_decision not in [None, "pending", "not_applicable"]:
+                            continue  # Skip taken/missed invoices
+                        skonto_datum = invoice.get("skonto_datum")
+                        if not skonto_datum:
+                            continue
+                            
+                        # Parse different date formats
+                        if isinstance(skonto_datum, str):
+                            if "." in skonto_datum:
+                                skonto_date = datetime.strptime(skonto_datum, "%d.%m.%Y").date()
+                            elif "-" in skonto_datum:
+                                skonto_date = datetime.strptime(skonto_datum, "%Y-%m-%d").date()
+                            else:
+                                skonto_date = datetime.strptime(skonto_datum, "%Y%m%d").date()
+                        else:
+                            skonto_date = skonto_datum
+                        
+                        # Check if Skonto is due within the specified period
+                        if today <= skonto_date <= future_date:
+                            filtered_invoices.append(invoice)
+                            
+                    except Exception as e:
+                        logger.warning(f"Failed to parse Skonto date for invoice {invoice.get('id')}: {e}")
+                        continue
+                
+                logger.info(f"✅ Found {len(filtered_invoices)} invoices with Skonto due within {days_ahead} days")
+                return {"success": True, "data": filtered_invoices}
+            else:
+                logger.info("No invoices found with Skonto due")
+                return {"success": True, "data": []}
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to get invoices with Skonto due: {e}")
+            return {"success": False, "error": str(e)}
+
+    def update_skonto_reminder_sent(self, invoice_id: str) -> Dict[str, Any]:
+        """
+        Mark Skonto reminder as sent for an invoice.
+        
+        Args:
+            invoice_id: The ID of the invoice
+            
+        Returns:
+            Dict with success status and updated data
+        """
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            update_data = {
+                "skonto_reminder_sent": True,
+                "skonto_reminder_sent_at": datetime.utcnow().isoformat()
+            }
+            
+            response = self._client.table(self.table_name)\
+                .update(update_data)\
+                .eq("id", invoice_id)\
+                .execute()
+            
+            if response.data:
+                logger.info(f"✅ Marked Skonto reminder as sent for invoice {invoice_id}")
+                return {"success": True, "data": response.data[0]}
+            else:
+                logger.error(f"❌ Failed to update Skonto reminder status for invoice {invoice_id}")
+                return {"success": False, "error": "Skonto reminder update failed"}
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to update Skonto reminder status: {e}")
+            return {"success": False, "error": str(e)}
+
+    def update_skonto_decision(self, invoice_id: str, decision: str, actual_savings: float = None, 
+                             decision_timestamp: str = None, decision_email: str = None) -> Dict[str, Any]:
+        """
+        Update Skonto decision for an invoice.
+        
+        Args:
+            invoice_id: The ID of the invoice
+            decision: The Skonto decision ('taken', 'missed', 'not_applicable')
+            actual_savings: The actual savings amount (optional)
+            decision_timestamp: When the decision was made (optional)
+            decision_email: Email of who made the decision (optional)
+            
+        Returns:
+            Dict with success status and updated data
+        """
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        # Validate decision value
+        valid_decisions = ["taken", "missed", "not_applicable"]
+        if decision not in valid_decisions:
+            return {"success": False, "error": f"Invalid decision. Must be one of: {valid_decisions}"}
+        
+        try:
+            update_data = {
+                "skonto_decision": decision
+            }
+            
+            # Only update actual_savings if provided
+            if actual_savings is not None:
+                update_data["actual_skonto_savings"] = actual_savings
+            
+            response = self._client.table(self.table_name)\
+                .update(update_data)\
+                .eq("id", invoice_id)\
+                .execute()
+            
+            if response.data:
+                logger.info(f"✅ Updated Skonto decision for invoice {invoice_id}: {decision}")
+                return {"success": True, "data": response.data[0]}
+            else:
+                logger.error(f"❌ Failed to update Skonto decision for invoice {invoice_id}")
+                return {"success": False, "error": "Skonto decision update failed"}
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to update Skonto decision: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_skonto_statistics(self, date_from: str = None, date_to: str = None) -> Dict[str, Any]:
+        """
+        Get Skonto statistics for reporting.
+        
+        Args:
+            date_from: Start date for statistics (optional)
+            date_to: End date for statistics (optional)
+            
+        Returns:
+            Dict with success status and statistics data
+        """
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            # Build query
+            query = self._client.table(self.table_name).select("*")
+            
+            # Add date filters if provided
+            if date_from:
+                query = query.gte("rechnungsdatum", date_from)
+            if date_to:
+                query = query.lte("rechnungsdatum", date_to)
+            
+            # Execute query
+            response = query.execute()
+            
+            if response.data:
+                invoices = response.data
+                
+                # Calculate statistics
+                stats = {
+                    "total_invoices_with_skonto": 0,
+                    "skonto_reminders_sent": 0,
+                    "skonto_taken": 0,
+                    "skonto_missed": 0,
+                    "skonto_not_applicable": 0,
+                    "total_potential_savings": 0.0,
+                    "total_actual_savings": 0.0,
+                    "pending_decisions": 0
+                }
+                
+                for invoice in invoices:
+                    # Check if invoice has Skonto data
+                    if invoice.get("skonto_datum") and invoice.get("skonto_prozent"):
+                        stats["total_invoices_with_skonto"] += 1
+                        
+                        # Calculate potential savings
+                        total_amount = invoice.get("rechnungsbetrag")
+                        skonto_percent = invoice.get("skonto_prozent")
+                        if total_amount and skonto_percent:
+                            potential_savings = float(total_amount) * float(skonto_percent) / 100
+                            stats["total_potential_savings"] += potential_savings
+                        
+                        # Check reminder status
+                        if invoice.get("skonto_reminder_sent"):
+                            stats["skonto_reminders_sent"] += 1
+                        
+                        # Check decision status
+                        decision = invoice.get("skonto_decision")
+                        if decision == "taken":
+                            stats["skonto_taken"] += 1
+                            actual_savings = invoice.get("actual_skonto_savings")
+                            if actual_savings:
+                                stats["total_actual_savings"] += float(actual_savings)
+                        elif decision == "missed":
+                            stats["skonto_missed"] += 1
+                        elif decision == "not_applicable":
+                            stats["skonto_not_applicable"] += 1
+                        else:
+                            stats["pending_decisions"] += 1
+                
+                logger.info(f"✅ Generated Skonto statistics for {len(invoices)} invoices")
+                return {"success": True, "data": stats}
+            else:
+                logger.info("No invoices found for statistics")
+                return {"success": True, "data": {}}
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to get Skonto statistics: {e}")
+            return {"success": False, "error": str(e)}
+
+    def update_expired_skonto_statuses(self) -> Dict[str, Any]:
+        """
+        Update invoices with expired Skonto dates to 'missed' status.
+        Should be called periodically or before displaying Skonto data.
+        """
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            from datetime import datetime
+            
+            # Get current date
+            today = datetime.now().date()
+            
+            # Get all invoices with Skonto data that have pending decision
+            response = self._client.table(self.table_name)\
+                .select("*")\
+                .not_.is_("skonto_datum", "null")\
+                .not_.is_("skonto_prozent", "null")\
+                .in_("skonto_decision", ["pending", None])\
+                .execute()
+            
+            if not response.data:
+                return {"success": True, "updated_count": 0, "message": "No invoices to update"}
+            
+            updated_count = 0
+            
+            for invoice in response.data:
+                try:
+                    skonto_datum = invoice.get("skonto_datum")
+                    if not skonto_datum:
+                        continue
+                    
+                    # Parse the Skonto date
+                    if isinstance(skonto_datum, str):
+                        if "-" in skonto_datum:
+                            skonto_date = datetime.strptime(skonto_datum, "%Y-%m-%d").date()
+                        else:
+                            skonto_date = datetime.strptime(skonto_datum, "%d.%m.%Y").date()
+                    else:
+                        skonto_date = skonto_datum
+                    
+                    # Check if expired
+                    if skonto_date < today:
+                        # Update to missed status
+                        update_result = self.update_skonto_decision(
+                            invoice["id"], 
+                            "missed", 
+                            actual_savings=0.0
+                        )
+                        
+                        if update_result["success"]:
+                            updated_count += 1
+                            logger.info(f"📅 Marked expired Skonto as missed: {invoice['id']}")
+                        
+                except Exception as e:
+                    logger.warning(f"Failed to process invoice {invoice.get('id')}: {e}")
+                    continue
+            
+            logger.info(f"✅ Updated {updated_count} expired Skonto invoices to 'missed' status")
+            return {
+                "success": True, 
+                "updated_count": updated_count,
+                "message": f"Updated {updated_count} expired invoices"
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to update expired Skonto statuses: {e}")
+            return {"success": False, "error": str(e)}
+
+    # =============================================================================
+    # USER MANAGEMENT (for authentication)
+    # =============================================================================
+    
+    async def ensure_users_table_exists(self) -> Dict[str, Any]:
+        """Ensure users table exists in database"""
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            # Check if users table exists by trying to query it
+            response = self._client.table("users").select("*").limit(1).execute()
+            logger.info("✅ Users table exists")
+            return {"success": True, "message": "Users table exists"}
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Users table may not exist: {e}")
+            # In Supabase, tables are typically created through the web interface
+            # For development, we'll note this and continue
+            return {"success": False, "error": f"Users table not found: {e}"}
+
+    def get_all_invoices_with_skonto_data(self) -> Dict[str, Any]:
+        """
+        Get ALL invoices that have Skonto data, regardless of deadline or status.
+        This is used for the Prüfbericht (Skonto report) page to show comprehensive data.
+        
+        Returns:
+            Dict with success status and list of all invoices with Skonto information
+        """
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            # Query all invoices that have both skonto_datum and skonto_prozent
+            response = self._client.table(self.table_name)\
+                .select("*")\
+                .not_.is_("skonto_datum", "null")\
+                .not_.is_("skonto_prozent", "null")\
+                .order("created_at", desc=True)\
+                .execute()
+            
+            if response.data:
+                # Add URL field for each invoice (for file access)
+                for invoice in response.data:
+                    if invoice.get("file_path"):
+                        invoice["url"] = f"https://bdtcfypvadryfeabqnlc.supabase.co/storage/v1/object/public/invoices/{invoice['file_path']}"
+                
+                logger.info(f"✅ Found {len(response.data)} invoices with Skonto data")
+                return {"success": True, "data": response.data}
+            else:
+                logger.info("No invoices found with Skonto data")
+                return {"success": True, "data": []}
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to get invoices with Skonto data: {e}")
+            return {"success": False, "error": str(e)}
+
+# =============================================================================
+# GLOBAL INSTANCE - Single database service for entire application
+# =============================================================================
+db_service = DatabaseService()

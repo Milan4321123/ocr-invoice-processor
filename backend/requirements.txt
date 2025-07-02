@@ -1,4 +1,3 @@
-
 fastapi==0.104.1
 uvicorn==0.24.0
 python-multipart==0.0.6
@@ -9,12 +8,22 @@ pytest-asyncio==0.21.1
 httpx>=0.24.0,<0.25.0
 pytest-mock==3.12.0
 
-# Google Cloud Document AI for OCR
-google-cloud-documentai==2.25.0
-google-auth==2.23.4
-google-api-core==2.12.0
-
-# Additional dependencies for OCR processing
+# Additional dependencies for data validation
 pydantic==2.5.0
-Pillow==10.1.0
-setuptools==80.9.0
+
+# Folder watching for automatic processing
+watchdog==3.0.0
+
+# Email service dependencies for Prüfbericht workflow
+# Using SendGrid for professional email delivery
+sendgrid==6.11.0
+# JWT for secure approval tokens
+PyJWT==2.8.0
+# Jinja2 for HTML email templating
+Jinja2==3.1.2
+# Cryptography for additional security features
+cryptography==43.0.3
+
+# Authentication dependencies
+passlib[bcrypt]==1.7.4
+python-jose[cryptography]==3.3.0

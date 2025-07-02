@@ -2,15 +2,16 @@
 from fastapi import APIRouter
 import os
 import time
+import tempfile
 from datetime import datetime
-from config.ocr_config import ocr_config
+from services.database import db_service
 
 router = APIRouter()
 
 @router.get("/")
 async def root():
     """Root endpoint"""
-    return {"message": "Invoice OCR API is running", "version": "0.1.0"}
+    return {"message": "Invoice Management API is running", "version": "1.0.0"}
 
 @router.get("/health")
 async def health_check():
@@ -27,81 +28,131 @@ async def system_health():
     overall_status = "healthy"
     
     # Database component check
-    # Import supabase from main to check actual connection
     try:
-        from main import supabase
-        if supabase:
-            # Try to perform a simple query to test the connection
+        db_start = time.time()
+        
+        if db_service.is_available:
             try:
-                # Test query to check connection (this won't create a table if it doesn't exist)
-                result = supabase.table('invoices').select('count', count='exact').limit(0).execute()
+                # Test database connection by getting invoice count
+                result = db_service.get_invoices(limit=1)
+                if result.get("success"):
+                    invoice_count = result.get("count", 0)
+                    db_status = "healthy"
+                    connection_status = "Connected"
+                else:
+                    invoice_count = 0
+                    db_status = "error"
+                    connection_status = "Configuration Error"
+                    
                 components["database"] = {
-                    "status": "healthy",
-                    "response_time_ms": round((time.time() - start_time) * 1000, 2),
-                    "connection": "Supabase (Connected)",
-                    "total_invoices": result.count if hasattr(result, 'count') else 0
+                    "status": db_status,
+                    "response_time_ms": round((time.time() - db_start) * 1000, 2),
+                    "connection": connection_status,
+                    "total_invoices": invoice_count
                 }
             except Exception as e:
                 components["database"] = {
-                    "status": "degraded",
-                    "response_time_ms": round((time.time() - start_time) * 1000, 2),
-                    "connection": "Supabase (Connection Error)",
+                    "status": "error",
+                    "response_time_ms": round((time.time() - db_start) * 1000, 2),
+                    "connection": "Configuration Error",
                     "error": str(e),
                     "total_invoices": 0
                 }
         else:
             components["database"] = {
-                "status": "mock",
-                "response_time_ms": round((time.time() - start_time) * 1000, 2),
-                "connection": "Supabase (Demo Mode)",
+                "status": "error",
+                "response_time_ms": round((time.time() - db_start) * 1000, 2),
+                "connection": "Configuration Error",
                 "total_invoices": 0
             }
-    except ImportError:
+    except Exception as e:
         components["database"] = {
             "status": "error",
             "response_time_ms": round((time.time() - start_time) * 1000, 2),
             "connection": "Configuration Error",
+            "error": str(e),
             "total_invoices": 0
         }
     
     # Storage component check  
     try:
-        from main import supabase
-        if supabase:
+        storage_start = time.time()
+        
+        if db_service.is_available:
             try:
-                # Test storage access
-                buckets = supabase.storage.list_buckets()
-                components["storage"] = {
-                    "status": "healthy",
-                    "response_time_ms": round((time.time() - start_time) * 1000, 2),
-                    "connection": "Supabase Storage (Connected)",
-                    "bucket": "invoices",
-                    "write_access": True
-                }
+                client = db_service.client
+                
+                # Test storage bucket access
+                try:
+                    # List files in invoices bucket (no limit parameter for Supabase)
+                    files_response = client.storage.from_('invoices').list()
+                    bucket_accessible = True
+                    files_count = len(files_response) if files_response else 0
+                except Exception as bucket_error:
+                    bucket_accessible = False
+                    files_count = 0
+                
+                # Test write access with a small test file
+                write_access = False
+                try:
+                    test_content = b"health_check_test"
+                    test_filename = f"health_test_{int(time.time())}.txt"
+                    
+                    upload_response = client.storage.from_('invoices').upload(
+                        test_filename, 
+                        test_content,
+                        file_options={"content-type": "text/plain"}
+                    )
+                    
+                    # Clean up test file
+                    client.storage.from_('invoices').remove([test_filename])
+                    write_access = True
+                    
+                except Exception:
+                    write_access = False
+                
+                if bucket_accessible and write_access:
+                    components["storage"] = {
+                        "status": "healthy",
+                        "response_time_ms": round((time.time() - storage_start) * 1000, 2),
+                        "connection": "Connected",
+                        "bucket": "invoices",
+                        "write_access": "Yes"
+                    }
+                else:
+                    components["storage"] = {
+                        "status": "error",
+                        "response_time_ms": round((time.time() - storage_start) * 1000, 2),
+                        "connection": "Configuration Error",
+                        "bucket": "invoices",
+                        "write_access": "No"
+                    }
+                    
             except Exception as e:
                 components["storage"] = {
-                    "status": "degraded",
-                    "response_time_ms": round((time.time() - start_time) * 1000, 2),
-                    "connection": "Supabase Storage (Error)",
+                    "status": "error",
+                    "response_time_ms": round((time.time() - storage_start) * 1000, 2),
+                    "connection": "Configuration Error",
                     "bucket": "invoices",
                     "error": str(e),
-                    "write_access": False
+                    "write_access": "No"
                 }
         else:
             components["storage"] = {
-                "status": "mock",
-                "response_time_ms": round((time.time() - start_time) * 1000, 2),
-                "connection": "Supabase Storage (Demo Mode)",
+                "status": "error",
+                "response_time_ms": round((time.time() - storage_start) * 1000, 2),
+                "connection": "Configuration Error",
                 "bucket": "invoices",
-                "write_access": True
+                "write_access": "No"
             }
-    except ImportError:
+    except Exception as e:
         components["storage"] = {
             "status": "error",
             "response_time_ms": round((time.time() - start_time) * 1000, 2),
             "connection": "Configuration Error",
             "bucket": "invoices",
-            "write_access": False
+            "error": str(e),
+            "write_access": "No"
         }
     
     # Environment component check
@@ -110,18 +161,19 @@ async def system_health():
     
     # Check critical environment variables (both naming conventions)
     url_configured = os.getenv("SUPABASE_URL") or os.getenv("SUPA_URL")
-    key_configured = os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPA_KEY")
+    key_configured = os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPA_KEY")
     
     env_config["SUPABASE_URL"] = "configured" if url_configured else "missing"
     env_config["SUPABASE_KEY"] = "configured" if key_configured else "missing"
     
     if not url_configured or not key_configured:
-        env_status = "degraded"
+        env_status = "error"
+        overall_status = "error"
     
     components["environment"] = {
         "status": env_status,
         "response_time_ms": round((time.time() - start_time) * 1000, 2),
-        "config": env_config
+        "configuration": env_config
     }
     
     # API endpoints component check
@@ -132,59 +184,27 @@ async def system_health():
     }
     
     # Filesystem component check
-    components["filesystem"] = {
-        "status": "healthy",
-        "response_time_ms": round((time.time() - start_time) * 1000, 2),
-        "write_access": True
-    }
-    
-    # OCR component check
-    ocr_checks = {}
-    ocr_status = "healthy"
-    
-    # Check if we're using mock OCR
-    use_mock_ocr = ocr_config.use_mock_ocr or os.getenv("USE_MOCK_OCR", "false").lower() in ("true", "1", "yes")
-    
-    if use_mock_ocr:
-        ocr_checks["service"] = {"status": "healthy", "details": "Using mock OCR service (testing mode)"}
-        ocr_status = "healthy"
-        service_name = "Mock Service"
-    elif ocr_config.enable_ocr:
-        # Check credentials file if path is specified
-        if ocr_config.google_application_credentials:
-            if os.path.exists(ocr_config.google_application_credentials):
-                ocr_checks["credentials"] = {"status": "healthy", "details": "GCP credentials file found"}
-            else:
-                ocr_checks["credentials"] = {"status": "unhealthy", "details": "GCP credentials file missing"}
-                ocr_status = "degraded"
-        else:
-            ocr_checks["credentials"] = {"status": "degraded", "details": "Using default credentials"}
-            
-        ocr_checks["processor"] = {
-            "status": "healthy" if ocr_config.processor_id else "degraded",
-            "details": f"Processor ID: {ocr_config.processor_id or 'Using default processor'}"
-        }
+    try:
+        fs_start = time.time()
         
-        ocr_checks["project"] = {
-            "status": "healthy" if ocr_config.gcp_project_id else "unhealthy",
-            "details": f"Project: {ocr_config.gcp_project_id or 'Not configured'}"
-        }
+        # Test write access to temp directory
+        with tempfile.NamedTemporaryFile(mode='w', delete=True) as temp_file:
+            temp_file.write("health check test")
+            temp_file.flush()
+            write_access = True
         
-        if not ocr_config.gcp_project_id:
-            ocr_status = "error"
-        elif not ocr_config.processor_id:
-            ocr_status = "degraded"
-        service_name = "Document AI"
-    else:
-        ocr_checks["service"] = {"status": "healthy", "details": "OCR disabled"}
-        service_name = "Disabled"
-    
-    components["ocr"] = {
-        "status": ocr_status,
-        "response_time_ms": round((time.time() - start_time) * 1000, 2),
-        "service": service_name,
-        "checks": ocr_checks
-    }
+        components["filesystem"] = {
+            "status": "healthy",
+            "response_time_ms": round((time.time() - fs_start) * 1000, 2),
+            "write_access": "Yes"
+        }
+    except Exception as e:
+        components["filesystem"] = {
+            "status": "error",
+            "response_time_ms": round((time.time() - fs_start) * 1000, 2),
+            "write_access": "No",
+            "error": str(e)
+        }
     
     # Determine overall status
     component_statuses = [comp["status"] for comp in components.values()]
@@ -201,19 +221,4 @@ async def system_health():
         "components": components
     }
 
-@router.get("/debug/ocr-config")
-async def debug_ocr_config():
-    """Debug endpoint to show OCR configuration"""
-    return {
-        "gcp_project_id": ocr_config.gcp_project_id,
-        "gcp_location": ocr_config.gcp_location,
-        "processor_id": ocr_config.processor_id,
-        "processor_name": ocr_config.get_processor_name(),
-        "enable_ocr": ocr_config.enable_ocr,
-        "env_vars": {
-            "GCP_PROJECT_ID": os.getenv("GCP_PROJECT_ID"),
-            "GCP_LOCATION": os.getenv("GCP_LOCATION"),
-            "DOCUMENT_AI_PROCESSOR_ID": os.getenv("DOCUMENT_AI_PROCESSOR_ID"),
-            "ENABLE_OCR": os.getenv("ENABLE_OCR")
-        }
-    }
+# Debug endpoints removed for production - use /health and /system-health instead

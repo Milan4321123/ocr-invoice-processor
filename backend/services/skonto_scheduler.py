@@ -1,0 +1,301 @@
+"""
+Automated Skonto Reminder Scheduler Service
+Handles automatic sending of Skonto reminder emails based on expiry dates.
+"""
+import logging
+import asyncio
+import time
+from datetime import datetime, timedelta
+from typing import List, Dict, Any, Optional
+import os
+from dataclasses import dataclass
+
+from services.database import db_service
+from services.email_service import email_service
+
+logger = logging.getLogger(__name__)
+
+@dataclass
+class SkontoReminderConfig:
+    """Configuration for Skonto reminder scheduling"""
+    enabled: bool = True
+    check_interval_hours: int = 6  # Check every 6 hours
+    days_ahead_urgent: int = 1     # Send urgent reminders 1 day before
+    days_ahead_normal: int = 3     # Send normal reminders 3 days before
+    days_ahead_early: int = 7      # Send early reminders 7 days before
+    max_reminders_per_run: int = 50  # Limit batch size
+    default_recipient_email: str = "finance@company.com"
+    dry_run: bool = False  # Set to True for testing
+
+class SkontoSchedulerService:
+    """
+    Automated service for sending Skonto reminder emails.
+    Runs as a background service to monitor and send reminders.
+    """
+    
+    def __init__(self, config: SkontoReminderConfig = None):
+        self.config = config or SkontoReminderConfig()
+        self.is_running = False
+        self.last_run = None
+        self.stats = {
+            "total_runs": 0,
+            "total_reminders_sent": 0,
+            "total_errors": 0,
+            "last_error": None
+        }
+        
+        # Load configuration from environment
+        self._load_env_config()
+        
+    def _load_env_config(self):
+        """Load configuration from environment variables"""
+        self.config.enabled = os.getenv("SKONTO_SCHEDULER_ENABLED", "true").lower() == "true"
+        self.config.check_interval_hours = int(os.getenv("SKONTO_CHECK_INTERVAL_HOURS", "6"))
+        self.config.days_ahead_urgent = int(os.getenv("SKONTO_DAYS_AHEAD_URGENT", "1"))
+        self.config.days_ahead_normal = int(os.getenv("SKONTO_DAYS_AHEAD_NORMAL", "3"))
+        self.config.days_ahead_early = int(os.getenv("SKONTO_DAYS_AHEAD_EARLY", "7"))
+        self.config.max_reminders_per_run = int(os.getenv("SKONTO_MAX_REMINDERS_PER_RUN", "50"))
+        self.config.default_recipient_email = os.getenv("SKONTO_DEFAULT_RECIPIENT", "finance@company.com")
+        self.config.dry_run = os.getenv("SKONTO_DRY_RUN", "false").lower() == "true"
+        
+        logger.info(f"📋 Skonto Scheduler Config: {self.config}")
+    
+    async def check_and_send_reminders(self) -> Dict[str, Any]:
+        """
+        Main method to check for invoices needing Skonto reminders and send them.
+        Returns summary of actions taken.
+        """
+        if not self.config.enabled:
+            logger.info("⏸️ Skonto scheduler is disabled")
+            return {"enabled": False, "reminders_sent": 0}
+        
+        start_time = datetime.now()
+        self.stats["total_runs"] += 1
+        reminders_sent = 0
+        errors = []
+        
+        try:
+            logger.info(f"🔍 Starting Skonto reminder check at {start_time}")
+            
+            # Get invoices needing reminders for different urgency levels
+            urgent_invoices = await self._get_invoices_needing_reminders(self.config.days_ahead_urgent)
+            normal_invoices = await self._get_invoices_needing_reminders(self.config.days_ahead_normal)
+            early_invoices = await self._get_invoices_needing_reminders(self.config.days_ahead_early)
+            
+            # Combine and deduplicate
+            all_invoices = self._deduplicate_invoices([
+                *urgent_invoices,
+                *normal_invoices, 
+                *early_invoices
+            ])
+            
+            logger.info(f"📊 Found {len(all_invoices)} invoices needing Skonto reminders")
+            
+            # Limit batch size
+            if len(all_invoices) > self.config.max_reminders_per_run:
+                logger.warning(f"⚠️ Limiting batch to {self.config.max_reminders_per_run} invoices")
+                all_invoices = all_invoices[:self.config.max_reminders_per_run]
+            
+            # Send reminders
+            for invoice in all_invoices:
+                try:
+                    success = await self._send_single_reminder(invoice)
+                    if success:
+                        reminders_sent += 1
+                    
+                    # Small delay between emails to avoid overwhelming the email service
+                    await asyncio.sleep(1)
+                    
+                except Exception as e:
+                    error_msg = f"Failed to send reminder for invoice {invoice.get('id')}: {str(e)}"
+                    logger.error(error_msg)
+                    errors.append(error_msg)
+                    self.stats["total_errors"] += 1
+            
+            # Update statistics
+            self.stats["total_reminders_sent"] += reminders_sent
+            self.last_run = start_time
+            
+            duration = (datetime.now() - start_time).total_seconds()
+            
+            logger.info(f"✅ Skonto reminder check completed in {duration:.2f}s")
+            logger.info(f"📧 Sent {reminders_sent} reminders, {len(errors)} errors")
+            
+            return {
+                "enabled": True,
+                "start_time": start_time.isoformat(),
+                "duration_seconds": duration,
+                "invoices_found": len(all_invoices),
+                "reminders_sent": reminders_sent,
+                "errors": errors,
+                "dry_run": self.config.dry_run
+            }
+            
+        except Exception as e:
+            error_msg = f"Critical error in Skonto scheduler: {str(e)}"
+            logger.error(error_msg)
+            self.stats["last_error"] = error_msg
+            self.stats["total_errors"] += 1
+            
+            return {
+                "enabled": True,
+                "error": error_msg,
+                "start_time": start_time.isoformat(),
+                "reminders_sent": reminders_sent
+            }
+    
+    async def _get_invoices_needing_reminders(self, days_ahead: int) -> List[Dict[str, Any]]:
+        """Get invoices that need Skonto reminders within specified days"""
+        try:
+            result = db_service.get_invoices_with_skonto_due(days_ahead=days_ahead)
+            
+            if result["success"]:
+                invoices = result["data"]
+                logger.info(f"📋 Found {len(invoices)} invoices with Skonto due within {days_ahead} days")
+                return invoices
+            else:
+                logger.error(f"❌ Failed to get invoices with Skonto due: {result.get('error')}")
+                return []
+                
+        except Exception as e:
+            logger.error(f"❌ Exception getting invoices with Skonto due: {str(e)}")
+            return []
+    
+    def _deduplicate_invoices(self, invoice_lists: List[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+        """Remove duplicate invoices from combined lists"""
+        seen_ids = set()
+        unique_invoices = []
+        
+        for invoice_list in invoice_lists:
+            for invoice in invoice_list:
+                invoice_id = invoice.get("id")
+                if invoice_id and invoice_id not in seen_ids:
+                    seen_ids.add(invoice_id)
+                    unique_invoices.append(invoice)
+        
+        return unique_invoices
+    
+    async def _send_single_reminder(self, invoice_data: Dict[str, Any]) -> bool:
+        """Send a single Skonto reminder email"""
+        try:
+            invoice_id = invoice_data.get("id")
+            
+            # Determine recipient email
+            recipient_email = (
+                invoice_data.get("bauleiter_email") or 
+                self.config.default_recipient_email
+            )
+            
+            if self.config.dry_run:
+                logger.info(f"🧪 DRY RUN: Would send Skonto reminder for invoice {invoice_id} to {recipient_email}")
+                return True
+            
+            # Send the reminder
+            result = await email_service.send_skonto_reminder(
+                invoice_data=invoice_data,
+                recipient_email=recipient_email,
+                recipient_name=None
+            )
+            
+            if result["success"]:
+                logger.info(f"✅ Sent Skonto reminder for invoice {invoice_id} to {recipient_email}")
+                return True
+            else:
+                logger.error(f"❌ Failed to send Skonto reminder for invoice {invoice_id}: {result.get('error')}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"❌ Exception sending Skonto reminder: {str(e)}")
+            return False
+    
+    async def start_scheduler(self):
+        """Start the automated scheduler using asyncio"""
+        if not self.config.enabled:
+            logger.info("⏸️ Skonto scheduler is disabled")
+            return
+        
+        logger.info(f"🚀 Starting Skonto reminder scheduler (check every {self.config.check_interval_hours} hours)")
+        
+        self.is_running = True
+        
+        # Run immediately on startup
+        logger.info("🔄 Running initial Skonto reminder check...")
+        await self.check_and_send_reminders()
+        
+        # Keep the scheduler running
+        while self.is_running:
+            try:
+                # Wait for the specified interval
+                await asyncio.sleep(self.config.check_interval_hours * 3600)  # Convert hours to seconds
+                
+                if self.is_running:  # Check if still running after sleep
+                    await self.check_and_send_reminders()
+                    
+            except asyncio.CancelledError:
+                logger.info("🛑 Scheduler cancelled")
+                break
+            except Exception as e:
+                logger.error(f"❌ Scheduler error: {str(e)}")
+                # Continue running even if there's an error
+                await asyncio.sleep(300)  # Wait 5 minutes before retrying
+    
+    def stop_scheduler(self):
+        """Stop the automated scheduler"""
+        logger.info("⏹️ Stopping Skonto reminder scheduler")
+        self.is_running = False
+    
+    def get_status(self) -> Dict[str, Any]:
+        """Get current scheduler status and statistics"""
+        next_run = None
+        if self.is_running and self.last_run:
+            next_run = (self.last_run + timedelta(hours=self.config.check_interval_hours)).isoformat()
+        
+        return {
+            "enabled": self.config.enabled,
+            "is_running": self.is_running,
+            "config": {
+                "check_interval_hours": self.config.check_interval_hours,
+                "days_ahead_urgent": self.config.days_ahead_urgent,
+                "days_ahead_normal": self.config.days_ahead_normal,
+                "days_ahead_early": self.config.days_ahead_early,
+                "max_reminders_per_run": self.config.max_reminders_per_run,
+                "dry_run": self.config.dry_run
+            },
+            "stats": self.stats,
+            "last_run": self.last_run.isoformat() if self.last_run else None,
+            "next_run": next_run
+        }
+
+# Global scheduler instance
+skonto_scheduler = SkontoSchedulerService()
+
+# Utility functions for manual operations
+async def run_manual_skonto_check() -> Dict[str, Any]:
+    """Run a manual Skonto reminder check (for testing/debugging)"""
+    logger.info("🔧 Running manual Skonto reminder check")
+    return await skonto_scheduler.check_and_send_reminders()
+
+async def send_test_skonto_reminder(invoice_id: str, recipient_email: str) -> Dict[str, Any]:
+    """Send a test Skonto reminder for a specific invoice"""
+    try:
+        # Get invoice data
+        invoice_result = db_service.get_invoice(invoice_id)
+        if not invoice_result["success"]:
+            return {"success": False, "error": f"Invoice not found: {invoice_result['error']}"}
+        
+        invoice_data = invoice_result["data"]
+        
+        # Send test reminder
+        result = await email_service.send_skonto_reminder(
+            invoice_data=invoice_data,
+            recipient_email=recipient_email,
+            recipient_name="Test Recipient"
+        )
+        
+        logger.info(f"🧪 Test Skonto reminder sent for invoice {invoice_id} to {recipient_email}")
+        return result
+        
+    except Exception as e:
+        error_msg = f"Failed to send test Skonto reminder: {str(e)}"
+        logger.error(error_msg)
+        return {"success": False, "error": error_msg}

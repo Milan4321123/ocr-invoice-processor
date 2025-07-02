@@ -1,5 +1,5 @@
 """File upload route handlers"""
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from fastapi.responses import Response
 import re
 import uuid
@@ -7,11 +7,11 @@ import datetime
 import logging
 import os
 from typing import Dict, Any
-from supabase import Client
 
-# OCR imports
-from ocr.workflow import ocr_workflow
-from config.ocr_config import ocr_config
+# Import upload service instead of direct database calls
+from services.upload_service import upload_service, UploadSource, FileData
+from services.database import db_service
+from api.dependencies.auth import require_auth
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -81,97 +81,17 @@ startxref
         headers={"Content-Disposition": f"inline; filename={filename}"}
     )
 
-async def upload_file_mock(file: UploadFile) -> Dict[str, Any]:
-    """Mock upload function for when Supabase is not available"""
-    content = await file.read()
-    
-    # Sanitize filename for security
-    safe_filename = sanitize_filename(file.filename)
-    
-    # Generate UUID for mock invoice
-    invoice_id = str(uuid.uuid4())
-    
-    # Mock URL
-    mock_url = f"http://localhost:8000/mock-storage/{safe_filename}"
-    
-    # Process OCR if enabled
-    ocr_result = None
-    if ocr_config.enable_ocr:
-        try:
-            # Validate file for OCR processing
-            is_valid, validation_error = ocr_workflow.validate_file_for_ocr(len(content), file.content_type)
-            
-            if is_valid:
-                # Process document with OCR
-                ocr_result = await ocr_workflow.process_document(
-                    content, file.content_type, file.filename, "invoice"
-                )
-            else:
-                # OCR validation failed, but still upload the file
-                ocr_result = {
-                    "success": False,
-                    "error": validation_error,
-                    "ocr_enabled": True
-                }
-        except Exception as e:
-            # OCR failed, but still upload the file
-            ocr_result = {
-                "success": False,
-                "error": f"OCR processing failed: {str(e)}",
-                "ocr_enabled": True
-            }
-    
-    # Prepare response
-    response_data = {
-        "status": "uploaded",
-        "filename": safe_filename,
-        "url": mock_url,
-        "id": invoice_id,
-        "file_size": len(content),
-        "ocr_enabled": ocr_config.enable_ocr
-    }
-    
-    # Include OCR results in response
-    if ocr_result:
-        response_data["ocr_result"] = {
-            "success": ocr_result.get("success", False),
-            "confidence": ocr_result.get("confidence", 0.0),
-            "pages": ocr_result.get("pages", 0),
-            "processing_time": ocr_result.get("processing_time", 0.0),
-            "error": ocr_result.get("error"),
-            "structured_data_available": bool(ocr_result.get("structured_data"))
-        }
-    
-    return response_data
-
 @router.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
-    """Upload a PDF invoice file"""
-    # Import here to avoid circular imports
-    import main
-    supabase = main.supabase
-    
-    # Sanitize filename for security
-    safe_filename = sanitize_filename(file.filename)
-    
-    if not supabase:
-        # For demo purposes, work without Supabase
-        # Create a new UploadFile-like object with sanitized filename
-        class SanitizedFile:
-            def __init__(self, original_file, sanitized_name):
-                self.filename = sanitized_name
-                self.content_type = original_file.content_type
-                self._original_file = original_file
-            
-            async def read(self):
-                return await self._original_file.read()
-        
-        sanitized_file = SanitizedFile(file, safe_filename)
-        return await upload_file_mock(sanitized_file)
-    
+async def upload_file(
+    file: UploadFile = File(...)
+):  # Removed authentication for demo
+    """Upload a PDF invoice file using the centralized upload service"""
     # Validate file type
     if file.content_type != "application/pdf":
         raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+    
+    # Sanitize filename for security
+    safe_filename = sanitize_filename(file.filename)
     
     # Validate filename pattern (use sanitized filename)
     if not re.match(FILENAME_PATTERN, safe_filename):
@@ -188,124 +108,34 @@ async def upload_file(file: UploadFile = File(...)):
         if len(content) == 0:
             raise HTTPException(status_code=400, detail="File is empty")
         
-        # Upload to Supabase storage
-        bucket_name = "invoices"
-        storage_path = safe_filename
+        # Create FileData object
+        file_data = FileData(
+            content=content,
+            filename=safe_filename,
+            content_type=file.content_type,
+            file_size=len(content),
+            source=UploadSource.DRAG_DROP,
+            source_metadata={"original_filename": file.filename}
+        )
         
-        # Upload file to storage
-        supabase.storage.from_(bucket_name).upload(storage_path, content)
+        # Use upload service to handle the upload
+        result = await upload_service.upload_file(file_data)
         
-        # Get public URL
-        public_url = supabase.storage.from_(bucket_name).get_public_url(storage_path)
+        if not result.success:
+            raise HTTPException(status_code=500, detail=f"Upload failed: {result.error}")
         
-        # Generate UUID for invoice record
-        invoice_id = str(uuid.uuid4())
-        
-        # Process OCR if enabled
-        ocr_result = None
-        if ocr_config.enable_ocr:
-            try:
-                # Validate file for OCR processing
-                is_valid, validation_error = ocr_workflow.validate_file_for_ocr(len(content), file.content_type)
-                
-                if is_valid:
-                    # Process document with OCR
-                    ocr_result = await ocr_workflow.process_document(
-                        content, file.content_type, file.filename, "invoice"
-                    )
-                else:
-                    # OCR validation failed, but still upload the file
-                    ocr_result = {
-                        "success": False,
-                        "error": validation_error,
-                        "ocr_enabled": True
-                    }
-            except Exception as e:
-                # OCR failed, but still upload the file
-                ocr_result = {
-                    "success": False,
-                    "error": f"OCR processing failed: {str(e)}",
-                    "ocr_enabled": True
-                }
-        
-        # Prepare database record with OCR data
-        invoice_data = {
-            "id": invoice_id,
-            "filename": safe_filename,
-            "url": public_url,
+        # Return successful response
+        return {
             "status": "uploaded",
-            "file_size": len(content)
+            "filename": result.filename,
+            "url": result.url,
+            "id": result.invoice_id,
+            "file_size": result.file_size,
+            "source": result.source.value
         }
         
-        # Add OCR data if available
-        if ocr_result:
-            invoice_data.update({
-                "ocr_status": "completed" if ocr_result.get("success") else "failed",
-                "ocr_text": ocr_result.get("raw_text", ""),
-                "ocr_confidence": ocr_result.get("confidence", 0.0),
-                "ocr_pages": ocr_result.get("pages", 0),
-                "ocr_processing_time": ocr_result.get("processing_time", 0.0),
-                "ocr_error": ocr_result.get("error"),
-                "ocr_processed_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                "ocr_entities": ocr_result.get("entities", []),
-                "ocr_form_fields": ocr_result.get("form_fields", []),
-                "ocr_tables": ocr_result.get("tables", [])
-            })
-            
-            # Add structured invoice data if available
-            structured_data = ocr_result.get("structured_data")
-            if structured_data:
-                invoice_data.update({
-                    "invoice_number": structured_data.get("invoice_number"),
-                    "invoice_date": structured_data.get("invoice_date"),
-                    "due_date": structured_data.get("due_date"),
-                    "vendor_name": structured_data.get("vendor_name"),
-                    "vendor_address": structured_data.get("vendor_address"),
-                    "customer_name": structured_data.get("customer_name"),
-                    "customer_address": structured_data.get("customer_address"),
-                    "subtotal": float(structured_data.get("subtotal")) if structured_data.get("subtotal") else None,
-                    "tax_amount": float(structured_data.get("tax_amount")) if structured_data.get("tax_amount") else None,
-                    "total_amount": float(structured_data.get("total_amount")) if structured_data.get("total_amount") else None,
-                    "currency": structured_data.get("currency"),
-                    "payment_terms": structured_data.get("payment_terms"),
-                    "po_number": structured_data.get("po_number"),
-                    "line_items": structured_data.get("line_items", [])
-                })
-        else:
-            # OCR disabled
-            invoice_data.update({
-                "ocr_status": "disabled",
-                "ocr_text": "",
-                "ocr_confidence": 0.0,
-                "ocr_pages": 0,
-                "ocr_processing_time": 0.0
-            })
-        
-        supabase.table("invoices").insert(invoice_data).execute()
-        
-        # Prepare response
-        response_data = {
-            "status": "uploaded",
-            "filename": safe_filename,
-            "url": public_url,
-            "id": invoice_id,
-            "file_size": len(content),
-            "ocr_enabled": ocr_config.enable_ocr
-        }
-        
-        # Include OCR results in response
-        if ocr_result:
-            response_data["ocr_result"] = {
-                "success": ocr_result.get("success", False),
-                "confidence": ocr_result.get("confidence", 0.0),
-                "pages": ocr_result.get("pages", 0),
-                "processing_time": ocr_result.get("processing_time", 0.0),
-                "error": ocr_result.get("error"),
-                "structured_data_available": bool(ocr_result.get("structured_data"))
-            }
-        
-        return response_data
-        
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Upload failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")

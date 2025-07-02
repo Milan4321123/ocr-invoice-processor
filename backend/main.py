@@ -1,75 +1,102 @@
 """
-Refactored Invoice OCR API main application.
-This file now imports route handlers from separate modules for better maintainability.
+Clean Invoice Management API
+Handles upload, storage, editing, and workflow without OCR dependencies.
 """
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from supabase import create_client, Client
-import os
 import uuid
 import logging
 from dotenv import load_dotenv
-from typing import Optional
-
-# Route imports
-from api.routes import health, upload, invoices
-
-# OCR imports
-from ocr.workflow import ocr_workflow
-from config.ocr_config import ocr_config
 
 # Load environment variables
 load_dotenv()
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize FastAPI app
-app = FastAPI(title="Invoice OCR API", version="0.1.0")
-
-# Add request ID middleware for better traceability
-@app.middleware("http")
-async def add_request_id(request: Request, call_next):
-    request_id = str(uuid.uuid4())
-    request.state.request_id = request_id
-    response = await call_next(request)
-    response.headers["X-Request-ID"] = request_id
-    return response
+app = FastAPI(
+    title="Invoice Management API",
+    description="Clean invoice processing without OCR dependencies",
+    version="2.0.0"
+)
 
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:3003"],  # Next.js ports
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001", "http://127.0.0.1:3001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Initialize Supabase client
-supabase: Optional[Client] = None
+# Add request ID middleware
+@app.middleware("http")
+async def add_request_id(request: Request, call_next):
+    request_id = str(uuid.uuid4())
+    request.state.request_id = request_id
+    
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+    return response
 
-# Supabase configuration - check both naming conventions
-SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("SUPA_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPA_KEY")
+# Import routes
+from api.routes import (
+    health, 
+    upload, 
+    invoices, 
+    dropdowns, 
+    approval, 
+    approval_workflow,
+    email_workflow,
+    # email_test,  # Removed - not needed for production
+    reports,
+    folder_watcher,
+    skonto_dashboard,  # Added missing skonto dashboard import
+    # multi_layer_approval,  # Removed - using simple single Bauleiter approval only
+    auth
+)
 
-if SUPABASE_URL and SUPABASE_KEY:
+# Register routes
+app.include_router(auth.router, tags=["authentication"])
+app.include_router(health.router, prefix="/api", tags=["health"])
+app.include_router(upload.router, prefix="/api", tags=["upload"])
+app.include_router(invoices.router, prefix="/api", tags=["invoices"])
+app.include_router(dropdowns.router, prefix="/api", tags=["dropdowns"])
+app.include_router(approval.router, prefix="/api/approval", tags=["approval"])
+app.include_router(approval_workflow.router, prefix="/api", tags=["workflow"])
+app.include_router(email_workflow.router, prefix="/api", tags=["email"])
+app.include_router(reports.router, prefix="/api", tags=["reports"])
+app.include_router(skonto_dashboard.router, prefix="/api", tags=["skonto"])  # Added missing skonto dashboard router
+app.include_router(folder_watcher.router, prefix="/api/folder-watcher", tags=["folder-watcher"])
+# Removed multi_layer_approval.router - using simple single Bauleiter approval only
+
+@app.get("/")
+async def root():
+    return {
+        "message": "Invoice Management API",
+        "version": "2.0.0",
+        "status": "running",
+        "features": ["manual_entry", "searchable_dropdowns", "workflow", "email"]
+    }
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize application on startup"""
+    logger.info("🚀 Starting Invoice Management API...")
+    
+    # Initialize authentication system
     try:
-        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-        logger.info(f"Supabase client initialized successfully with URL: {SUPABASE_URL[:50]}...")
+        from services.auth_service import auth_service
+        result = await auth_service.initialize_default_user()
+        if result["success"]:
+            logger.info(f"🔐 {result['message']}")
+        else:
+            logger.error(f"❌ Auth initialization failed: {result.get('error', 'Unknown error')}")
     except Exception as e:
-        logger.error(f"Failed to initialize Supabase client: {e}")
-        supabase = None
-else:
-    logger.warning("Supabase configuration not found. Running in demo mode.")
-
-# Include route modules
-app.include_router(health.router, tags=["health"])
-app.include_router(upload.router, tags=["upload"])
-app.include_router(invoices.router, tags=["invoices"])
+        logger.error(f"❌ Auth initialization error: {e}")
+    
+    logger.info("✅ Application startup complete")
 
 if __name__ == "__main__":
     import uvicorn
