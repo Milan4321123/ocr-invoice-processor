@@ -13,16 +13,11 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 @router.get("/invoices")
-async def get_invoices():  # Removed authentication for demo
+async def get_invoices():
     """Get all invoices"""
     
     if not db_service.is_available:
-        # Mock response when database is not available
-        return {
-            "invoices": [],
-            "total": 0,
-            "message": "Demo mode - Database not configured"
-        }
+        raise HTTPException(status_code=503, detail="Database service not available")
     
     try:
         # Use centralized database service method
@@ -38,40 +33,7 @@ async def get_invoices():  # Removed authentication for demo
         
     except Exception as e:
         error_msg = str(e)
-        logger.warning(f"Database query failed (falling back to demo mode): {error_msg}")
-        
-        # If table doesn't exist, return demo data
-        if "does not exist" in error_msg or "relation" in error_msg:
-            return {
-                "invoices": [
-                    {
-                        "id": "demo-001",
-                        "filename": "20250626_DEMO_INVOICE_001.pdf",
-                        "url": "http://localhost:8000/api/mock-storage/demo_invoice_001.pdf",
-                        "status": "uploaded",
-                        "file_size": 245760,
-                        "created_at": "2025-06-26T10:30:00Z",
-                        "customer_name": "Demo Customer Ltd",
-                        "vendor_name": "Demo Vendor GmbH",
-                        "total_amount": 1250.00
-                    },
-                    {
-                        "id": "demo-002", 
-                        "filename": "20250625_DEMO_INVOICE_002.pdf",
-                        "url": "http://localhost:8000/api/mock-storage/demo_invoice_002.pdf",
-                        "status": "uploaded",
-                        "file_size": 156432,
-                        "created_at": "2025-06-25T14:20:00Z",
-                        "customer_name": "Demo Construction AG",
-                        "vendor_name": "Demo Electrical Services",
-                        "total_amount": 3750.50
-                    }
-                ],
-                "total": 2,
-                "message": "Demo mode - Using sample data"
-            }
-        
-        # For other errors, raise exception
+        logger.error(f"Database query failed: {error_msg}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch invoices: {error_msg}")
 
 @router.get("/invoices/pending-approval")
@@ -215,8 +177,7 @@ async def get_invoice(invoice_id: str = Path(..., description="The invoice ID"))
     """Get a specific invoice by ID"""
     
     if not db_service.is_available:
-        # Mock response when database is not available
-        raise HTTPException(status_code=404, detail="Invoice not found (Demo mode)")
+        raise HTTPException(status_code=503, detail="Database service not available")
     
     try:
         # Use centralized database service method
@@ -655,43 +616,48 @@ async def send_invoice_to_bauleiter(
 @router.post("/invoices/{invoice_id}/send-skonto-reminder")
 async def send_skonto_reminder(
     invoice_id: str = Path(..., description="Invoice ID"),
-    recipient_email: str = Query(None, description="Recipient email address"),
-    recipient_name: str = Query(None, description="Recipient name")
+    recipient_email: str = Query(default=None, description="Email address to send reminder to"),
+    recipient_name: str = Query(default=None, description="Name of recipient")
 ):
     """
-    Send Skonto reminder email for a specific invoice.
+    Send Skonto reminder email for an invoice.
     
     Args:
         invoice_id: The ID of the invoice
-        recipient_email: Optional recipient email (defaults to bauleiter_email)
-        recipient_name: Optional recipient name
+        recipient_email: Email address to send reminder to (optional, falls back to default)
+        recipient_name: Name of recipient (optional)
     """
     try:
-        logger.info(f"📧 Sending Skonto reminder for invoice {invoice_id}")
+        logger.info(f"🔔 Sending Skonto reminder for invoice {invoice_id}")
         
         # Get invoice data
-        invoice_result = db_service.get_invoice_by_id(invoice_id)
+        invoice_result = db_service.get_invoice(invoice_id)
         if not invoice_result["success"]:
-            raise HTTPException(status_code=404, detail="Invoice not found")
+            raise HTTPException(status_code=404, detail=f"Invoice not found: {invoice_result['error']}")
         
         invoice_data = invoice_result["data"]
         
-        # Validate that invoice has Skonto data
+        # Validate invoice has Skonto data
         if not invoice_data.get("skonto_datum") or not invoice_data.get("skonto_prozent"):
             raise HTTPException(
-                status_code=400,
-                detail="Invoice does not have Skonto data (missing skonto_datum or skonto_prozent)"
+                status_code=400, 
+                detail="Invoice does not have Skonto information (missing skonto_datum or skonto_prozent)"
             )
         
-        # Check if invoice has already been processed
+        # Check if reminder already sent (but still allow resending)
+        if invoice_data.get("skonto_reminder_sent"):
+            logger.info(f"⚠️ Skonto reminder already sent for invoice {invoice_id}, but allowing resend")
+            # Don't block the resend, just log it
+        
+        # Check if Skonto decision already made
         skonto_decision = invoice_data.get("skonto_decision")
-        if skonto_decision in ["taken", "missed"]:
+        if skonto_decision in ["taken", "missed", "not_applicable"]:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invoice Skonto has already been processed as '{skonto_decision}'"
+                detail=f"Skonto decision already made: {skonto_decision}"
             )
         
-        # Use provided recipient email or fallback to defaults
+        # Use provided email or fall back to default stakeholder
         if not recipient_email:
             # Default to bauleiter_email or a configured default
             recipient_email = invoice_data.get("bauleiter_email") or "default@company.com"
@@ -705,9 +671,6 @@ async def send_skonto_reminder(
         )
         
         if email_result["success"]:
-            # Update database to mark reminder as sent
-            db_service.update_skonto_reminder_sent(invoice_id)
-            
             logger.info(f"✅ Skonto reminder sent successfully for invoice {invoice_id}")
             return {
                 "success": True,
@@ -777,10 +740,6 @@ async def update_invoice(
                 if amount and percentage:
                     update_data["actual_skonto_savings"] = float(amount) * float(percentage) / 100
             
-            # If marking as missed, ensure actual_skonto_savings is 0
-            if skonto_decision == "missed":
-                update_data["actual_skonto_savings"] = 0.0
-            
             logger.info(f"📊 Marking Skonto as {skonto_decision} for invoice {invoice_id}")
         
         # Update invoice in database
@@ -793,7 +752,6 @@ async def update_invoice(
                 "message": "Invoice updated successfully",
                 "invoice_id": invoice_id,
                 "updated_fields": list(update_data.keys()),
-                "data": result["data"],
                 "updated_at": datetime.utcnow().isoformat()
             }
         else:
