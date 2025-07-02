@@ -24,11 +24,7 @@ async def get_invoice_summary(
     """
     try:
         if not db_service.is_available:
-            return {
-                "success": False,
-                "message": "Demo mode - Database not configured",
-                "data": []
-            }
+            raise HTTPException(status_code=503, detail="Database service not available")
         
         # Build filters
         filters = {}

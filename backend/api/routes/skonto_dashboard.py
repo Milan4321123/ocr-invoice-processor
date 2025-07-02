@@ -423,37 +423,6 @@ async def get_scheduler_status():
         logger.error(f"❌ Failed to get scheduler status: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to get scheduler status: {str(e)}")
 
-@router.post("/skonto/test/send-reminder/{invoice_id}")
-async def send_test_skonto_reminder(
-    invoice_id: str,
-    recipient_email: str = Query(..., description="Email address to send test reminder to")
-):
-    """
-    Send a test Skonto reminder for a specific invoice.
-    Useful for testing the email functionality.
-    """
-    try:
-        logger.info(f"🧪 Sending test Skonto reminder for invoice {invoice_id} to {recipient_email}")
-        
-        from services.skonto_scheduler import send_test_skonto_reminder
-        result = await send_test_skonto_reminder(invoice_id, recipient_email)
-        
-        if result["success"]:
-            return {
-                "success": True,
-                "message": f"Test Skonto reminder sent to {recipient_email}",
-                "result": result,
-                "timestamp": datetime.now().isoformat()
-            }
-        else:
-            raise HTTPException(status_code=500, detail=result.get("error", "Unknown error"))
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Failed to send test Skonto reminder: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to send test reminder: {str(e)}")
-
 @router.get("/skonto/reports/savings-potential")
 async def get_savings_potential_report():
     """

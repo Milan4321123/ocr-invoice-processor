@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 
 interface HealthComponent {
-  status: 'healthy' | 'degraded' | 'error' | 'mock';
+  status: 'healthy' | 'degraded' | 'error';
   response_time_ms?: number;
   error?: string;
   total_invoices?: number;
@@ -36,15 +36,13 @@ interface SystemHealth {
 const statusColors = {
   healthy: 'glass-card text-green-700 border-green-200',
   degraded: 'glass-card text-yellow-700 border-yellow-200',
-  error: 'glass-card text-red-700 border-red-200',
-  mock: 'glass-card text-blue-700 border-blue-200'
+  error: 'glass-card text-red-700 border-red-200'
 };
 
 const statusIcons = {
   healthy: '✅',
   degraded: '⚠️',
-  error: '❌',
-  mock: '🔧'
+  error: '❌'
 };
 
 export default function SystemHealthDashboard() {

@@ -25,7 +25,7 @@ class SkontoReminderConfig:
     days_ahead_early: int = 7      # Send early reminders 7 days before
     max_reminders_per_run: int = 50  # Limit batch size
     default_recipient_email: str = "finance@company.com"
-    dry_run: bool = False  # Set to True for testing
+    dry_run: bool = False  # For testing without actually sending emails
 
 class SkontoSchedulerService:
     """
@@ -269,33 +269,7 @@ class SkontoSchedulerService:
 # Global scheduler instance
 skonto_scheduler = SkontoSchedulerService()
 
-# Utility functions for manual operations
 async def run_manual_skonto_check() -> Dict[str, Any]:
-    """Run a manual Skonto reminder check (for testing/debugging)"""
+    """Run a manual Skonto reminder check"""
     logger.info("🔧 Running manual Skonto reminder check")
     return await skonto_scheduler.check_and_send_reminders()
-
-async def send_test_skonto_reminder(invoice_id: str, recipient_email: str) -> Dict[str, Any]:
-    """Send a test Skonto reminder for a specific invoice"""
-    try:
-        # Get invoice data
-        invoice_result = db_service.get_invoice(invoice_id)
-        if not invoice_result["success"]:
-            return {"success": False, "error": f"Invoice not found: {invoice_result['error']}"}
-        
-        invoice_data = invoice_result["data"]
-        
-        # Send test reminder
-        result = await email_service.send_skonto_reminder(
-            invoice_data=invoice_data,
-            recipient_email=recipient_email,
-            recipient_name="Test Recipient"
-        )
-        
-        logger.info(f"🧪 Test Skonto reminder sent for invoice {invoice_id} to {recipient_email}")
-        return result
-        
-    except Exception as e:
-        error_msg = f"Failed to send test Skonto reminder: {str(e)}"
-        logger.error(error_msg)
-        return {"success": False, "error": error_msg}

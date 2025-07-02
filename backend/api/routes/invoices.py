@@ -202,12 +202,7 @@ async def delete_invoice(invoice_id: str = Path(..., description="The invoice ID
     """Delete an invoice by ID"""
     
     if not db_service.is_available:
-        # Mock response when database is not available
-        return {
-            "message": "Invoice deleted (Demo mode)",
-            "invoice_id": invoice_id,
-            "status": "success"
-        }
+        raise HTTPException(status_code=503, detail="Database service not available")
     
     try:
         # Use centralized database service method
@@ -237,11 +232,7 @@ async def validate_invoice(invoice_id: str = Path(..., description="The invoice 
     """Validate if an invoice exists and is accessible"""
     
     if not db_service.is_available:
-        # Mock validation for demo
-        if invoice_id == "test-123":
-            return {"valid": True, "invoice_id": invoice_id}
-        else:
-            raise HTTPException(status_code=404, detail="Invoice not found")
+        raise HTTPException(status_code=503, detail="Database service not available")
     
     try:
         # Use centralized database service method
@@ -267,29 +258,7 @@ async def get_invoice_editor_data(invoice_id: str = Path(..., description="The i
     """Get invoice data formatted for the editor interface"""
     
     if not db_service.is_available:
-        # Mock data for demo
-        if invoice_id == "test-123":
-            return {
-                "pdfUrl": "/test_invoice_1748551760.pdf",
-                "fields": {
-                    "rechnungsempfaenger": "ACME Construction GmbH",
-                    "rechnungssteller": "Demo Vendor Services",
-                    "projekt": "Residential Building Project",
-                    "gewerk": "Electrical Installation", 
-                    "rechnungsbetrag": 15750.50,
-                    "rechnungseingang": "2025-05-30",
-                    "faelligkeit": "2025-06-29",
-                    "skonto_datum": "2025-06-09",
-                    "skonto_prozent": 2.0,
-                    "rechnungsart": "rechnung",
-                    "kfw_anrechenbar": True,
-                    "rechnungspruefung_email": "review@acme-construction.de",
-                    "weiter_berechnen_an": "Client Invoice Department"
-                },
-                "filename": "test_invoice_1748551760.pdf"
-            }
-        else:
-            raise HTTPException(status_code=404, detail="Invoice not found")
+        raise HTTPException(status_code=503, detail="Database service not available")
     
     try:
         # Use centralized database service method
@@ -364,16 +333,7 @@ async def update_invoice_editor_data(
     editor_info = request_data.get("editor_info", {})
     
     if not db_service.is_available:
-        # Mock success for demo
-        if invoice_id == "test-123":
-            return {
-                "success": True,
-                "message": "Invoice updated successfully (demo mode)",
-                "invoice_id": invoice_id,
-                "updated_fields": fields
-            }
-        else:
-            raise HTTPException(status_code=404, detail="Invoice not found")
+        raise HTTPException(status_code=503, detail="Database service not available")
     
     try:
         # Update invoice data using centralized database service
@@ -474,17 +434,7 @@ async def complete_invoice(
     completion_info = request_data.get("completion_info", {})
     
     if not db_service.is_available:
-        # Mock success for demo
-        if invoice_id == "test-123":
-            return {
-                "success": True,
-                "message": "Invoice marked as completed (demo mode)",
-                "invoice_id": invoice_id,
-                "completion_status": "completed_review",
-                "email_sent": False
-            }
-        else:
-            raise HTTPException(status_code=404, detail="Invoice not found")
+        raise HTTPException(status_code=503, detail="Database service not available")
     
     try:
         # Use centralized database service to complete invoice

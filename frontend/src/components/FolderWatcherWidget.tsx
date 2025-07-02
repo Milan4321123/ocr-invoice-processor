@@ -54,7 +54,7 @@ export default function FolderWatcherWidget() {
     const interval = setInterval(() => {
       fetchStatus();
       fetchNotifications();
-    }, 5000); // Changed from 15000 to 5000 for faster testing
+    }, 5000); // Poll every 5 seconds
     return () => clearInterval(interval);
   }, []);
 

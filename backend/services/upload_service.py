@@ -50,15 +50,11 @@ class UploadService:
     # Filename pattern validation following German business convention:
     # FIXED Pattern: EINGANGSDATUM_PROJEKT_GEWERK_LIEFERANT.pdf
     # - EINGANGSDATUM: YYYYMMDD (8 digits - receipt date)
-    # - PROJEKT: Project identifier (letters, numbers, hyphens, periods - NO underscores)
-    # - GEWERK: Trade/work type (letters, numbers, hyphens, periods - NO underscores)  
-    # - LIEFERANT: Supplier name (letters, numbers, hyphens, periods - NO underscores)
-    # Must be exactly 4 parts separated by underscores, no more, no less
+    # - PROJEKT: Project identifier (letters, numbers, hyphens, periods)
+    # - GEWERK: Trade/work type (letters, numbers, hyphens, periods)  
+    # - LIEFERANT: Supplier name (letters, numbers, hyphens, periods)
+    # Must be exactly 4 parts separated by underscores
     # Supports German characters (ä, ö, ü, ß) and international characters
-    # Examples:
-    # - 20250627_BauProjekt-A1_Elektrik_Müller-GmbH.pdf
-    # - 20250627_Neubau.Office_Heizung_Schmidt-Co.pdf
-    # - 20250627_Sanierung_Sanitär_ABC.Industries.pdf
     FILENAME_PATTERN = r'^\d{8}_[A-Za-z0-9äöüÄÖÜß][A-Za-z0-9äöüÄÖÜß.\-]*_[A-Za-z0-9äöüÄÖÜß][A-Za-z0-9äöüÄÖÜß.\-]*_[A-Za-z0-9äöüÄÖÜß][A-Za-z0-9äöüÄÖÜß.\-]*\.pdf$'
     
     # Supported content types
@@ -154,9 +150,7 @@ class UploadService:
         Returns (success, public_url, error_message)
         """
         if not db_service.is_available:
-            # Mock upload for demo mode
-            mock_url = f"http://localhost:8000/mock-storage/{file_data.filename}"
-            return True, mock_url, None
+            raise Exception("Database service not available")
 
         try:
             # Get the appropriate bucket for this upload source
