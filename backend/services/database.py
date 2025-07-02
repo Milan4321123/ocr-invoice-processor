@@ -373,12 +373,23 @@ class DatabaseService:
             return {"success": False, "error": "Database unavailable"}
         
         try:
+            # First get the current invoice to check if it has Skonto data
+            current_invoice = self.get_invoice(invoice_id)
+            
             update_data = {
                 "status": "completed",
                 "review_status": "completed_review",
                 "reviewed_at": datetime.utcnow().isoformat(),
                 "updated_at": datetime.utcnow().isoformat()
             }
+            
+            # If invoice has Skonto data and no decision yet, set to pending for Prüfbericht tracking
+            if (current_invoice.get("success") and 
+                current_invoice["data"].get("skonto_datum") and 
+                current_invoice["data"].get("skonto_prozent") and 
+                not current_invoice["data"].get("skonto_decision")):
+                update_data["skonto_decision"] = "pending"
+                logger.info(f"🎯 Setting skonto_decision to 'pending' for invoice {invoice_id} with Skonto data")
             
             if completed_by:
                 update_data["reviewed_by"] = completed_by
@@ -955,19 +966,22 @@ class DatabaseService:
             future_date = today + timedelta(days=days_ahead)
             
             # Query invoices with Skonto due within the specified period
-            # Include invoices where skonto_decision is pending or null
+            # Include invoices where skonto_decision is pending, null, or not set
             response = self._client.table(self.table_name)\
                 .select("*")\
                 .not_.is_("skonto_datum", "null")\
                 .not_.is_("skonto_prozent", "null")\
-                .eq("skonto_decision", "pending")\
                 .execute()
             
             if response.data:
-                # Filter invoices based on Skonto date
+                # Filter invoices based on Skonto date and decision status
                 filtered_invoices = []
                 for invoice in response.data:
                     try:
+                        # Only include invoices where skonto_decision is pending, null, or not_applicable
+                        skonto_decision = invoice.get("skonto_decision")
+                        if skonto_decision not in [None, "pending", "not_applicable"]:
+                            continue  # Skip taken/missed invoices
                         skonto_datum = invoice.get("skonto_datum")
                         if not skonto_datum:
                             continue
@@ -1166,6 +1180,76 @@ class DatabaseService:
             logger.error(f"❌ Failed to get Skonto statistics: {e}")
             return {"success": False, "error": str(e)}
 
+    def update_expired_skonto_statuses(self) -> Dict[str, Any]:
+        """
+        Update invoices with expired Skonto dates to 'missed' status.
+        Should be called periodically or before displaying Skonto data.
+        """
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            from datetime import datetime
+            
+            # Get current date
+            today = datetime.now().date()
+            
+            # Get all invoices with Skonto data that have pending decision
+            response = self._client.table(self.table_name)\
+                .select("*")\
+                .not_.is_("skonto_datum", "null")\
+                .not_.is_("skonto_prozent", "null")\
+                .in_("skonto_decision", ["pending", None])\
+                .execute()
+            
+            if not response.data:
+                return {"success": True, "updated_count": 0, "message": "No invoices to update"}
+            
+            updated_count = 0
+            
+            for invoice in response.data:
+                try:
+                    skonto_datum = invoice.get("skonto_datum")
+                    if not skonto_datum:
+                        continue
+                    
+                    # Parse the Skonto date
+                    if isinstance(skonto_datum, str):
+                        if "-" in skonto_datum:
+                            skonto_date = datetime.strptime(skonto_datum, "%Y-%m-%d").date()
+                        else:
+                            skonto_date = datetime.strptime(skonto_datum, "%d.%m.%Y").date()
+                    else:
+                        skonto_date = skonto_datum
+                    
+                    # Check if expired
+                    if skonto_date < today:
+                        # Update to missed status
+                        update_result = self.update_skonto_decision(
+                            invoice["id"], 
+                            "missed", 
+                            actual_savings=0.0
+                        )
+                        
+                        if update_result["success"]:
+                            updated_count += 1
+                            logger.info(f"📅 Marked expired Skonto as missed: {invoice['id']}")
+                        
+                except Exception as e:
+                    logger.warning(f"Failed to process invoice {invoice.get('id')}: {e}")
+                    continue
+            
+            logger.info(f"✅ Updated {updated_count} expired Skonto invoices to 'missed' status")
+            return {
+                "success": True, 
+                "updated_count": updated_count,
+                "message": f"Updated {updated_count} expired invoices"
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to update expired Skonto statuses: {e}")
+            return {"success": False, "error": str(e)}
+
     # =============================================================================
     # USER MANAGEMENT (for authentication)
     # =============================================================================
@@ -1186,6 +1270,42 @@ class DatabaseService:
             # In Supabase, tables are typically created through the web interface
             # For development, we'll note this and continue
             return {"success": False, "error": f"Users table not found: {e}"}
+
+    def get_all_invoices_with_skonto_data(self) -> Dict[str, Any]:
+        """
+        Get ALL invoices that have Skonto data, regardless of deadline or status.
+        This is used for the Prüfbericht (Skonto report) page to show comprehensive data.
+        
+        Returns:
+            Dict with success status and list of all invoices with Skonto information
+        """
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            # Query all invoices that have both skonto_datum and skonto_prozent
+            response = self._client.table(self.table_name)\
+                .select("*")\
+                .not_.is_("skonto_datum", "null")\
+                .not_.is_("skonto_prozent", "null")\
+                .order("created_at", desc=True)\
+                .execute()
+            
+            if response.data:
+                # Add URL field for each invoice (for file access)
+                for invoice in response.data:
+                    if invoice.get("file_path"):
+                        invoice["url"] = f"https://bdtcfypvadryfeabqnlc.supabase.co/storage/v1/object/public/invoices/{invoice['file_path']}"
+                
+                logger.info(f"✅ Found {len(response.data)} invoices with Skonto data")
+                return {"success": True, "data": response.data}
+            else:
+                logger.info("No invoices found with Skonto data")
+                return {"success": True, "data": []}
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to get invoices with Skonto data: {e}")
+            return {"success": False, "error": str(e)}
 
 # =============================================================================
 # GLOBAL INSTANCE - Single database service for entire application

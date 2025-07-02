@@ -655,54 +655,43 @@ async def send_invoice_to_bauleiter(
 @router.post("/invoices/{invoice_id}/send-skonto-reminder")
 async def send_skonto_reminder(
     invoice_id: str = Path(..., description="Invoice ID"),
-    recipient_email: str = Query(default=None, description="Email address to send reminder to"),
-    recipient_name: str = Query(default=None, description="Name of recipient")
+    recipient_email: str = Query(None, description="Recipient email address"),
+    recipient_name: str = Query(None, description="Recipient name")
 ):
     """
-    Send Skonto reminder email for an invoice.
+    Send Skonto reminder email for a specific invoice.
     
     Args:
         invoice_id: The ID of the invoice
-        recipient_email: Email address to send reminder to (optional, falls back to default)
-        recipient_name: Name of recipient (optional)
+        recipient_email: Optional recipient email (defaults to bauleiter_email)
+        recipient_name: Optional recipient name
     """
     try:
-        logger.info(f"🔔 Sending Skonto reminder for invoice {invoice_id}")
+        logger.info(f"📧 Sending Skonto reminder for invoice {invoice_id}")
         
         # Get invoice data
-        invoice_result = db_service.get_invoice(invoice_id)
+        invoice_result = db_service.get_invoice_by_id(invoice_id)
         if not invoice_result["success"]:
-            raise HTTPException(status_code=404, detail=f"Invoice not found: {invoice_result['error']}")
+            raise HTTPException(status_code=404, detail="Invoice not found")
         
         invoice_data = invoice_result["data"]
         
-        # Validate invoice has Skonto data
+        # Validate that invoice has Skonto data
         if not invoice_data.get("skonto_datum") or not invoice_data.get("skonto_prozent"):
             raise HTTPException(
-                status_code=400, 
-                detail="Invoice does not have Skonto information (missing skonto_datum or skonto_prozent)"
+                status_code=400,
+                detail="Invoice does not have Skonto data (missing skonto_datum or skonto_prozent)"
             )
         
-        # Check if reminder already sent
-        if invoice_data.get("skonto_reminder_sent"):
-            logger.info(f"⚠️ Skonto reminder already sent for invoice {invoice_id}")
-            return {
-                "success": False,
-                "message": "Skonto reminder already sent for this invoice",
-                "invoice_id": invoice_id,
-                "already_sent": True,
-                "sent_at": invoice_data.get("skonto_reminder_sent_at")
-            }
-        
-        # Check if Skonto decision already made
+        # Check if invoice has already been processed
         skonto_decision = invoice_data.get("skonto_decision")
-        if skonto_decision in ["taken", "missed", "not_applicable"]:
+        if skonto_decision in ["taken", "missed"]:
             raise HTTPException(
                 status_code=400,
-                detail=f"Skonto decision already made: {skonto_decision}"
+                detail=f"Invoice Skonto has already been processed as '{skonto_decision}'"
             )
         
-        # Use provided email or fall back to default stakeholder
+        # Use provided recipient email or fallback to defaults
         if not recipient_email:
             # Default to bauleiter_email or a configured default
             recipient_email = invoice_data.get("bauleiter_email") or "default@company.com"
@@ -716,6 +705,9 @@ async def send_skonto_reminder(
         )
         
         if email_result["success"]:
+            # Update database to mark reminder as sent
+            db_service.update_skonto_reminder_sent(invoice_id)
+            
             logger.info(f"✅ Skonto reminder sent successfully for invoice {invoice_id}")
             return {
                 "success": True,
@@ -785,6 +777,10 @@ async def update_invoice(
                 if amount and percentage:
                     update_data["actual_skonto_savings"] = float(amount) * float(percentage) / 100
             
+            # If marking as missed, ensure actual_skonto_savings is 0
+            if skonto_decision == "missed":
+                update_data["actual_skonto_savings"] = 0.0
+            
             logger.info(f"📊 Marking Skonto as {skonto_decision} for invoice {invoice_id}")
         
         # Update invoice in database
@@ -797,6 +793,7 @@ async def update_invoice(
                 "message": "Invoice updated successfully",
                 "invoice_id": invoice_id,
                 "updated_fields": list(update_data.keys()),
+                "data": result["data"],
                 "updated_at": datetime.utcnow().isoformat()
             }
         else:

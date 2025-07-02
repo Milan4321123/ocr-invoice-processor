@@ -23,6 +23,7 @@ interface SkontoInvoice {
   status: 'captured' | 'missed' | 'pending' | 'expired';
   processedDate?: string;
   daysRemaining?: number;
+  reminderSent?: boolean;
 }
 
 export default function PrufberichtPage() {
@@ -38,65 +39,75 @@ export default function PrufberichtPage() {
     try {
       setLoading(true);
       
-      // Mock data for demonstration - replace with actual API calls
-      const mockMetrics: SkontoMetrics = {
-        totalInvoices: 847,
-        totalSkontoAmount: 89750,
-        capturedSkonto: 67320,
-        missedSkonto: 12450,
-        pendingReview: 23,
-        averageProcessingTime: 2.3
+      // Fetch real data from Skonto API endpoints
+      const [metricsResponse, opportunitiesResponse] = await Promise.all([
+        fetch('/api/skonto/dashboard/summary'),
+        fetch('/api/skonto/dashboard/opportunities?urgency=all&limit=200') // Max limit is 200
+      ]);
+
+      if (!metricsResponse.ok || !opportunitiesResponse.ok) {
+        throw new Error('Failed to fetch Skonto data');
+      }
+
+      const metricsData = await metricsResponse.json();
+      const opportunitiesData = await opportunitiesResponse.json();
+
+      console.log('📊 Metrics data:', metricsData);
+      console.log('📋 Opportunities data:', opportunitiesData);
+
+      // Transform API data to match our interface
+      const transformedMetrics: SkontoMetrics = {
+        totalInvoices: metricsData.total_opportunities || 0,
+        totalSkontoAmount: metricsData.total_potential_savings || 0,
+        capturedSkonto: 0, // Will be calculated from transformed invoices
+        missedSkonto: 0,   // Will be calculated from transformed invoices
+        pendingReview: metricsData.urgent_count || 0,
+        averageProcessingTime: 2.3 // Default for now
       };
 
-      const mockInvoices: SkontoInvoice[] = [
-        {
-          id: '1',
-          invoiceNumber: 'INV-2024-001',
-          vendor: 'Siemens AG',
-          amount: 15420,
-          skontoRate: 2.5,
-          skontoAmount: 385.50,
-          skontoDeadline: '2024-01-15',
-          status: 'pending',
-          daysRemaining: 5
-        },
-        {
-          id: '2',
-          invoiceNumber: 'INV-2024-002',
-          vendor: 'BMW Group',
-          amount: 28750,
-          skontoRate: 3.0,
-          skontoAmount: 862.50,
-          skontoDeadline: '2024-01-12',
-          status: 'captured',
-          processedDate: '2024-01-10'
-        },
-        {
-          id: '3',
-          invoiceNumber: 'INV-2024-003',
-          vendor: 'Mercedes-Benz',
-          amount: 42100,
-          skontoRate: 2.0,
-          skontoAmount: 842.00,
-          skontoDeadline: '2024-01-08',
-          status: 'missed',
-          daysRemaining: -2
-        },
-        {
-          id: '4',
-          invoiceNumber: 'INV-2024-004',
-          vendor: 'Volkswagen AG',
-          amount: 18900,
-          skontoRate: 2.5,
-          skontoAmount: 472.50,
-          skontoDeadline: '2024-01-20',
-          status: 'pending',
-          daysRemaining: 10
+      // Transform opportunities data to match our interface
+      const transformedInvoices: SkontoInvoice[] = opportunitiesData.map((opportunity: any) => {
+        const skontoAmount = opportunity.potential_savings || 0;
+        let status: 'captured' | 'missed' | 'pending' | 'expired' = 'pending';
+        
+        // Determine status based on skonto_decision from backend
+        const skontoDecision = opportunity.skonto_decision;
+        if (skontoDecision === 'taken') {
+          status = 'captured';
+        } else if (skontoDecision === 'missed') {
+          status = 'missed';
+        } else if (opportunity.days_until_expiry < 0) {
+          status = 'expired';
+        } else {
+          status = 'pending';
         }
-      ];
 
-      setMetrics(mockMetrics);
-      setInvoices(mockInvoices);
+        return {
+          id: opportunity.id,
+          invoiceNumber: opportunity.invoice_number || 'N/A',
+          vendor: opportunity.supplier || 'N/A', // This uses rechnungssteller from backend
+          amount: opportunity.amount || 0,
+          skontoRate: opportunity.skonto_percentage || 0,
+          skontoAmount: skontoAmount,
+          skontoDeadline: opportunity.skonto_date || '',
+          status: status,
+          daysRemaining: opportunity.days_until_expiry || 0,
+          processedDate: opportunity.processed_date,
+          reminderSent: opportunity.reminder_sent || false
+        };
+      });
+
+      // Calculate captured and missed amounts from transformed invoices
+      transformedMetrics.capturedSkonto = transformedInvoices
+        .filter(invoice => invoice.status === 'captured')
+        .reduce((total, invoice) => total + invoice.skontoAmount, 0);
+      
+      transformedMetrics.missedSkonto = transformedInvoices
+        .filter(invoice => invoice.status === 'missed')
+        .reduce((total, invoice) => total + invoice.skontoAmount, 0);
+
+      setMetrics(transformedMetrics);
+      setInvoices(transformedInvoices);
       setError(null);
       
     } catch (error) {
@@ -116,6 +127,7 @@ export default function PrufberichtPage() {
       });
       
       if (response.ok) {
+        alert('✅ Reminder sent successfully!');
         // Refresh data after action
         await fetchData();
       } else {
@@ -441,6 +453,7 @@ export default function PrufberichtPage() {
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Skonto</th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deadline</th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reminder</th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
@@ -478,39 +491,61 @@ export default function PrufberichtPage() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           {getStatusBadge(invoice.status)}
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ${
+                            invoice.reminderSent 
+                              ? 'bg-green-50 text-green-700 border border-green-200' 
+                              : 'bg-gray-50 text-gray-500 border border-gray-200'
+                          }`}>
+                            <Mail className="h-3 w-3" />
+                            {invoice.reminderSent ? 'Sent' : 'Not Sent'}
+                          </span>
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex space-x-2">
                             {/* Send Reminder Button */}
                             <button 
                               onClick={() => handleSendReminder(invoice.id)}
-                              disabled={actionLoading === invoice.id || invoice.status === 'captured' || invoice.status === 'missed'}
-                              className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md text-blue-600 bg-blue-50 hover:bg-blue-100 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                              title="Send Skonto Reminder"
+                              disabled={actionLoading === invoice.id}
+                              className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-md transition-colors ${
+                                invoice.reminderSent 
+                                  ? 'text-green-600 bg-green-50 border border-green-200' 
+                                  : 'text-blue-600 bg-blue-50 hover:bg-blue-100 hover:text-blue-700'
+                              } disabled:opacity-50 disabled:cursor-not-allowed`}
+                              title={invoice.reminderSent ? "Reminder already sent" : "Send Skonto Reminder"}
                             >
                               <Mail className="h-3 w-3 mr-1" />
-                              Reminder
+                              {invoice.reminderSent ? 'Sent' : 'Reminder'}
                             </button>
                             
                             {/* Mark as Taken Button */}
                             <button 
                               onClick={() => handleMarkAsTaken(invoice.id)}
-                              disabled={actionLoading === invoice.id || invoice.status === 'captured' || invoice.status === 'missed'}
-                              className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md text-green-600 bg-green-50 hover:bg-green-100 hover:text-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                              title="Mark Skonto as Taken"
+                              disabled={actionLoading === invoice.id}
+                              className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-md transition-colors ${
+                                invoice.status === 'captured'
+                                  ? 'text-green-800 bg-green-200 border border-green-300 cursor-default'
+                                  : 'text-green-600 bg-green-50 hover:bg-green-100 hover:text-green-700'
+                              } disabled:opacity-50 disabled:cursor-not-allowed`}
+                              title={invoice.status === 'captured' ? "Already marked as taken" : "Mark Skonto as Taken"}
                             >
                               <ThumbsUp className="h-3 w-3 mr-1" />
-                              Taken
+                              {invoice.status === 'captured' ? 'Captured' : 'Take'}
                             </button>
                             
                             {/* Mark as Missed Button */}
                             <button 
                               onClick={() => handleMarkAsMissed(invoice.id)}
-                              disabled={actionLoading === invoice.id || invoice.status === 'captured' || invoice.status === 'missed'}
-                              className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md text-red-600 bg-red-50 hover:bg-red-100 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                              title="Mark Skonto as Missed"
+                              disabled={actionLoading === invoice.id}
+                              className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-md transition-colors ${
+                                invoice.status === 'missed'
+                                  ? 'text-red-800 bg-red-200 border border-red-300 cursor-default'
+                                  : 'text-red-600 bg-red-50 hover:bg-red-100 hover:text-red-700'
+                              } disabled:opacity-50 disabled:cursor-not-allowed`}
+                              title={invoice.status === 'missed' ? "Already marked as missed" : "Mark Skonto as Missed"}
                             >
                               <ThumbsDown className="h-3 w-3 mr-1" />
-                              Missed
+                              {invoice.status === 'missed' ? 'Missed' : 'Miss'}
                             </button>
                             
                             {actionLoading === invoice.id && (

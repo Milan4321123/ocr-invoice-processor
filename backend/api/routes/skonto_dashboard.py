@@ -45,6 +45,7 @@ class SkontoOpportunityResponse(BaseModel):
     days_until_expiry: int
     urgency_level: str
     reminder_sent: bool
+    skonto_decision: str
 
 @router.get("/skonto/dashboard/summary", response_model=SkontoSummaryResponse)
 async def get_skonto_summary():
@@ -55,8 +56,11 @@ async def get_skonto_summary():
     try:
         logger.info("📊 Fetching Skonto dashboard summary")
         
-        # Use database service methods instead of raw SQL
-        skonto_opportunities = db_service.get_invoices_with_skonto_due(days_ahead=365)  # Get all active Skonto opportunities
+        # First, update any expired Skonto statuses automatically
+        db_service.update_expired_skonto_statuses()
+        
+        # Get ALL invoices with Skonto data for comprehensive reporting
+        skonto_opportunities = db_service.get_all_invoices_with_skonto_data()
         
         if not skonto_opportunities["success"]:
             logger.error(f"Failed to get Skonto opportunities: {skonto_opportunities.get('error')}")
@@ -263,8 +267,11 @@ async def get_skonto_opportunities(
     try:
         logger.info(f"🎯 Fetching Skonto opportunities (urgency: {urgency}, limit: {limit})")
         
-        # Get all invoices and filter for Skonto opportunities
-        invoices_result = db_service.get_all_invoices(limit=10000)
+        # First, update any expired Skonto statuses automatically
+        db_service.update_expired_skonto_statuses()
+        
+        # Get ALL invoices with Skonto data for opportunities
+        invoices_result = db_service.get_all_invoices_with_skonto_data()
         
         if not invoices_result["success"]:
             raise HTTPException(status_code=500, detail="Failed to fetch invoices")
@@ -292,9 +299,8 @@ async def get_skonto_opportunities(
             except (ValueError, TypeError):
                 continue
                 
-            # Skip if decision already made (not pending or null)
-            if skonto_decision and skonto_decision != "pending":
-                continue
+            # Include ALL invoices with Skonto data regardless of decision status
+            # This allows the frontend to filter and categorize properly
             
             try:
                 # Parse Skonto date
@@ -308,9 +314,8 @@ async def get_skonto_opportunities(
                 else:
                     skonto_date = skonto_datum
                 
-                # Skip if Skonto has expired
-                if skonto_date < today:
-                    continue
+                # Calculate days until expiry (can be negative for expired)
+                days_until_expiry = (skonto_date - today).days
                 
                 # Calculate days until expiry
                 days_until_expiry = (skonto_date - today).days
@@ -354,7 +359,8 @@ async def get_skonto_opportunities(
                     potential_savings=round(potential_savings, 2),
                     days_until_expiry=days_until_expiry,
                     urgency_level=urgency_level,
-                    reminder_sent=bool(invoice.get("skonto_reminder_sent", False))
+                    reminder_sent=bool(invoice.get("skonto_reminder_sent", False)),
+                    skonto_decision=skonto_decision or "pending"
                 ))
                 
             except Exception as e:
