@@ -2,6 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Mobile-first responsive design */
+@layer base {
+  html {
+    /* Improved text rendering on mobile */
+    -webkit-text-size-adjust: 100%;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  body {
+    /* Prevent horizontal scroll on mobile */
+    overflow-x: hidden;
+  }
+}
+
 /* Modern Glass Effects */
 @layer utilities {
   .glass {
@@ -32,6 +47,22 @@
     -webkit-backdrop-filter: blur(20px);
     border-bottom: 1px solid rgba(255, 255, 255, 0.2);
     box-shadow: 0 2px 20px 0 rgba(31, 38, 135, 0.1);
+  }
+
+  /* Mobile-specific styles */
+  .mobile-safe-area {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .mobile-card {
+    /* Optimized card spacing for mobile */
+    @apply rounded-lg shadow-md border border-gray-200;
+  }
+
+  .mobile-touch-target {
+    /* Ensure minimum 44px touch targets on mobile */
+    min-height: 44px;
+    min-width: 44px;
   }
   
   .gradient-bg {

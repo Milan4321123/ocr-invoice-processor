@@ -68,67 +68,288 @@ class EmailService:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Prüfbericht - Rechnung bearbeitet</title>
+    <title>✅ Prüfbericht - Rechnung erfolgreich bearbeitet</title>
     <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
-        .header { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
-        .content { background: white; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; }
-        .invoice-details { background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 15px 0; }
-        .changes-section { margin-top: 20px; }
-        .change-item { padding: 10px; border-left: 4px solid #007bff; margin-bottom: 10px; background: #f8f9fa; }
-        .footer { margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px; font-size: 0.9em; color: #666; }
-        .button { display: inline-block; padding: 12px 24px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; margin: 10px 0; }
-        .status-badge { padding: 4px 8px; background: #28a745; color: white; border-radius: 3px; font-size: 0.8em; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 900px; margin: 0 auto; padding: 20px; background-color: #f5f7fa; }
+        .container { background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; padding: 30px; text-align: center; }
+        .header h1 { margin: 0; font-size: 28px; font-weight: 300; }
+        .header p { margin: 10px 0 0 0; opacity: 0.9; }
+        .content { padding: 30px; }
+        .success-summary { background: #d4edda; border-left: 4px solid #28a745; padding: 20px; margin: 20px 0; border-radius: 8px; }
+        .invoice-details { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 25px 0; }
+        .detail-section { background: #ffffff; border: 1px solid #e1e5e9; border-radius: 8px; padding: 20px; }
+        .detail-section h3 { color: #28a745; margin-top: 0; margin-bottom: 15px; font-size: 16px; font-weight: 600; border-bottom: 2px solid #f0f2f7; padding-bottom: 8px; }
+        .detail-row { display: flex; justify-content: space-between; margin-bottom: 12px; padding: 8px 0; border-bottom: 1px solid #f5f7fa; }
+        .detail-label { font-weight: 600; color: #4a5568; min-width: 140px; }
+        .detail-value { color: #2d3748; flex: 1; text-align: right; }
+        .amount-highlight { background: #e6fffa; border: 2px solid #38b2ac; border-radius: 8px; padding: 15px; text-align: center; margin: 20px 0; }
+        .amount-highlight .amount { font-size: 24px; font-weight: bold; color: #38b2ac; }
+        .changes-section { background: #f0f8ff; border: 1px solid #b3d9ff; border-radius: 8px; padding: 20px; margin: 20px 0; }
+        .change-item { background: white; padding: 12px; margin: 8px 0; border-left: 4px solid #4299e1; border-radius: 4px; }
+        .pdf-link { background: #e6f7ff; border: 1px solid #91d5ff; border-radius: 8px; padding: 15px; margin: 20px 0; text-align: center; }
+        .pdf-link a { color: #1890ff; text-decoration: none; font-weight: 600; }
+        .next-steps { background: #f7fafc; border-radius: 12px; padding: 25px; text-align: center; margin: 30px 0; }
+        .next-steps h3 { color: #2d3748; margin-bottom: 15px; }
+        .view-btn { display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%); color: white; text-decoration: none; border-radius: 6px; margin: 10px; font-weight: 500; font-size: 14px; }
+        .footer { background: #f7fafc; padding: 25px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #718096; }
+        .status-badge { display: inline-block; padding: 6px 12px; background: #28a745; color: white; border-radius: 20px; font-size: 12px; font-weight: 600; }
+        @media (max-width: 768px) {
+            .invoice-details { grid-template-columns: 1fr; }
+            .detail-row { flex-direction: column; }
+            .detail-value { text-align: left; margin-top: 5px; }
+        }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>🔍 Prüfbericht - Rechnung bearbeitet</h1>
-        <p><strong>Datum:</strong> {{ completion_date }}</p>
-        <p><strong>Bearbeiter:</strong> {{ editor_name }} ({{ editor_email }})</p>
-    </div>
-    
-    <div class="content">
-        <h2>Rechnung Details</h2>
-        <div class="invoice-details">
-            <p><strong>Rechnungsnummer:</strong> {{ invoice_number or 'Nicht verfügbar' }}</p>
-            <p><strong>Lieferant:</strong> {{ supplier_name or 'Nicht verfügbar' }}</p>
-            <p><strong>Rechnungsdatum:</strong> {{ invoice_date or 'Nicht verfügbar' }}</p>
-            <p><strong>Betrag:</strong> {{ total_amount or 'Nicht verfügbar' }}{% if currency %} {{ currency }}{% endif %}</p>
-            <p><strong>Status:</strong> <span class="status-badge">{{ status }}</span></p>
+    <div class="container">
+        <div class="header">
+            <h1>✅ Prüfbericht - Rechnung erfolgreich bearbeitet</h1>
+            <p><strong>Bearbeitet am:</strong> {{ completion_date }}</p>
+            <p><strong>Bearbeiter:</strong> {{ editor_name }} ({{ editor_email }})</p>
         </div>
         
-        {% if changes_summary and changes_summary|length > 0 %}
-        <div class="changes-section">
-            <h3>Durchgeführte Änderungen</h3>
-            {% for change in changes_summary %}
-            <div class="change-item">
-                <strong>{{ change.field }}:</strong>
-                {% if change.old_value %}
-                Von "{{ change.old_value }}" zu "{{ change.new_value }}"
-                {% else %}
-                Neu hinzugefügt: "{{ change.new_value }}"
-                {% endif %}
-                {% if change.timestamp %}
-                <br><small>Geändert am: {{ change.timestamp }}</small>
+        <div class="content">
+            <!-- Success Summary -->
+            <div class="success-summary">
+                <h2 style="margin: 0 0 15px 0; color: #155724;">🎉 Bearbeitung erfolgreich abgeschlossen</h2>
+                <p style="margin: 0; font-size: 16px;"><strong>{{ invoice_number or 'Rechnung ohne Nummer' }}</strong> wurde vollständig erfasst und ist bereit für die Genehmigung.</p>
+                <p style="margin: 5px 0 0 0; color: #155724;">Status: <span class="status-badge">{{ status }}</span></p>
+            </div>
+
+            <!-- Amount Highlight -->
+            {% if total_amount %}
+            <div class="amount-highlight">
+                <div style="color: #4a5568; margin-bottom: 5px;">Rechnungsbetrag</div>
+                <div class="amount">{{ total_amount }}{% if currency %} {{ currency }}{% else %} EUR{% endif %}</div>
+                {% if skonto_prozent and skonto_datum %}
+                <div style="color: #718096; font-size: 14px; margin-top: 8px;">
+                    Skonto: {{ skonto_prozent }}% bis {{ skonto_datum }}
+                </div>
                 {% endif %}
             </div>
-            {% endfor %}
+            {% endif %}
+
+            <!-- Comprehensive Invoice Details -->
+            <div class="invoice-details">
+                <!-- Basic Information -->
+                <div class="detail-section">
+                    <h3>📋 Grunddaten</h3>
+                    <div class="detail-row">
+                        <span class="detail-label">Rechnungsnummer:</span>
+                        <span class="detail-value">{{ invoice_number or 'Nicht verfügbar' }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Rechnungsempfänger:</span>
+                        <span class="detail-value">{{ rechnungsempfaenger or 'Nicht verfügbar' }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Rechnungssteller:</span>
+                        <span class="detail-value">{{ rechnungssteller or supplier_name or 'Nicht verfügbar' }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Rechnungsdatum:</span>
+                        <span class="detail-value">{{ invoice_date or 'Nicht verfügbar' }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Rechnungseingang:</span>
+                        <span class="detail-value">{{ rechnungseingang or 'Nicht verfügbar' }}</span>
+                    </div>
+                </div>
+
+                <!-- Project & Trade Information -->
+                <div class="detail-section">
+                    <h3>🏗️ Projekt & Gewerk</h3>
+                    <div class="detail-row">
+                        <span class="detail-label">Projekt:</span>
+                        <span class="detail-value">{{ projekt or 'Nicht zugeordnet' }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Gewerk:</span>
+                        <span class="detail-value">{{ gewerk or 'Nicht zugeordnet' }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Kostenstelle:</span>
+                        <span class="detail-value">{{ kostenstelle or 'Nicht zugeordnet' }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Weiter berechnen an:</span>
+                        <span class="detail-value">{{ weiter_berechnen_an or 'Nicht festgelegt' }}</span>
+                    </div>
+                    {% if bestellnummer %}
+                    <div class="detail-row">
+                        <span class="detail-label">Bestellnummer:</span>
+                        <span class="detail-value">{{ bestellnummer }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Financial Information -->
+                <div class="detail-section">
+                    <h3>💰 Finanzdaten</h3>
+                    <div class="detail-row">
+                        <span class="detail-label">Rechnungsbetrag:</span>
+                        <span class="detail-value"><strong>{{ total_amount or rechnungsbetrag or 'Nicht verfügbar' }}{% if currency %} {{ currency }}{% else %} EUR{% endif %}</strong></span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Fälligkeit:</span>
+                        <span class="detail-value">{{ faelligkeit or 'Nicht festgelegt' }}</span>
+                    </div>
+                    {% if skonto_datum %}
+                    <div class="detail-row">
+                        <span class="detail-label">Skonto Datum:</span>
+                        <span class="detail-value">{{ skonto_datum }}</span>
+                    </div>
+                    {% endif %}
+                    {% if skonto_prozent %}
+                    <div class="detail-row">
+                        <span class="detail-label">Skonto Prozent:</span>
+                        <span class="detail-value">{{ skonto_prozent }}%</span>
+                    </div>
+                    {% endif %}
+                    {% if kfw_anrechenbare_kosten %}
+                    <div class="detail-row">
+                        <span class="detail-label">KfW anrechenbare Kosten:</span>
+                        <span class="detail-value">{{ kfw_anrechenbare_kosten }}{% if currency %} {{ currency }}{% else %} EUR{% endif %}</span>
+                    </div>
+                    {% endif %}
+                    {% if material_kosten %}
+                    <div class="detail-row">
+                        <span class="detail-label">Materialkosten:</span>
+                        <span class="detail-value">{{ material_kosten }}{% if currency %} {{ currency }}{% else %} EUR{% endif %}</span>
+                    </div>
+                    {% endif %}
+                    {% if lohn_kosten %}
+                    <div class="detail-row">
+                        <span class="detail-label">Lohnkosten:</span>
+                        <span class="detail-value">{{ lohn_kosten }}{% if currency %} {{ currency }}{% else %} EUR{% endif %}</span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Additional Information -->
+                <div class="detail-section">
+                    <h3>📝 Zusatzinformationen</h3>
+                    {% if liefertermin %}
+                    <div class="detail-row">
+                        <span class="detail-label">Liefertermin:</span>
+                        <span class="detail-value">{{ liefertermin }}</span>
+                    </div>
+                    {% endif %}
+                    {% if aufmass_datum %}
+                    <div class="detail-row">
+                        <span class="detail-label">Aufmaß Datum:</span>
+                        <span class="detail-value">{{ aufmass_datum }}</span>
+                    </div>
+                    {% endif %}
+                    {% if netto_brutto %}
+                    <div class="detail-row">
+                        <span class="detail-label">Netto/Brutto:</span>
+                        <span class="detail-value">{{ netto_brutto }}</span>
+                    </div>
+                    {% endif %}
+                    {% if mwst_satz %}
+                    <div class="detail-row">
+                        <span class="detail-label">MwSt. Satz:</span>
+                        <span class="detail-value">{{ mwst_satz }}%</span>
+                    </div>
+                    {% endif %}
+                    {% if kontierung %}
+                    <div class="detail-row">
+                        <span class="detail-label">Kontierung:</span>
+                        <span class="detail-value">{{ kontierung }}</span>
+                    </div>
+                    {% endif %}
+                    {% if bemerkungen %}
+                    <div class="detail-row">
+                        <span class="detail-label">Bemerkungen:</span>
+                        <span class="detail-value">{{ bemerkungen }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Workflow Information -->
+                <div class="detail-section">
+                    <h3>🔄 Workflow</h3>
+                    {% if bauleiter_email %}
+                    <div class="detail-row">
+                        <span class="detail-label">Bau-Leiter E-Mail:</span>
+                        <span class="detail-value">{{ bauleiter_email }}</span>
+                    </div>
+                    {% endif %}
+                    {% if rechnungspruefung_email %}
+                    <div class="detail-row">
+                        <span class="detail-label">Rechnungsprüfung E-Mail:</span>
+                        <span class="detail-value">{{ rechnungspruefung_email }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="detail-row">
+                        <span class="detail-label">Bearbeitungsdatum:</span>
+                        <span class="detail-value">{{ completion_date }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PDF Link -->
+            {% if pdf_url %}
+            <div class="pdf-link">
+                <strong>📄 Original Rechnung anzeigen:</strong><br>
+                <a href="{{ pdf_url }}" target="_blank" class="view-btn">PDF öffnen</a>
+                <p style="font-size: 12px; color: #718096; margin: 10px 0 0 0;">
+                    Klicken Sie hier, um die Original-Rechnung als PDF zu öffnen
+                </p>
+            </div>
+            {% endif %}
+
+            <!-- Changes Summary -->
+            {% if changes_summary and changes_summary|length > 0 %}
+            <div class="changes-section">
+                <h3 style="color: #1e88e5; margin-top: 0;">🔄 Durchgeführte Bearbeitungen ({{ changes_summary|length }} Änderungen)</h3>
+                <p style="color: #4a5568; margin-bottom: 15px;">
+                    Folgende Felder wurden während der Bearbeitung erfasst oder geändert:
+                </p>
+                {% for change in changes_summary %}
+                <div class="change-item">
+                    <strong>{{ change.field }}:</strong>
+                    {% if change.old_value %}
+                        Von "<span style="color: #e53e3e;">{{ change.old_value }}</span>" zu "<span style="color: #48bb78;">{{ change.new_value }}</span>"
+                    {% else %}
+                        Neu erfasst: "<span style="color: #48bb78;">{{ change.new_value }}</span>"
+                    {% endif %}
+                    {% if change.timestamp %}
+                    <br><small style="color: #718096;">Geändert am: {{ change.timestamp }}</small>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Next Steps -->
+            <div class="next-steps">
+                <h3>🎯 Nächste Schritte</h3>
+                <p style="color: #4a5568; margin-bottom: 15px;">
+                    Die Rechnung wurde vollständig erfasst und ist bereit für den Genehmigungsworkflow.
+                </p>
+                <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 6px; padding: 15px; margin: 15px 0;">
+                    <strong>📋 Automatische Weiterleitung:</strong> Das System wird automatisch eine 
+                    Benachrichtigung an den zuständigen Bau-Leiter senden, sobald alle Daten validiert wurden.
+                </div>
+                <p style="font-size: 14px; color: #718096;">
+                    Sie erhalten eine weitere Benachrichtigung, sobald die Genehmigung erteilt oder abgelehnt wurde.
+                </p>
+            </div>
         </div>
-        {% endif %}
         
-        <div style="margin-top: 30px;">
-            <h3>Nächste Schritte</h3>
-            <p>Die Rechnung wurde erfolgreich bearbeitet und ist nun für die Bau-Leiter Prüfung vorbereitet. 
-               Das System wird automatisch eine Benachrichtigung an den zuständigen Bau-Leiter senden.</p>
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>✅ Bearbeitung erfolgreich abgeschlossen</strong></p>
+            <p><strong>Bearbeiter:</strong> {{ editor_name }} ({{ editor_email }})</p>
+            <p><strong>Zeitstempel:</strong> {{ timestamp }}</p>
+            <p><strong>Request ID:</strong> {{ request_id }}</p>
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 15px 0;">
+            <p>Diese E-Mail wurde automatisch vom Rechnungsverarbeitungssystem generiert. Bitte antworten Sie nicht auf diese E-Mail.</p>
+            <p><strong>Technischer Support:</strong> Bei Fragen zur Rechnungsverarbeitung kontaktieren Sie das IT-Team.</p>
         </div>
-    </div>
-    
-    <div class="footer">
-        <p><strong>Automatisch generiert vom Rechnungssystem</strong></p>
-        <p>Zeitstempel: {{ timestamp }}</p>
-        <p>Request ID: {{ request_id }}</p>
-        <p>Diese E-Mail wurde automatisch versendet. Bitte antworten Sie nicht auf diese E-Mail.</p>
     </div>
 </body>
 </html>
@@ -609,21 +830,66 @@ class EmailService:
         Only marks invoice as completed after successful email send.
         """
         try:
-            # Prepare template context
+            # Prepare comprehensive template context with ALL invoice fields
             context = {
+                # Editor and timing information
                 "editor_name": editor_name,
                 "editor_email": editor_email,
                 "completion_date": datetime.now().strftime("%d.%m.%Y um %H:%M"),
                 "timestamp": datetime.now().isoformat(),
                 "request_id": request_id or "N/A",
+                
+                # Basic invoice information
                 "invoice_number": invoice_data.get("rechnungsnummer"),
                 "supplier_name": invoice_data.get("lieferant"),
                 "invoice_date": invoice_data.get("rechnungsdatum"),
                 "total_amount": invoice_data.get("rechnungsbetrag"),
                 "currency": invoice_data.get("currency", "EUR"),
                 "status": "Bearbeitung abgeschlossen",
+                
+                # Comprehensive invoice fields
+                "rechnungsempfaenger": invoice_data.get("rechnungsempfaenger"),
+                "rechnungssteller": invoice_data.get("rechnungssteller"),
+                "rechnungseingang": invoice_data.get("rechnungseingang"),
+                
+                # Project and trade information
+                "projekt": invoice_data.get("projekt"),
+                "gewerk": invoice_data.get("gewerk"),
+                "kostenstelle": invoice_data.get("kostenstelle"),
+                "weiter_berechnen_an": invoice_data.get("weiter_berechnen_an"),
+                "bestellnummer": invoice_data.get("bestellnummer"),
+                
+                # Financial details
+                "rechnungsbetrag": invoice_data.get("rechnungsbetrag"),
+                "faelligkeit": invoice_data.get("faelligkeit"),
+                "skonto_datum": invoice_data.get("skonto_datum"),
+                "skonto_prozent": invoice_data.get("skonto_prozent"),
+                "kfw_anrechenbare_kosten": invoice_data.get("kfw_anrechenbare_kosten"),
+                "material_kosten": invoice_data.get("material_kosten"),
+                "lohn_kosten": invoice_data.get("lohn_kosten"),
+                
+                # Additional information
+                "liefertermin": invoice_data.get("liefertermin"),
+                "aufmass_datum": invoice_data.get("aufmass_datum"),
+                "netto_brutto": invoice_data.get("netto_brutto"),
+                "mwst_satz": invoice_data.get("mwst_satz"),
+                "kontierung": invoice_data.get("kontierung"),
+                "bemerkungen": invoice_data.get("bemerkungen"),
+                
+                # Workflow information
+                "bauleiter_email": invoice_data.get("bauleiter_email"),
+                "rechnungspruefung_email": invoice_data.get("rechnungspruefung_email"),
+                
+                # PDF link
+                "pdf_url": None,
+                
+                # Changes summary
                 "changes_summary": changes_summary or []
             }
+            
+            # Generate PDF URL if file path exists
+            if invoice_data.get("file_path"):
+                context["pdf_url"] = f"https://bdtcfypvadryfeabqnlc.supabase.co/storage/v1/object/public/invoices/{invoice_data['file_path']}"
             
             # Render template
             template = self.jinja_env.get_template("editor_notification")

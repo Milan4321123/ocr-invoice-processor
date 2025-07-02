@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import FolderWatcherWidget from './FolderWatcherWidget'
 import DeleteConfirmationDialog from './DeleteConfirmationDialog'
+import InvoiceMobileCard from './InvoiceMobileCard'
 
 interface CleanInvoice {
   id: string
@@ -387,7 +388,7 @@ export default function CleanInvoiceDashboard() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-4 lg:py-8">
 
         {error && (
           <div className="mb-6 glass-card border border-red-200 rounded-xl p-4 animate-fade-in">
@@ -498,10 +499,10 @@ export default function CleanInvoiceDashboard() {
 
         {/* Invoice List */}
         <div className="glass-card border-0 shadow-xl rounded-xl overflow-hidden animate-fade-in">
-          <div className="px-6 py-4 border-b border-white/20 bg-gradient-to-r from-purple-50 to-blue-50">
+          <div className="px-4 lg:px-6 py-4 border-b border-white/20 bg-gradient-to-r from-purple-50 to-blue-50">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold gradient-text">Rechnungen</h2>
-              <div className="text-sm text-gray-600 glass-dark px-3 py-1 rounded-full">
+              <div className="hidden lg:block text-sm text-gray-600 glass-dark px-3 py-1 rounded-full">
                 ← → Horizontal scrollen für alle Felder
               </div>
             </div>
@@ -516,17 +517,36 @@ export default function CleanInvoiceDashboard() {
               <p className="text-gray-600">Laden Sie Rechnungen hoch, um zu beginnen.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-white/20" style={{ minWidth: '1800px' }}>
-                <thead className="glass-dark">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider sticky left-0 glass-dark z-10 min-w-[200px]">
-                      Rechnungsdetails
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[120px]">
-                      Status
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[150px]">
+            <>
+              {/* Mobile Card View */}
+              <div className="lg:hidden">
+                <div className="p-4 space-y-4">
+                  {invoices.map((invoice) => (
+                    <InvoiceMobileCard
+                      key={invoice.id}
+                      invoice={invoice}
+                      onDelete={openDeleteDialog}
+                      onSendToBauleiter={sendToBauleiter}
+                      formatFileSize={formatFileSize}
+                      getWorkflowStatusColor={getWorkflowStatusColor}
+                      getWorkflowStatusLabel={getWorkflowStatusLabel}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden lg:block overflow-x-auto">
+                <table className="min-w-full divide-y divide-white/20" style={{ minWidth: '1800px' }}>
+                  <thead className="glass-dark">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider sticky left-0 glass-dark z-10 min-w-[200px]">
+                        Rechnungsdetails
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[120px]">
+                        Status
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[150px]">
                       Rechnungsempfänger
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[150px]">
@@ -720,7 +740,8 @@ export default function CleanInvoiceDashboard() {
                   ))}
                 </tbody>
               </table>
-            </div>
+              </div>
+            </>
           )}
         </div>
 

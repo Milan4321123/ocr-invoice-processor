@@ -674,10 +674,12 @@ async def process_skonto_decision(
         if not invoice_data.get("skonto_datum") or not invoice_data.get("skonto_prozent"):
             return _create_error_html("Invoice does not have Skonto information")
         
-        # Check if Skonto decision already made
+        # Check if Skonto decision already made - ALLOW DEMO RETESTING
         current_decision = invoice_data.get("skonto_decision")
         if current_decision in ["taken", "missed", "not_applicable"]:
-            return _create_error_html(f"Skonto decision already made: {current_decision}")
+            logger.warning(f"⚠️ DEMO MODE: Skonto decision already made ({current_decision}) - allowing override for demonstration")
+            # For demonstration purposes, allow retesting - comment out the restriction
+            # return _create_error_html(f"Skonto decision already made: {current_decision}")
         
         # Calculate actual savings if Skonto was taken
         actual_savings = None

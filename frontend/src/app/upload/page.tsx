@@ -57,7 +57,7 @@ export default function UploadPage() {
     <div className="min-h-screen gradient-bg-light pt-20 pb-12"> {/* Added modern background */}
       <Toaster {...toastConfig} />
       
-      <div className="max-w-2xl mx-auto px-4">
+      <div className="max-w-2xl mx-auto px-2 sm:px-4">
         <div className="mb-8">
           <Link 
             href="/dashboard" 

@@ -37,50 +37,40 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false); // Start as false - no loading screen needed
   const router = useRouter();
   const pathname = usePathname();
 
   const isAuthenticated = !!token && !!user;
 
-  // Load token from localStorage on mount
+  // Load token from localStorage on mount - optimized
   useEffect(() => {
-    const checkAuth = () => {
-      try {
-        const savedToken = localStorage.getItem('authToken');
-        const savedUser = localStorage.getItem('authUser');
-        
-        if (savedToken && savedUser) {
-          setToken(savedToken);
-          setUser(JSON.parse(savedUser));
-        }
-      } catch (error) {
-        console.error('Error loading saved auth data:', error);
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('authUser');
-      } finally {
-        setIsLoading(false);
+    try {
+      const savedToken = localStorage.getItem('authToken');
+      const savedUser = localStorage.getItem('authUser');
+      
+      if (savedToken && savedUser) {
+        setToken(savedToken);
+        setUser(JSON.parse(savedUser));
       }
-    };
-
-    // Run immediately
-    checkAuth();
+    } catch (error) {
+      console.error('Error loading saved auth data:', error);
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('authUser');
+    }
+    // No loading state needed - this is instant
   }, []);
 
-  // Handle redirects based on authentication state
+  // Simplified redirect logic - only redirect if needed
   useEffect(() => {
-    if (!isLoading) {
-      const isLoginPage = pathname === '/login';
-      
-      if (!isAuthenticated && !isLoginPage) {
-        console.log('🔒 User not authenticated, redirecting to login');
-        router.replace('/login');
-      } else if (isAuthenticated && isLoginPage) {
-        console.log('✅ User authenticated, redirecting to home');
-        router.replace('/dashboard');
-      }
+    const isLoginPage = pathname === '/login';
+    
+    if (!isAuthenticated && !isLoginPage) {
+      router.replace('/login');
+    } else if (isAuthenticated && isLoginPage) {
+      router.replace('/dashboard');
     }
-  }, [isAuthenticated, isLoading, pathname, router]);
+  }, [isAuthenticated, pathname, router]);
 
   const login = async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {

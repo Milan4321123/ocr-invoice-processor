@@ -282,7 +282,7 @@ export default function PrufberichtPage() {
       <div className="absolute top-1/2 right-10 w-28 h-28 bg-yellow-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-float" style={{ animationDelay: '1s' }}></div>
 
       <div className="relative z-10 pt-20 pb-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8">
           {/* Header Section */}
           <div className="mb-8">
             <div className="glass-card p-6 border-0 shadow-xl rounded-xl">

@@ -155,10 +155,7 @@ export const api = {
   
   // Dropdowns
   getDropdowns: () => apiClient.get('/api/dropdowns/all'),
-  addDropdownOption: (data: any) => apiClient.post('/api/dropdowns/add', data),
-  
-  // Email testing
-  sendTestEmail: (data: any) => apiClient.post('/api/email-test/bauleiter-approval', data),
+  addDropdownOption: (data: any) => apiClient.post('/api/dropdowns/add-option', data),
   
   // Folder watcher
   getFolderWatcherStatus: () => apiClient.get('/api/folder-watcher/status'),

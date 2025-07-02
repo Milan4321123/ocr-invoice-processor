@@ -599,13 +599,15 @@ async def send_skonto_reminder(
             logger.info(f"⚠️ Skonto reminder already sent for invoice {invoice_id}, but allowing resend")
             # Don't block the resend, just log it
         
-        # Check if Skonto decision already made
+        # Check if Skonto decision already made - ALLOW DEMO RETESTING
         skonto_decision = invoice_data.get("skonto_decision")
         if skonto_decision in ["taken", "missed", "not_applicable"]:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Skonto decision already made: {skonto_decision}"
-            )
+            logger.warning(f"⚠️ DEMO MODE: Skonto decision already made ({skonto_decision}) - allowing override for demonstration")
+            # For demonstration purposes, allow retesting - comment out the restriction
+            # raise HTTPException(
+            #     status_code=400,
+            #     detail=f"Skonto decision already made: {skonto_decision}"
+            # )
         
         # Use provided email or fall back to default stakeholder
         if not recipient_email:
