@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     backendFormData.append('username', username);
     backendFormData.append('password', password);
     
-    const response = await fetch(`${apiUrl}/login`, {
+    const response = await fetch(`${apiUrl}/api/auth/login`, {
       method: 'POST',
       body: backendFormData,
     });

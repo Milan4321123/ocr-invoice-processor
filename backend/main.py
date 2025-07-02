@@ -52,7 +52,6 @@ from api.routes import (
     # email_test,  # Removed - not needed for production
     reports,
     folder_watcher,
-    debug,
     skonto_dashboard,  # Added missing skonto dashboard import
     # multi_layer_approval,  # Removed - using simple single Bauleiter approval only
     auth
@@ -70,7 +69,6 @@ app.include_router(email_workflow.router, prefix="/api", tags=["email"])
 app.include_router(reports.router, prefix="/api", tags=["reports"])
 app.include_router(skonto_dashboard.router, prefix="/api", tags=["skonto"])  # Added missing skonto dashboard router
 app.include_router(folder_watcher.router, prefix="/api/folder-watcher", tags=["folder-watcher"])
-app.include_router(debug.router, prefix="/api", tags=["debug"])
 # Removed multi_layer_approval.router - using simple single Bauleiter approval only
 
 @app.get("/")

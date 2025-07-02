@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
     // Get the authorization header
     const authHeader = request.headers.get('authorization');
     
-    const response = await fetch(`${apiUrl}/logout`, {
+    const response = await fetch(`${apiUrl}/api/auth/logout`, {
       method: 'POST',
       headers: authHeader ? {
         'Authorization': authHeader,
