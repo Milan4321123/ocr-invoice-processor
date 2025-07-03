@@ -520,34 +520,85 @@ class DatabaseService:
             return {"success": False, "error": str(e)}
     
     def delete_invoice(self, invoice_id: str) -> Dict[str, Any]:
-        """Delete an invoice record from invoices_clean table"""
+        """
+        Delete an invoice record from invoices_clean table.
+        Performs comprehensive cleanup including:
+        - Invoice record deletion
+        - File storage cleanup
+        - Skonto tracking data cleanup (automatic via cascade)
+        - Logging for audit trail
+        """
         if not self.is_available:
             return {"success": False, "error": "Database unavailable"}
         
         try:
-            # First get the invoice to check file_path for storage cleanup
+            # First get the invoice to check details before deletion
             invoice_result = self.get_invoice(invoice_id)
             
+            if not invoice_result.get("success"):
+                return {"success": False, "error": "Invoice not found"}
+            
+            invoice_data = invoice_result["data"]
+            filename = invoice_data.get("file_name", "unknown")
+            file_path = invoice_data.get("file_path")
+            
+            # Check if invoice has Skonto data for logging
+            has_skonto_data = bool(
+                invoice_data.get("skonto_datum") or 
+                invoice_data.get("skonto_prozent") or 
+                invoice_data.get("skonto_reminder_sent") or 
+                invoice_data.get("skonto_decision")
+            )
+            
+            # Log pre-deletion information
+            logger.info(f"🗑️ Preparing to delete invoice {invoice_id} ('{filename}')")
+            if has_skonto_data:
+                skonto_status = {
+                    "skonto_datum": invoice_data.get("skonto_datum"),
+                    "skonto_prozent": invoice_data.get("skonto_prozent"),
+                    "reminder_sent": invoice_data.get("skonto_reminder_sent", False),
+                    "decision": invoice_data.get("skonto_decision", "pending"),
+                    "actual_savings": invoice_data.get("actual_skonto_savings")
+                }
+                logger.info(f"💰 Invoice contains Skonto data: {skonto_status}")
+            
+            # Delete the invoice record (this will also delete all associated Skonto data)
             response = (self._client.table(self.table_name)
                        .delete()
                        .eq("id", invoice_id)
                        .execute())
             
             if response.data:
-                logger.info(f"✅ Deleted invoice: {invoice_id}")
+                logger.info(f"✅ Successfully deleted invoice {invoice_id} from database")
+                if has_skonto_data:
+                    logger.info(f"💰 Associated Skonto tracking data automatically cleaned up")
                 
                 # Also delete from storage if file exists
-                if invoice_result.get("success") and invoice_result["data"].get("file_path"):
+                if file_path:
                     try:
-                        file_path = invoice_result["data"]["file_path"]
                         self._client.storage.from_("invoices").remove([file_path])
-                        logger.info(f"✅ Also deleted file: {file_path}")
+                        logger.info(f"📁 Successfully deleted file from storage: {file_path}")
                     except Exception as storage_error:
                         logger.warning(f"⚠️ Could not delete file from storage: {storage_error}")
+                        # Don't fail the whole operation if storage cleanup fails
                 
-                return {"success": True, "data": response.data}
+                # Return comprehensive deletion info
+                deletion_summary = {
+                    "invoice_id": invoice_id,
+                    "filename": filename,
+                    "file_path": file_path,
+                    "had_skonto_data": has_skonto_data,
+                    "storage_cleaned": file_path is not None
+                }
+                
+                logger.info(f"🎯 Invoice deletion completed successfully: {deletion_summary}")
+                return {"success": True, "data": response.data, "deletion_summary": deletion_summary}
             else:
-                return {"success": False, "error": "Invoice not found"}
+                return {"success": False, "error": "Invoice not found or already deleted"}
+                
+        except Exception as e:
+            logger.error(f"❌ Database error deleting invoice {invoice_id}: {e}")
+            return {"success": False, "error": str(e)}
                 
         except Exception as e:
             logger.error(f"❌ Database error deleting invoice {invoice_id}: {e}")

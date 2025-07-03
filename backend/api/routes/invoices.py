@@ -199,21 +199,33 @@ async def get_invoice(invoice_id: str = Path(..., description="The invoice ID"))
 
 @router.delete("/invoices/{invoice_id}")
 async def delete_invoice(invoice_id: str = Path(..., description="The invoice ID")):
-    """Delete an invoice by ID"""
+    """
+    Delete an invoice by ID with comprehensive cleanup.
+    Removes invoice record, associated Skonto data, and file storage.
+    """
     
     if not db_service.is_available:
         raise HTTPException(status_code=503, detail="Database service not available")
     
     try:
-        # Use centralized database service method
+        # Use enhanced database service method with comprehensive cleanup
         result = db_service.delete_invoice(invoice_id)
         
         if result["success"]:
+            deletion_summary = result.get("deletion_summary", {})
+            
+            logger.info(f"✅ Invoice deletion completed: {deletion_summary}")
+            
             return {
                 "message": "Invoice deleted successfully",
                 "invoice_id": invoice_id,
-                "filename": result.get("filename"),
-                "status": "success"
+                "filename": deletion_summary.get("filename", "unknown"),
+                "status": "success",
+                "details": {
+                    "skonto_data_cleaned": deletion_summary.get("had_skonto_data", False),
+                    "storage_cleaned": deletion_summary.get("storage_cleaned", False),
+                    "file_path": deletion_summary.get("file_path")
+                }
             }
         else:
             if "not found" in result["error"].lower():

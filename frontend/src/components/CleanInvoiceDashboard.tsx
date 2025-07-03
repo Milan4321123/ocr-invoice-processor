@@ -107,7 +107,37 @@ export default function CleanInvoiceDashboard() {
         throw new Error('Rechnung konnte nicht gelöscht werden')
       }
 
-      toast.success(`Rechnung "${filename}" erfolgreich gelöscht`)
+      // Parse the enhanced deletion response
+      const result = await response.json()
+      
+      // Create detailed success message based on what was cleaned up
+      let successMessage = `Rechnung "${filename}" erfolgreich gelöscht`
+      
+      if (result.details?.skonto_data_cleaned) {
+        successMessage += ' (inkl. Skonto-Daten)'
+      }
+      
+      if (result.details?.storage_cleaned) {
+        successMessage += ' • Datei aus Speicher entfernt'
+      }
+
+      toast.success(successMessage, {
+        duration: 4000,
+        style: {
+          background: '#10B981',
+          color: 'white',
+        },
+      })
+      
+      // Log deletion details for debugging
+      console.log('Invoice deletion completed:', {
+        invoice_id: result.invoice_id,
+        filename: result.filename,
+        skonto_cleaned: result.details?.skonto_data_cleaned || false,
+        storage_cleaned: result.details?.storage_cleaned || false,
+        file_path: result.details?.file_path
+      })
+      
       await fetchInvoices() // Refresh the list
       
       // Close delete dialog
@@ -119,7 +149,13 @@ export default function CleanInvoiceDashboard() {
       })
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Rechnung konnte nicht gelöscht werden'
-      toast.error(errorMessage)
+      toast.error(errorMessage, {
+        duration: 5000,
+        style: {
+          background: '#EF4444',
+          color: 'white',
+        },
+      })
     }
   }
 
