@@ -14,7 +14,9 @@ import {
   AlertTriangle,
   CheckCircle,
   Clock,
-  RefreshCw
+  RefreshCw,
+  Search,
+  X
 } from 'lucide-react'
 import FolderWatcherWidget from './FolderWatcherWidget'
 import DeleteConfirmationDialog from './DeleteConfirmationDialog'
@@ -55,6 +57,7 @@ export default function CleanInvoiceDashboard() {
   const [invoices, setInvoices] = useState<CleanInvoice[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState('')
   const [deleteDialog, setDeleteDialog] = useState<{
     isOpen: boolean
     invoiceId: string
@@ -298,6 +301,7 @@ export default function CleanInvoiceDashboard() {
   }
 
   const formatDate = (dateString: string): string => {
+    if (!dateString) return 'Nicht verfügbar'
     try {
       // Handle different date formats
       const date = new Date(dateString)
@@ -335,6 +339,45 @@ export default function CleanInvoiceDashboard() {
       currency: 'EUR'
     }).format(amount)
   }
+
+  // Search filter function
+  const filterInvoices = (invoices: CleanInvoice[], searchTerm: string): CleanInvoice[] => {
+    if (!searchTerm.trim()) {
+      return invoices
+    }
+
+    const term = searchTerm.toLowerCase().trim()
+    return invoices.filter(invoice => {
+      // Search in multiple fields
+      const searchableFields = [
+        invoice.file_name,
+        invoice.rechnungsempfaenger,
+        invoice.rechnungssteller,
+        invoice.projekt,
+        invoice.gewerk,
+        invoice.rechnungsart,
+        invoice.weiter_berechnen_an,
+        invoice.rechnungspruefung,
+        invoice.status,
+        invoice.review_status,
+        // Convert number fields to strings for searching
+        invoice.rechnungsbetrag?.toString(),
+        invoice.skonto_prozent?.toString(),
+        // Format dates for searching
+        invoice.rechnungseingang,
+        invoice.faelligkeit,
+        invoice.skonto_datum,
+        formatDate(invoice.created_at)
+      ]
+
+      return searchableFields.some(field => 
+        field && field.toString().toLowerCase().includes(term)
+      )
+    })
+  }
+
+  // Get filtered invoices
+  const filteredInvoices = filterInvoices(invoices, searchTerm)
 
   if (loading) {
     return (
@@ -500,28 +543,78 @@ export default function CleanInvoiceDashboard() {
         {/* Invoice List */}
         <div className="glass-card border-0 shadow-xl rounded-xl overflow-hidden animate-fade-in">
           <div className="px-4 lg:px-6 py-4 border-b border-white/20 bg-gradient-to-r from-purple-50 to-blue-50">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between space-y-3 lg:space-y-0">
               <h2 className="text-lg font-semibold gradient-text">Rechnungen</h2>
-              <div className="hidden lg:block text-sm text-gray-600 glass-dark px-3 py-1 rounded-full">
-                ← → Horizontal scrollen für alle Felder
+              
+              {/* Search Input */}
+              <div className="flex items-center space-x-3">
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Search className="h-4 w-4 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Suchen... (Dateiname, Empfänger, Projekt, etc.)"
+                    className="block w-64 pl-10 pr-10 py-2 border border-gray-300 rounded-lg text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white/90 backdrop-blur-sm"
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm('')}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    >
+                      <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                    </button>
+                  )}
+                </div>
+                
+                <div className="hidden lg:block text-sm text-gray-600 glass-dark px-3 py-1 rounded-full">
+                  ← → Horizontal scrollen für alle Felder
+                </div>
               </div>
             </div>
+            
+            {/* Search Results Summary */}
+            {searchTerm && (
+              <div className="mt-3 text-sm text-gray-600">
+                {filteredInvoices.length === 0 ? (
+                  <span className="text-orange-600">Keine Rechnungen gefunden für "{searchTerm}"</span>
+                ) : (
+                  <span>
+                    {filteredInvoices.length} von {invoices.length} Rechnungen gefunden
+                    {filteredInvoices.length !== invoices.length && (
+                      <button
+                        onClick={() => setSearchTerm('')}
+                        className="ml-2 text-purple-600 hover:text-purple-800 underline"
+                      >
+                        Alle anzeigen
+                      </button>
+                    )}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
-          {invoices.length === 0 ? (
+          {filteredInvoices.length === 0 ? (
             <div className="text-center py-12">
               <div className="w-16 h-16 bg-gradient-to-r from-gray-300 to-gray-400 rounded-xl flex items-center justify-center mx-auto mb-4">
                 <FileText className="h-8 w-8 text-white" />
               </div>
-              <h3 className="text-lg font-medium gradient-text mb-2">Keine Rechnungen gefunden</h3>
-              <p className="text-gray-600">Laden Sie Rechnungen hoch, um zu beginnen.</p>
+              <h3 className="text-lg font-medium gradient-text mb-2">
+                {searchTerm ? `Keine Rechnungen gefunden für "${searchTerm}"` : 'Keine Rechnungen gefunden'}
+              </h3>
+              <p className="text-gray-600">
+                {searchTerm ? 'Versuchen Sie einen anderen Suchbegriff.' : 'Laden Sie Rechnungen hoch, um zu beginnen.'}
+              </p>
             </div>
           ) : (
             <>
               {/* Mobile Card View */}
               <div className="lg:hidden">
                 <div className="p-4 space-y-4">
-                  {invoices.map((invoice) => (
+                  {filteredInvoices.map((invoice) => (
                     <InvoiceMobileCard
                       key={invoice.id}
                       invoice={invoice}
@@ -591,7 +684,7 @@ export default function CleanInvoiceDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/10">
-                  {invoices.map((invoice) => (
+                  {filteredInvoices.map((invoice) => (
                     <tr key={invoice.id} className="hover:bg-white/5 transition-colors">
                       <td className="px-4 py-4 whitespace-nowrap min-w-[200px]">
                         <div className="flex items-center space-x-3 h-full">

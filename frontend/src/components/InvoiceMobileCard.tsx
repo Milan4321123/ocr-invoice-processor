@@ -83,7 +83,7 @@ export default function InvoiceMobileCard({
             <FileText className="h-6 w-6 text-white" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold text-gray-900 truncate">
+            <div className="text-sm font-semibold text-gray-900 break-words leading-tight">
               {invoice.file_name}
             </div>
             <div className="text-xs text-gray-600 flex items-center space-x-2">
