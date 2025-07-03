@@ -540,7 +540,7 @@ export default function CleanInvoiceDashboard() {
                 <table className="min-w-full divide-y divide-white/20" style={{ minWidth: '1800px' }}>
                   <thead className="glass-dark">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider sticky left-0 glass-dark z-10 min-w-[200px]">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[200px]">
                         Rechnungsdetails
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[120px]">
@@ -593,13 +593,13 @@ export default function CleanInvoiceDashboard() {
                 <tbody className="divide-y divide-white/10">
                   {invoices.map((invoice) => (
                     <tr key={invoice.id} className="hover:bg-white/5 transition-colors">
-                      <td className="px-4 py-4 whitespace-nowrap sticky left-0 glass-card z-10 min-w-[200px]">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 bg-gradient-to-r from-gray-400 to-gray-500 rounded-lg flex items-center justify-center">
+                      <td className="px-4 py-4 whitespace-nowrap min-w-[200px]">
+                        <div className="flex items-center space-x-3 h-full">
+                          <div className="w-8 h-8 bg-gradient-to-r from-gray-400 to-gray-500 rounded-lg flex items-center justify-center flex-shrink-0">
                             <FileText className="h-4 w-4 text-white" />
                           </div>
-                          <div>
-                            <div className="text-sm font-medium text-gray-900 truncate max-w-[140px]">
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-gray-900 break-words leading-tight" title={invoice.file_name}>
                               {invoice.file_name}
                             </div>
                             <div className="text-sm text-gray-600">
