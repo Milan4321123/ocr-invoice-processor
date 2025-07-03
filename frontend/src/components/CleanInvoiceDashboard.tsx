@@ -121,13 +121,7 @@ export default function CleanInvoiceDashboard() {
         successMessage += ' • Datei aus Speicher entfernt'
       }
 
-      toast.success(successMessage, {
-        duration: 4000,
-        style: {
-          background: '#10B981',
-          color: 'white',
-        },
-      })
+      toast.success(successMessage)
       
       // Log deletion details for debugging
       console.log('Invoice deletion completed:', {
@@ -149,13 +143,7 @@ export default function CleanInvoiceDashboard() {
       })
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Rechnung konnte nicht gelöscht werden'
-      toast.error(errorMessage, {
-        duration: 5000,
-        style: {
-          background: '#EF4444',
-          color: 'white',
-        },
-      })
+      toast.error(errorMessage)
     }
   }
 
@@ -429,7 +417,33 @@ export default function CleanInvoiceDashboard() {
 
   return (
     <div className="min-h-screen gradient-bg-light pt-16"> {/* Added pt-16 for fixed navigation */}
-      <Toaster position="top-right" />
+      <Toaster 
+        position="top-right" 
+        toastOptions={{
+          style: {
+            marginTop: '80px', // Push notifications below the fixed navigation
+            zIndex: 9999, // Ensure toasts appear above all other elements
+          },
+          success: {
+            style: {
+              background: '#10B981',
+              color: 'white',
+              fontWeight: '500',
+              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+            },
+            duration: 4000,
+          },
+          error: {
+            style: {
+              background: '#EF4444',
+              color: 'white',
+              fontWeight: '500',
+              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+            },
+            duration: 5000,
+          },
+        }}
+      />
       
       {/* Header */}
       <header className="glass-card border-0 shadow-lg">
