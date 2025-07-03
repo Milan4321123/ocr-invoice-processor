@@ -10,7 +10,9 @@ import {
   ChevronRight,
   Maximize2,
   Minimize2,
-  Download
+  Download,
+  X,
+  ArrowLeft
 } from 'lucide-react';
 
 // Import CSS for react-pdf
@@ -60,6 +62,52 @@ export default function PDFViewer({
     onLoadError?.(error);
   }, [onLoadError, pdfUrl]);
 
+  // Keyboard shortcuts for better UX
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle shortcuts when PDF viewer is focused or in fullscreen
+      if (!isFullscreen && document.activeElement?.closest('.pdf-viewer-container') === null) {
+        return;
+      }
+
+      switch (e.key) {
+        case 'ArrowLeft':
+          e.preventDefault();
+          handlePrevPage();
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          handleNextPage();
+          break;
+        case '+':
+        case '=':
+          e.preventDefault();
+          handleZoomIn();
+          break;
+        case '-':
+          e.preventDefault();
+          handleZoomOut();
+          break;
+        case 'Escape':
+          if (isFullscreen) {
+            e.preventDefault();
+            setIsFullscreen(false);
+          }
+          break;
+        case 'f':
+        case 'F':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            toggleFullscreen();
+          }
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen, pageNumber, numPages, scale]);
+
   const handleZoomIn = () => {
     setScale(prev => Math.min(prev + 0.25, 3.0));
   };
@@ -89,6 +137,10 @@ export default function PDFViewer({
 
   const toggleFullscreen = () => {
     setIsFullscreen(!isFullscreen);
+    // Reset zoom when entering/exiting fullscreen for better UX
+    if (!isFullscreen) {
+      setScale(1.0);
+    }
   };
 
   const handleDownload = () => {
@@ -99,60 +151,75 @@ export default function PDFViewer({
   };
 
   const containerClasses = `
+    pdf-viewer-container
     ${className}
     ${isFullscreen ? 'fixed inset-0 z-50 bg-white' : 'relative'}
-    flex flex-col h-full
+    flex flex-col ${isFullscreen ? 'h-screen' : 'h-full'}
   `;
 
   return (
-    <div className={containerClasses}>
-      {/* PDF Controls Toolbar */}
-      <div className="flex items-center justify-between p-3 bg-gray-50 border-b border-gray-200">
+    <div className={containerClasses} tabIndex={0}>
+      {/* PDF Controls Toolbar - Compact Design */}
+      <div className="flex items-center justify-between px-2 py-1.5 bg-gray-50 border-b border-gray-200">
         {/* Left side controls */}
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1">
+          {/* Back/Close button when in fullscreen */}
+          {isFullscreen && (
+            <>
+              <button
+                onClick={toggleFullscreen}
+                className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
+                title="Back to Editor (ESC)"
+              >
+                <ArrowLeft size={16} />
+              </button>
+              <div className="h-4 w-px bg-gray-300 mx-1" />
+            </>
+          )}
+          
           <button
             onClick={handleZoomOut}
-            className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
-            title="Zoom Out"
+            className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
+            title="Zoom Out (-)"
             disabled={scale <= 0.5}
           >
-            <ZoomOut size={18} />
+            <ZoomOut size={16} />
           </button>
           
-          <span className="text-sm text-gray-600 min-w-[60px] text-center">
+          <span className="text-xs text-gray-600 min-w-[50px] text-center px-1">
             {Math.round(scale * 100)}%
           </span>
           
           <button
             onClick={handleZoomIn}
-            className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
-            title="Zoom In"
+            className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
+            title="Zoom In (+)"
             disabled={scale >= 3.0}
           >
-            <ZoomIn size={18} />
+            <ZoomIn size={16} />
           </button>
 
-          <div className="h-6 w-px bg-gray-300 mx-2" />
+          <div className="h-4 w-px bg-gray-300 mx-1" />
 
           <button
             onClick={handleRotate}
-            className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
+            className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
             title="Rotate"
           >
-            <RotateCw size={18} />
+            <RotateCw size={16} />
           </button>
         </div>
 
-        {/* Center - Page Navigation */}
+        {/* Center - Page Navigation - Compact */}
         {numPages > 0 && (
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1">
             <button
               onClick={handlePrevPage}
               disabled={pageNumber <= 1}
-              className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Previous Page"
+              className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Previous Page (←)"
             >
-              <ChevronLeft size={18} />
+              <ChevronLeft size={16} />
             </button>
 
             <div className="flex items-center space-x-1">
@@ -160,89 +227,125 @@ export default function PDFViewer({
                 type="number"
                 value={pageNumber}
                 onChange={handlePageInputChange}
-                className="w-12 px-2 py-1 text-sm text-center border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-10 px-1 py-0.5 text-xs text-center border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                 min={1}
                 max={numPages}
               />
-              <span className="text-sm text-gray-600">/ {numPages}</span>
+              <span className="text-xs text-gray-600">/ {numPages}</span>
             </div>
 
             <button
               onClick={handleNextPage}
               disabled={pageNumber >= numPages}
-              className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Next Page"
+              className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Next Page (→)"
             >
-              <ChevronRight size={18} />
+              <ChevronRight size={16} />
             </button>
           </div>
         )}
 
-        {/* Right side controls */}
-        <div className="flex items-center space-x-2">
+        {/* Right side controls - Compact */}
+        <div className="flex items-center space-x-1">
           <button
             onClick={handleDownload}
-            className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
+            className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
             title="Download PDF"
           >
-            <Download size={18} />
+            <Download size={16} />
           </button>
 
           <button
             onClick={toggleFullscreen}
-            className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
-            title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+            className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
+            title={isFullscreen ? "Exit Fullscreen (ESC)" : "Fullscreen (Ctrl+F)"}
           >
-            {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+            {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
           </button>
         </div>
       </div>
 
-      {/* PDF Content Area */}
-      <div className="flex-1 overflow-auto bg-gray-100 p-4">
-        <div className="flex justify-center">
-          {error ? (
-            <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-              <div className="text-lg font-medium mb-2">Unable to load PDF</div>
-              <div className="text-sm">{error}</div>
-            </div>
-          ) : (
+      {/* PDF Content Area - Enhanced scrolling with maximum space */}
+      <div 
+        className="flex-1 bg-gray-100 pdf-content-area overflow-auto" 
+        style={{ 
+          height: isFullscreen ? 'calc(100vh - 60px)' : '620px',
+          maxHeight: isFullscreen ? 'calc(100vh - 60px)' : '620px',
+          minHeight: '200px',
+          position: 'relative'
+        }}
+      >
+        {error ? (
+          <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+            <div className="text-lg font-medium mb-2">Unable to load PDF</div>
+            <div className="text-sm">{error}</div>
+          </div>
+        ) : (
+          <div 
+            className="pdf-document-container"
+            style={{ 
+              display: 'flex',
+              justifyContent: scale <= 1.0 ? 'center' : 'flex-start',
+              alignItems: 'flex-start',
+              minWidth: 'fit-content',
+              width: scale > 1.0 ? 'max-content' : '100%',
+              minHeight: 'fit-content',
+              padding: '2px'
+            }}
+          >
             <Document
-              file={pdfUrl}
-              onLoadSuccess={onDocumentLoadSuccess}
-              onLoadError={onDocumentLoadError}
-              loading={
-                <div className="flex items-center justify-center h-64">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                </div>
-              }
-              className="shadow-lg"
-            >
-              <Page
-                pageNumber={pageNumber}
-                scale={scale}
-                rotate={rotation}
+                file={pdfUrl}
+                onLoadSuccess={onDocumentLoadSuccess}
+                onLoadError={onDocumentLoadError}
                 loading={
-                  <div className="flex items-center justify-center h-64 bg-white border border-gray-200 rounded">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  <div className="flex items-center justify-center h-64">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
                   </div>
                 }
-                className="border border-gray-300 bg-white"
-              />
-            </Document>
-          )}
-        </div>
+                className="shadow-lg"
+              >
+                <Page
+                  pageNumber={pageNumber}
+                  scale={scale}
+                  rotate={rotation}
+                  loading={
+                    <div className="flex items-center justify-center h-64 bg-white border border-gray-200 rounded">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    </div>
+                  }
+                  className="border border-gray-300 bg-white block"
+                  renderTextLayer={true}
+                  renderAnnotationLayer={true}
+                  width={undefined}
+                  height={undefined}
+                />
+              </Document>
+          </div>
+        )}
       </div>
 
-      {/* Status Bar */}
-      <div className="px-3 py-2 bg-gray-50 border-t border-gray-200 text-xs text-gray-500">
-        {isLoading ? (
-          'Loading PDF...'
-        ) : error ? (
-          'Error loading PDF'
-        ) : (
-          `Page ${pageNumber} of ${numPages} • ${Math.round(scale * 100)}% zoom`
-        )}
+      {/* Ultra Compact Status Bar */}
+      <div className="px-2 py-0.5 bg-gray-50 border-t border-gray-200 text-xs text-gray-500">
+        <div className="flex justify-between items-center">
+          <div className="text-xs">
+            {isLoading ? (
+              'Loading...'
+            ) : error ? (
+              'Error'
+            ) : (
+              `Page ${pageNumber} of ${numPages} • ${Math.round(scale * 100)}%`
+            )}
+          </div>
+          {!isLoading && !error && (
+            <div className="text-gray-400 hidden sm:block text-xs">
+              {isFullscreen ? (
+                'ESC: Exit • ←→: Pages • ±: Zoom'
+              ) : (
+                'Ctrl+F: Fullscreen • ←→: Pages • ±: Zoom'
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
