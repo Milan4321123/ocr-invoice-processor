@@ -374,39 +374,8 @@ async def update_invoice_editor_data(
         
         logger.info(f"✅ Invoice {invoice_id} updated and moved to 'in Bearbeitung' stage")
         
-        # Send email notification if editor information is provided
+        # Email notification removed - only completion email will be sent when invoice is finished
         email_sent = False
-        if editor_info.get("editor_email") and editor_info.get("editor_name"):
-            try:
-                # Get updated invoice data for email
-                updated_result = db_service.get_invoice(invoice_id)
-                if updated_result["success"]:
-                    invoice_data = updated_result["data"]
-                    
-                    # Send editor notification email (summary so far)
-                    email_result = await email_service.send_editor_notification(
-                        invoice_data=invoice_data,
-                        editor_email=editor_info["editor_email"],
-                        editor_name=editor_info["editor_name"],
-                        changes_summary=editor_info.get("changes_summary", []),
-                        request_id=None,
-                        is_completion=False  # This is just editing, not completion
-                    )
-                    
-                    if email_result["success"]:
-                        email_sent = True
-                        logger.info(f"Email notification sent successfully for invoice {invoice_id}")
-                    else:
-                        logger.warning(f"Email notification failed for invoice {invoice_id}: {email_result.get('error')}")
-                        
-            except ValueError as ve:
-                if "No email provider configured" in str(ve):
-                    logger.info(f"Email notification skipped for invoice {invoice_id}: No email provider configured (demo mode)")
-                else:
-                    logger.warning(f"Email notification error for invoice {invoice_id}: {str(ve)}")
-            except Exception as email_error:
-                logger.warning(f"Email notification error for invoice {invoice_id}: {str(email_error)}")
-                # Continue with successful save response even if email fails
         
         return {
             "success": True,
