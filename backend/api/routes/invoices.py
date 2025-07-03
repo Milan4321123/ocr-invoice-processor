@@ -383,13 +383,14 @@ async def update_invoice_editor_data(
                 if updated_result["success"]:
                     invoice_data = updated_result["data"]
                     
-                    # Send editor notification email
+                    # Send editor notification email (summary so far)
                     email_result = await email_service.send_editor_notification(
                         invoice_data=invoice_data,
                         editor_email=editor_info["editor_email"],
                         editor_name=editor_info["editor_name"],
                         changes_summary=editor_info.get("changes_summary", []),
-                        request_id=None
+                        request_id=None,
+                        is_completion=False  # This is just editing, not completion
                     )
                     
                     if email_result["success"]:
@@ -451,7 +452,37 @@ async def complete_invoice(
         
         updated_invoice = result["data"]
         
-        # No automatic email sending - let user control via dashboard "An Bauleiter senden" button
+        # Send editor completion notification if editor information is provided
+        completion_email_sent = False
+        editor_info = request_data.get("editor_info", {})
+        
+        if editor_info.get("editor_email") and editor_info.get("editor_name"):
+            try:
+                # Send formal completion notification to editor
+                email_result = await email_service.send_editor_notification(
+                    invoice_data=updated_invoice,
+                    editor_email=editor_info["editor_email"],
+                    editor_name=editor_info["editor_name"],
+                    changes_summary=editor_info.get("changes_summary", []),
+                    request_id=None,
+                    is_completion=True  # This is a formal completion notification
+                )
+                
+                if email_result["success"]:
+                    completion_email_sent = True
+                    logger.info(f"Editor completion notification sent successfully for invoice {invoice_id}")
+                else:
+                    logger.warning(f"Editor completion notification failed for invoice {invoice_id}: {email_result.get('error')}")
+                    
+            except ValueError as ve:
+                if "No email provider configured" in str(ve):
+                    logger.info(f"Editor completion notification skipped for invoice {invoice_id}: No email provider configured (demo mode)")
+                else:
+                    logger.warning(f"Editor completion notification error for invoice {invoice_id}: {str(ve)}")
+            except Exception as email_error:
+                logger.warning(f"Editor completion notification error for invoice {invoice_id}: {str(email_error)}")
+        
+        # No automatic Bauleiter email sending - let user control via dashboard "An Bauleiter senden" button
         logger.info(f"Invoice {invoice_id} marked as completed - ready for manual Bauleiter sending via dashboard")
         
         return {
@@ -460,7 +491,8 @@ async def complete_invoice(
             "invoice_id": invoice_id,
             "completion_status": updated_invoice.get("review_status", "completed_review"),
             "completed_at": updated_invoice.get("reviewed_at"),
-            "email_sent": False,  # No automatic email - user controls via dashboard
+            "completion_email_sent": completion_email_sent,
+            "email_sent": False,  # No automatic Bauleiter email - user controls via dashboard
             "email_note": "Use 'An Bauleiter senden' button in dashboard to send approval email"
         }
         

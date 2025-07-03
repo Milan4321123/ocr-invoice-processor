@@ -151,19 +151,16 @@ export default function InvoiceEditorDashboard({
       // Mark as completed - no automatic email sending
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       
-      // Prepare completion data (no Bauleiter email needed here)
+      // Prepare completion data with editor info for completion email
       const completionData = {
-        fields: {
-          ...fields,
-          // Don't override existing fields, just add completion status
-        },
         completion_info: {
           completed_by: fields.rechnungspruefung_email || "editor@company.de",
+          completed_at: new Date().toISOString(),
+          completion_notes: "Rechnung wurde vollständig bearbeitet - bereit für Bauleiter-Genehmigung über Dashboard"
+        },
+        editor_info: {
           editor_email: fields.rechnungspruefung_email || "editor@company.de",
           editor_name: fields.rechnungspruefung_email?.split('@')[0] || "Editor",
-          completed_at: new Date().toISOString(),
-          review_status: "completed_review",
-          completion_notes: "Rechnung wurde vollständig bearbeitet - bereit für Bauleiter-Genehmigung über Dashboard",
           changes_summary: [
             {
               field: "Status",
@@ -189,8 +186,12 @@ export default function InvoiceEditorDashboard({
 
       const result = await response.json();
       
-      // Show success message - no automatic email sent
-      alert(`✅ Rechnung erfolgreich abgeschlossen!\n\n📋 Status: "Bearbeitung abgeschlossen - bereit für Bauleiter"\n\n💡 Nächster Schritt: Verwenden Sie die "An Bauleiter senden" Schaltfläche im Dashboard, um die Genehmigung zu beantragen.`);
+      // Show success message based on whether completion email was sent
+      const emailMessage = result.completion_email_sent 
+        ? "\n📧 Abschluss-E-Mail wurde gesendet"
+        : "\n⚠️ Keine E-Mail-Benachrichtigung gesendet";
+      
+      alert(`✅ Rechnung erfolgreich abgeschlossen!${emailMessage}\n\n📋 Status: "Bearbeitung abgeschlossen - bereit für Bauleiter"\n\n💡 Nächster Schritt: Verwenden Sie die "An Bauleiter senden" Schaltfläche im Dashboard, um die Genehmigung zu beantragen.`);
       
       // Redirect to dashboard after completion
       window.location.href = '/dashboard';

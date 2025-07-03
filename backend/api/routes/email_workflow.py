@@ -75,13 +75,14 @@ async def send_editor_notification(
         await _update_invoice_status(request.invoice_id, 'edited')
         await _update_invoice_review_status(request.invoice_id, 'under_review')
         
-        # Send editor notification
+        # Send editor notification (summary so far)
         result = await email_service.send_editor_notification(
             invoice_data=invoice_data,
             editor_email=request.editor_email,
             editor_name=request.editor_name,
             changes_summary=request.changes_summary,
-            request_id=request_id
+            request_id=request_id,
+            is_completion=False  # This is for ongoing editing workflow
         )
         
         if not result["success"]:
