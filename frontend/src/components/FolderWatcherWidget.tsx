@@ -43,35 +43,49 @@ interface FileNotification {
 export default function FolderWatcherWidget() {
   const [status, setStatus] = useState<WatcherStatus | null>(null);
   const [notifications, setNotifications] = useState<FileNotification[]>([]);
-  const [showNotifications, setShowNotifications] = useState(true); // Changed from false to true
+  const [showNotifications, setShowNotifications] = useState(true);
   const [loading, setLoading] = useState(true);
   const [lastNotificationCount, setLastNotificationCount] = useState(0);
+  const [isPolling, setIsPolling] = useState(true);
 
   useEffect(() => {
+    // Initial fetch
     fetchStatus();
     fetchNotifications();
-    // Poll status and notifications every 5 seconds for faster updates
+    
+    // Set up polling with much longer interval (60 seconds)
+    // Only poll when tab is active and component is mounted
     const interval = setInterval(() => {
-      fetchStatus();
-      fetchNotifications();
-    }, 5000); // Poll every 5 seconds
-    return () => clearInterval(interval);
-  }, []);
+      if (!document.hidden && isPolling) {
+        fetchStatus();
+        fetchNotifications();
+      }
+    }, 60000); // Poll every 60 seconds for much less traffic
+    
+    // Handle visibility changes
+    const handleVisibilityChange = () => {
+      if (!document.hidden && isPolling) {
+        // Tab became active, fetch fresh data but only once
+        fetchStatus();
+        fetchNotifications();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isPolling]);
 
   // Show toast notifications for new events
   useEffect(() => {
-    console.log('🔔 Notification effect triggered:', {
-      notificationsLength: notifications.length,
-      lastNotificationCount,
-      hasNewNotifications: notifications.length > lastNotificationCount && lastNotificationCount > 0
-    });
-    
+    // Reduced console logging - only log when there are actual new notifications
     if (notifications.length > lastNotificationCount && lastNotificationCount > 0) {
       const newNotifications = notifications.slice(0, notifications.length - lastNotificationCount);
-      console.log('🆕 New notifications detected:', newNotifications);
       
       newNotifications.forEach(notification => {
-        console.log('🔔 Showing toast for:', notification.type, notification.filename);
         switch (notification.type) {
           case 'upload_success':
             toast.success(`Datei erfolgreich hochgeladen: ${notification.filename}`);
@@ -97,6 +111,7 @@ export default function FolderWatcherWidget() {
         setStatus(data);
       }
     } catch (error) {
+      // Only log errors, not successful requests
       console.error('Error fetching folder watcher status:', error);
     } finally {
       setLoading(false);
@@ -106,17 +121,14 @@ export default function FolderWatcherWidget() {
   const fetchNotifications = async () => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      console.log('🔍 Fetching notifications from:', `${apiUrl}/api/folder-watcher/notifications?limit=5`);
       const response = await fetch(`${apiUrl}/api/folder-watcher/notifications?limit=5`);
       if (response.ok) {
         const data = await response.json();
-        console.log('📨 Received notifications:', data);
         setNotifications(data.notifications || []);
-      } else {
-        console.error('❌ Failed to fetch notifications:', response.status, response.statusText);
       }
     } catch (error) {
-      console.error('❌ Error fetching notifications:', error);
+      // Only log errors, not successful requests
+      console.error('Error fetching notifications:', error);
     }
   };
 
@@ -434,6 +446,19 @@ export default function FolderWatcherWidget() {
             <PlayIcon className="w-4 h-4" />
           </button>
         )}
+        
+        {/* Polling toggle button */}
+        <button 
+          onClick={() => setIsPolling(!isPolling)}
+          className={`px-3 py-2 glass-card hover:bg-white/20 rounded-xl transition-all transform hover:scale-105 border shadow-lg ${
+            isPolling 
+              ? 'text-blue-700 border-blue-200' 
+              : 'text-gray-500 border-gray-200'
+          }`}
+          title={isPolling ? "Auto-Refresh deaktivieren (60s)" : "Auto-Refresh aktivieren"}
+        >
+          <ClockIcon className="w-4 h-4" />
+        </button>
       </div>
     </div>
   );

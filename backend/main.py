@@ -11,9 +11,35 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+# Configure logging with filter to reduce noise from frequent requests
+class QuietPathsFilter(logging.Filter):
+    """Filter to reduce logging noise from frequently called endpoints"""
+    
+    def __init__(self):
+        super().__init__()
+        # Paths that should have reduced logging (only log errors)
+        self.quiet_paths = [
+            "/api/folder-watcher/status",
+            "/api/folder-watcher/notifications"
+        ]
+    
+    def filter(self, record):
+        # For uvicorn access logs, reduce noise from frequent endpoints
+        if hasattr(record, 'getMessage'):
+            message = record.getMessage()
+            for quiet_path in self.quiet_paths:
+                if quiet_path in message and " 200 " in message:
+                    # Only log errors for these paths, skip successful 200 responses
+                    return False
+        return True
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Apply quiet filter to uvicorn access logs
+uvicorn_logger = logging.getLogger("uvicorn.access")
+uvicorn_logger.addFilter(QuietPathsFilter())
 
 app = FastAPI(
     title="Invoice Management API",
