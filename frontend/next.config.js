@@ -20,7 +20,9 @@ const nextConfig = {
     return config;
   },
   async rewrites() {
+    // In production, use direct API calls to the deployed backend
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    
     return [
       // Proxy API calls to backend server
       {
