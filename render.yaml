@@ -4,7 +4,7 @@ services:
     name: ocr-invoice-backend
     env: docker
     region: frankfurt
-    dockerfilePath: ./backend/Dockerfile
+    dockerfilePath: ./Dockerfile
     repo: https://github.com/Milan4321123/ocr-invoice-processor.git
     branch: lala
     rootDir: backend
@@ -34,14 +34,23 @@ services:
         value: "production"
       - key: BASE_URL
         value: https://ocr-invoice-backend.onrender.com
-    healthCheckPath: /api/health
+      - key: EMAIL_PROVIDER
+        value: "sendgrid"
+      - key: SMTP_HOST
+        value: "smtp.gmail.com"
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USERNAME
+        value: "adhikarimilan4321@gmail.com"
+      - key: SMTP_PASSWORD
+        sync: false # Set manually in Render dashboard
 
   # Frontend Next.js Application
   - type: web
     name: ocr-invoice-frontend
     env: docker
     region: frankfurt
-    dockerfilePath: ./frontend/Dockerfile
+    dockerfilePath: ./Dockerfile
     repo: https://github.com/Milan4321123/ocr-invoice-processor.git
     branch: lala
     rootDir: frontend
@@ -55,7 +64,6 @@ services:
         value: https://ocr-invoice-backend.onrender.com
       - key: NODE_ENV
         value: "production"
-    healthCheckPath: /api/health
 
 # Optional: Database (if you want to use Render's PostgreSQL instead of Supabase)
 # databases:
