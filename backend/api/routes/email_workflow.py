@@ -9,7 +9,7 @@ from typing import Dict, Any, Optional, List
 from uuid import UUID
 import jwt
 from fastapi import APIRouter, HTTPException, Depends, Request, Query
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, validator
 from fastapi.responses import HTMLResponse
 
 from services.database import db_service
