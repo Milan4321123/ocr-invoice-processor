@@ -2,10 +2,11 @@
 --only-binary=all
 --prefer-binary
 
-# Core FastAPI stack - compatible with pre-built wheels
-fastapi==0.99.1
+# Core FastAPI stack - compatible with Python 3.11
+fastapi==0.95.2
 uvicorn[standard]==0.22.0
 pydantic==1.10.12
+gunicorn==21.2.0
 
 # Essential dependencies
 python-multipart==0.0.6

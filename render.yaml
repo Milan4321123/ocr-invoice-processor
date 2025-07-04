@@ -1,11 +1,10 @@
  services:
-  # Backend API Service
+# Backend API Service
   - type: web
     name: ocr-invoice-backend
-    env: python
+    env: docker
     region: frankfurt
-    buildCommand: pip install -r requirements.txt
-    startCommand: python render_start.py
+    dockerfilePath: ./backend/Dockerfile
     repo: https://github.com/Milan4321123/ocr-invoice-processor.git
     branch: deployy
     rootDir: backend
