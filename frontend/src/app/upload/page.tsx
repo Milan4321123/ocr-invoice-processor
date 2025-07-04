@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import Dropzone from '../../components/Dropzone'
+import Dropzone from '@/components/Dropzone'
 import toast, { Toaster } from 'react-hot-toast'
 import { toastConfig } from '@/lib/toast-config'
 

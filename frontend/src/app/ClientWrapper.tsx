@@ -2,8 +2,8 @@
 
 import React from 'react'
 import { usePathname } from 'next/navigation'
-import { AuthProvider, useAuth } from '../contexts/AuthContext'
-import Navigation from '../components/Navigation'
+import { AuthProvider, useAuth } from '@/contexts/AuthContext'
+import Navigation from '@/components/Navigation'
 
 interface ClientWrapperProps {
   children: React.ReactNode

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { testSupabaseConnection } from '../../lib/supabase';
+import { testSupabaseConnection } from '@/lib/supabase';
 
 export default function ConnectivityTestPage() {
   const [backendStatus, setBackendStatus] = useState<string>('Testing...');
