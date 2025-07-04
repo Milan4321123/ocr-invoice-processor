@@ -12,7 +12,9 @@ gunicorn==21.2.0
 python-multipart==0.0.6
 python-dotenv==1.0.0
 PyJWT==2.8.0
-python-jose==3.3.0
+python-jose[cryptography]==3.3.0
+email-validator==2.0.0
+cryptography==41.0.7
 ecdsa==0.18.0
 pyasn1==0.4.8
 Jinja2==3.1.2
