@@ -24,7 +24,14 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001", "http://127.0.0.1:3001"],
+    allow_origins=[
+        "http://localhost:3000", 
+        "http://127.0.0.1:3000", 
+        "http://localhost:3001", 
+        "http://127.0.0.1:3001",
+        "https://ocr-invoice-frontend.onrender.com",  # Production frontend
+        "https://ocr-invoice-backend.onrender.com"   # Production backend
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -95,6 +102,18 @@ async def startup_event():
             logger.error(f"❌ Auth initialization failed: {result.get('error', 'Unknown error')}")
     except Exception as e:
         logger.error(f"❌ Auth initialization error: {e}")
+    
+    # Start Skonto reminder scheduler
+    try:
+        from services.skonto_scheduler import skonto_scheduler
+        import asyncio
+        
+        # Start the scheduler in the background
+        asyncio.create_task(skonto_scheduler.start_scheduler())
+        logger.info("📅 Skonto reminder scheduler started")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to start Skonto scheduler: {e}")
     
     logger.info("✅ Application startup complete")
 

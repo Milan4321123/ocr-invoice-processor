@@ -6,7 +6,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, HTTPException, Query, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, EmailStr
 
 from services.database import db_service
 from services.skonto_scheduler import skonto_scheduler, run_manual_skonto_check
@@ -46,6 +46,20 @@ class SkontoOpportunityResponse(BaseModel):
     urgency_level: str
     reminder_sent: bool
     skonto_decision: str
+
+# Request Models
+class SkontoConfigUpdateRequest(BaseModel):
+    default_recipient_email: EmailStr
+    check_interval_hours: Optional[int] = None
+    days_ahead_urgent: Optional[int] = None
+    days_ahead_normal: Optional[int] = None
+    days_ahead_early: Optional[int] = None
+    dry_run: Optional[bool] = None
+
+class SkontoReminderRequest(BaseModel):
+    invoice_ids: List[str]
+    recipient_email: EmailStr
+    recipient_name: Optional[str] = None
 
 @router.get("/skonto/dashboard/summary", response_model=SkontoSummaryResponse)
 async def get_skonto_summary():
@@ -559,3 +573,114 @@ async def get_savings_potential_report():
     except Exception as e:
         logger.error(f"❌ Failed to generate savings potential report: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to generate report: {str(e)}")
+
+@router.put("/skonto/scheduler/config")
+async def update_skonto_config(config_update: SkontoConfigUpdateRequest):
+    """
+    Update Skonto reminder scheduler configuration.
+    Allows changing default recipient email and other settings.
+    """
+    try:
+        logger.info(f"🔧 Updating Skonto scheduler configuration")
+        
+        # Update the scheduler configuration
+        if config_update.default_recipient_email:
+            skonto_scheduler.config.default_recipient_email = str(config_update.default_recipient_email)
+        
+        if config_update.check_interval_hours is not None:
+            skonto_scheduler.config.check_interval_hours = config_update.check_interval_hours
+            
+        if config_update.days_ahead_urgent is not None:
+            skonto_scheduler.config.days_ahead_urgent = config_update.days_ahead_urgent
+            
+        if config_update.days_ahead_normal is not None:
+            skonto_scheduler.config.days_ahead_normal = config_update.days_ahead_normal
+            
+        if config_update.days_ahead_early is not None:
+            skonto_scheduler.config.days_ahead_early = config_update.days_ahead_early
+            
+        if config_update.dry_run is not None:
+            skonto_scheduler.config.dry_run = config_update.dry_run
+        
+        logger.info(f"✅ Skonto configuration updated")
+        logger.info(f"   Default recipient: {skonto_scheduler.config.default_recipient_email}")
+        logger.info(f"   Check interval: {skonto_scheduler.config.check_interval_hours} hours")
+        logger.info(f"   Dry run: {skonto_scheduler.config.dry_run}")
+        
+        return {
+            "success": True,
+            "message": "Skonto scheduler configuration updated successfully",
+            "config": {
+                "default_recipient_email": skonto_scheduler.config.default_recipient_email,
+                "check_interval_hours": skonto_scheduler.config.check_interval_hours,
+                "days_ahead_urgent": skonto_scheduler.config.days_ahead_urgent,
+                "days_ahead_normal": skonto_scheduler.config.days_ahead_normal,
+                "days_ahead_early": skonto_scheduler.config.days_ahead_early,
+                "dry_run": skonto_scheduler.config.dry_run
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to update Skonto config: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update configuration: {str(e)}")
+
+@router.post("/skonto/send-reminder")
+async def send_manual_skonto_reminder(reminder_request: SkontoReminderRequest):
+    """
+    Manually send Skonto reminder to a specific email for selected invoices.
+    Allows choosing the recipient email address.
+    """
+    try:
+        logger.info(f"📧 Sending manual Skonto reminder to {reminder_request.recipient_email}")
+        
+        reminders_sent = 0
+        errors = []
+        
+        for invoice_id in reminder_request.invoice_ids:
+            try:
+                # Get invoice data
+                invoice_result = db_service.get_invoice_by_id(invoice_id)
+                if not invoice_result["success"]:
+                    errors.append(f"Invoice {invoice_id}: {invoice_result.get('error')}")
+                    continue
+                
+                invoice_data = invoice_result["data"]
+                
+                # Check if invoice has Skonto data
+                if not invoice_data.get("skonto_datum") or not invoice_data.get("skonto_prozent"):
+                    errors.append(f"Invoice {invoice_id}: Missing Skonto data")
+                    continue
+                
+                # Send reminder with specified email
+                from services.email_service import email_service
+                result = await email_service.send_skonto_reminder(
+                    invoice_data=invoice_data,
+                    recipient_email=str(reminder_request.recipient_email),
+                    recipient_name=reminder_request.recipient_name,
+                    request_id=f"manual-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+                )
+                
+                if result and result.get("success"):
+                    reminders_sent += 1
+                    logger.info(f"✅ Manual Skonto reminder sent for invoice {invoice_id}")
+                else:
+                    error_msg = result.get('error', 'Unknown error') if result else 'No result returned'
+                    errors.append(f"Invoice {invoice_id}: {error_msg}")
+                    
+            except Exception as e:
+                errors.append(f"Invoice {invoice_id}: {str(e)}")
+        
+        return {
+            "success": True,
+            "message": f"Manual Skonto reminders completed",
+            "reminders_sent": reminders_sent,
+            "total_invoices": len(reminder_request.invoice_ids),
+            "errors": errors,
+            "recipient_email": str(reminder_request.recipient_email),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to send manual Skonto reminder: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to send reminder: {str(e)}")

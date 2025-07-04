@@ -84,9 +84,9 @@ class SkontoSchedulerService:
             
             # Combine and deduplicate
             all_invoices = self._deduplicate_invoices([
-                *urgent_invoices,
-                *normal_invoices, 
-                *early_invoices
+                urgent_invoices,
+                normal_invoices, 
+                early_invoices
             ])
             
             logger.info(f"📊 Found {len(all_invoices)} invoices needing Skonto reminders")
@@ -99,6 +99,14 @@ class SkontoSchedulerService:
             # Send reminders
             for invoice in all_invoices:
                 try:
+                    # Validate invoice data before processing
+                    if not isinstance(invoice, dict):
+                        logger.error(f"❌ Invalid invoice data type: {type(invoice)}, value: {invoice}")
+                        continue
+                    
+                    invoice_id = invoice.get("id", "Unknown")
+                    logger.info(f"📧 Processing Skonto reminder for invoice {invoice_id}")
+                    
                     success = await self._send_single_reminder(invoice)
                     if success:
                         reminders_sent += 1
@@ -107,7 +115,8 @@ class SkontoSchedulerService:
                     await asyncio.sleep(1)
                     
                 except Exception as e:
-                    error_msg = f"Failed to send reminder for invoice {invoice.get('id')}: {str(e)}"
+                    invoice_id = invoice.get("id", "Unknown") if isinstance(invoice, dict) else "Unknown"
+                    error_msg = f"Failed to send reminder for invoice {invoice_id}: {str(e)}"
                     logger.error(error_msg)
                     errors.append(error_msg)
                     self.stats["total_errors"] += 1
@@ -178,7 +187,13 @@ class SkontoSchedulerService:
     async def _send_single_reminder(self, invoice_data: Dict[str, Any]) -> bool:
         """Send a single Skonto reminder email"""
         try:
-            invoice_id = invoice_data.get("id")
+            # Validate input
+            if not isinstance(invoice_data, dict):
+                logger.error(f"❌ Invalid invoice data type: {type(invoice_data)}")
+                return False
+            
+            invoice_id = invoice_data.get("id", "Unknown")
+            logger.info(f"📧 Preparing Skonto reminder for invoice {invoice_id}")
             
             # Determine recipient email
             recipient_email = (
@@ -186,26 +201,33 @@ class SkontoSchedulerService:
                 self.config.default_recipient_email
             )
             
+            if not recipient_email:
+                logger.error(f"❌ No recipient email found for invoice {invoice_id}")
+                return False
+            
             if self.config.dry_run:
                 logger.info(f"🧪 DRY RUN: Would send Skonto reminder for invoice {invoice_id} to {recipient_email}")
                 return True
             
             # Send the reminder
+            logger.info(f"📧 Sending Skonto reminder for invoice {invoice_id} to {recipient_email}")
             result = await email_service.send_skonto_reminder(
                 invoice_data=invoice_data,
                 recipient_email=recipient_email,
                 recipient_name=None
             )
             
-            if result["success"]:
+            if result and result.get("success"):
                 logger.info(f"✅ Sent Skonto reminder for invoice {invoice_id} to {recipient_email}")
                 return True
             else:
-                logger.error(f"❌ Failed to send Skonto reminder for invoice {invoice_id}: {result.get('error')}")
+                error_msg = result.get('error', 'Unknown error') if result else 'No result returned'
+                logger.error(f"❌ Failed to send Skonto reminder for invoice {invoice_id}: {error_msg}")
                 return False
                 
         except Exception as e:
-            logger.error(f"❌ Exception sending Skonto reminder: {str(e)}")
+            invoice_id = invoice_data.get("id", "Unknown") if isinstance(invoice_data, dict) else "Unknown"
+            logger.error(f"❌ Exception sending Skonto reminder for invoice {invoice_id}: {str(e)}")
             return False
     
     async def start_scheduler(self):
