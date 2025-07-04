@@ -1,15 +1,17 @@
+# Force binary wheels only (no compilation)
+--only-binary=all
+
 fastapi==0.104.1
 uvicorn==0.24.0
 python-multipart==0.0.6
 supabase==2.0.2
 python-dotenv==1.0.0
-pydantic==2.5.3
+pydantic==1.10.12
 sendgrid==6.11.0
 PyJWT==2.8.0
 Jinja2==3.1.2
 cryptography==41.0.7
 passlib[bcrypt]==1.7.4
-python-jose[cryptography]==3.3.0
 
 # Test dependencies (remove for production)
 pytest==7.4.3
