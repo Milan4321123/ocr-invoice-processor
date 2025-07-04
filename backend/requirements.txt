@@ -1,5 +1,5 @@
-fastapi==0.68.2
-uvicorn==0.15.0
+fastapi==0.104.1
+uvicorn==0.24.0
 python-multipart==0.0.5
 supabase==2.0.2
 python-dotenv==1.0.0
@@ -9,7 +9,7 @@ httpx>=0.24.0,<0.25.0
 pytest-mock==3.12.0
 
 # Additional dependencies for data validation
-pydantic==1.10.12
+pydantic==2.0.3
 
 # Folder watching for automatic processing
 watchdog==3.0.0
