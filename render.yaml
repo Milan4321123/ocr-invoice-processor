@@ -1,0 +1,67 @@
+services:
+  # Backend API Service
+  - type: web
+    name: ocr-invoice-backend
+    env: python
+    region: frankfurt
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python render_start.py
+    repo: https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git # Update with your actual repo
+    branch: main
+    rootDir: backend
+    envVars:
+      - key: SUPABASE_URL
+        value: https://bdtcfypvadryfeabqnlc.supabase.co
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false # This will be set manually in Render dashboard for security
+      - key: SUPABASE_ANON_KEY
+        sync: false # This will be set manually in Render dashboard for security
+      - key: SENDGRID_API_KEY
+        sync: false # This will be set manually in Render dashboard for security
+      - key: FROM_EMAIL
+        value: adhikarimilan4321@gmail.com
+      - key: FROM_NAME
+        value: Invoice Processing System
+      - key: JWT_SECRET
+        sync: false # This will be set manually in Render dashboard for security
+      - key: ENABLE_OCR
+        value: "false"
+      - key: USE_MOCK_OCR
+        value: "true"
+      - key: DEBUG
+        value: "false"
+      - key: PORT
+        value: "8000"
+
+  # Frontend Static Site
+  - type: web
+    name: ocr-invoice-frontend
+    env: static
+    region: frankfurt
+    plan: free
+    buildCommand: npm install && npm run build
+    staticPublishPath: .next
+    repo: https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git # Update with your actual repo
+    branch: main
+    rootDir: frontend
+    envVars:
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        value: https://bdtcfypvadryfeabqnlc.supabase.co
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false # This will be set manually in Render dashboard for security
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: ocr-invoice-backend
+          property: host
+      - key: NODE_VERSION
+        value: "18"
+
+# Optional: Database (if you want to use Render's PostgreSQL instead of Supabase)
+# databases:
+#   - name: ocr-invoice-db
+#     databaseName: ocr_invoice_db
+#     user: ocr_user
+#     region: frankfurt
+#     plan: free
