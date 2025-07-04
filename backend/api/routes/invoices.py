@@ -4,6 +4,7 @@ from fastapi.responses import StreamingResponse
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import logging
+import os
 
 from services.database import db_service
 from services.email_service import email_service
@@ -297,8 +298,9 @@ async def get_invoice_editor_data(invoice_id: str = Path(..., description="The i
                 bucket_name = "invoices"
                 file_name = file_path
             
-            # Construct full Supabase storage URL with correct bucket
-            pdf_url = f"https://bdtcfypvadryfeabqnlc.supabase.co/storage/v1/object/public/{bucket_name}/{file_name}"
+            # Construct full Supabase storage URL with correct bucket using environment variable
+            supabase_url = os.getenv("SUPA_URL", "https://bdtcfypvadryfeabqnlc.supabase.co")
+            pdf_url = f"{supabase_url}/storage/v1/object/public/{bucket_name}/{file_name}"
         else:
             pdf_url = ""
         

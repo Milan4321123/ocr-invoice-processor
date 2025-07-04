@@ -151,8 +151,7 @@ export default function CleanInvoiceDashboard() {
     try {
       // Get Bauleiter email from user
       const bauleiterEmail = prompt(
-        `Rechnung "${invoice.file_name}" an Bauleiter senden.\n\nBitte geben Sie die E-Mail-Adresse des Bauleiters ein:`,
-        "bauleiter@company.com"
+        `Rechnung "${invoice.file_name}" an Bauleiter senden.\n\nBitte geben Sie die E-Mail-Adresse des Bauleiters ein:`
       );
       
       if (!bauleiterEmail) {

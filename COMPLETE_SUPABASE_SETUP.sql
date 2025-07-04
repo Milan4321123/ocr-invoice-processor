@@ -1,0 +1,300 @@
+-- =====================================================================
+-- COMPLETE SUPABASE SETUP SQL FOR OCR INVOICE PROCESSOR
+-- Run this entire script in your NEW company Supabase SQL Editor
+-- =====================================================================
+
+-- 1. CREATE TRIGGER FUNCTION (needed for auto-updating timestamps)
+-- =====================================================================
+
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE 'plpgsql';
+
+-- =====================================================================
+-- 2. USERS TABLE (Authentication)
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS public.users (
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  username VARCHAR(50) NOT NULL UNIQUE,
+  hashed_password TEXT NOT NULL,
+  email VARCHAR(255),
+  full_name VARCHAR(255),
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  CONSTRAINT users_pkey PRIMARY KEY (id),
+  CONSTRAINT users_username_key UNIQUE (username)
+) TABLESPACE pg_default;
+
+-- Users table indexes
+CREATE INDEX IF NOT EXISTS idx_users_username ON public.users USING btree (username) TABLESPACE pg_default;
+CREATE INDEX IF NOT EXISTS idx_users_email ON public.users USING btree (email) TABLESPACE pg_default;
+
+-- Users table trigger
+CREATE TRIGGER update_users_updated_at 
+    BEFORE UPDATE ON users 
+    FOR EACH ROW 
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- =====================================================================
+-- 3. MAIN INVOICES TABLE (Core invoice data)
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS public.invoices_clean (
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  file_name VARCHAR(255) NOT NULL,
+  file_path VARCHAR(500),
+  file_size INTEGER,
+  mime_type VARCHAR(100),
+  rechnungsempfaenger VARCHAR(255),
+  rechnungssteller VARCHAR(255),
+  projekt VARCHAR(255),
+  gewerk VARCHAR(255),
+  weiter_berechnen_an VARCHAR(255),
+  rechnungsbetrag NUMERIC(10, 2),
+  kfw_anrechenbare_kosten BOOLEAN DEFAULT false,
+  rechnungseingang DATE,
+  faelligkeit DATE,
+  skonto_datum DATE,
+  skonto_prozent NUMERIC(5, 2),
+  rechnungsart VARCHAR(100),
+  rechnungspruefung VARCHAR(255),
+  status VARCHAR(50) DEFAULT 'pending'::VARCHAR,
+  ocr_status VARCHAR(50) DEFAULT 'pending'::VARCHAR,
+  ocr_text TEXT,
+  raw_ocr_data JSONB,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  review_status TEXT,
+  reviewed_by TEXT,
+  reviewed_at TIMESTAMP WITH TIME ZONE,
+  review_notes TEXT,
+  editor_email VARCHAR(255),
+  editor_name VARCHAR(255),
+  edit_completed_at TIMESTAMP WITH TIME ZONE,
+  edit_bericht_sent_at TIMESTAMP WITH TIME ZONE,
+  bauleiter_email VARCHAR(255),
+  bauleiter_review_sent_at TIMESTAMP WITH TIME ZONE,
+  approval_status VARCHAR(50) DEFAULT 'pending'::VARCHAR,
+  approved_at TIMESTAMP WITH TIME ZONE,
+  approval_method VARCHAR(50),
+  change_summary JSONB,
+  email_logs JSONB,
+  skonto_reminder_sent BOOLEAN DEFAULT false,
+  skonto_reminder_sent_at TIMESTAMP WITH TIME ZONE,
+  skonto_decision VARCHAR(20) DEFAULT 'pending'::VARCHAR,
+  actual_skonto_savings NUMERIC(10, 2),
+  CONSTRAINT invoices_clean_pkey PRIMARY KEY (id),
+  CONSTRAINT check_approval_status CHECK (
+    (approval_status)::text = ANY (
+      ARRAY[
+        'pending'::text,
+        'approved'::text,
+        'rejected'::text
+      ]
+    )
+  ),
+  CONSTRAINT check_review_status CHECK (
+    review_status = ANY (
+      ARRAY[
+        'pending'::text,
+        'under_review'::text,
+        'completed_review'::text,
+        'needs_attention'::text
+      ]
+    )
+  ),
+  CONSTRAINT check_skonto_decision CHECK (
+    (skonto_decision)::text = ANY (
+      (
+        ARRAY[
+          'pending'::VARCHAR,
+          'taken'::VARCHAR,
+          'missed'::VARCHAR,
+          'not_applicable'::VARCHAR
+        ]
+      )::text[]
+    )
+  ),
+  CONSTRAINT check_status CHECK (
+    (status)::text = ANY (
+      ARRAY[
+        'pending'::text,
+        'uploaded'::text,
+        'edited'::text,
+        'pending_email'::text,
+        'edit_completed'::text,
+        'in_review_by_bauleiter'::text,
+        'approved_by_bauleiter'::text,
+        'rejected_by_bauleiter'::text,
+        'completed'::text,
+        'error'::text
+      ]
+    )
+  )
+) TABLESPACE pg_default;
+
+-- Invoices table indexes
+CREATE INDEX IF NOT EXISTS idx_invoices_status ON public.invoices_clean USING btree (status) TABLESPACE pg_default;
+CREATE INDEX IF NOT EXISTS idx_invoices_approval_status ON public.invoices_clean USING btree (approval_status) TABLESPACE pg_default;
+CREATE INDEX IF NOT EXISTS idx_skonto_reminders ON public.invoices_clean USING btree (skonto_datum, skonto_reminder_sent) TABLESPACE pg_default
+WHERE (skonto_datum IS NOT NULL);
+
+-- =====================================================================
+-- 4. APPROVAL TOKENS TABLE (Email link security)
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS public.approval_tokens (
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  token_hash VARCHAR(255) NOT NULL,
+  invoice_id UUID NOT NULL,
+  action VARCHAR(20) NOT NULL,
+  user_email VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  used_at TIMESTAMP WITH TIME ZONE,
+  used_by_ip VARCHAR(45),
+  is_revoked BOOLEAN DEFAULT false,
+  nonce VARCHAR(255) NOT NULL,
+  CONSTRAINT approval_tokens_pkey PRIMARY KEY (id),
+  CONSTRAINT approval_tokens_token_hash_key UNIQUE (token_hash),
+  CONSTRAINT approval_tokens_invoice_id_fkey FOREIGN KEY (invoice_id) REFERENCES invoices_clean (id) ON DELETE CASCADE
+) TABLESPACE pg_default;
+
+-- Approval tokens indexes
+CREATE INDEX IF NOT EXISTS idx_approval_tokens_invoice_id ON public.approval_tokens USING btree (invoice_id) TABLESPACE pg_default;
+CREATE INDEX IF NOT EXISTS idx_approval_tokens_expires_at ON public.approval_tokens USING btree (expires_at) TABLESPACE pg_default;
+
+-- =====================================================================
+-- 5. EMAIL AUDIT LOG TABLE (Email tracking)
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS public.email_audit_log (
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  invoice_id UUID NOT NULL,
+  email_type VARCHAR(50) NOT NULL,
+  recipient_email VARCHAR(255) NOT NULL,
+  subject TEXT NOT NULL,
+  sent_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  send_success BOOLEAN NOT NULL,
+  provider_message_id VARCHAR(255),
+  provider_response JSONB,
+  template_used VARCHAR(100),
+  email_size_bytes INTEGER,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  CONSTRAINT email_audit_log_pkey PRIMARY KEY (id),
+  CONSTRAINT email_audit_log_invoice_id_fkey FOREIGN KEY (invoice_id) REFERENCES invoices_clean (id) ON DELETE CASCADE
+) TABLESPACE pg_default;
+
+-- Email audit log indexes
+CREATE INDEX IF NOT EXISTS idx_email_audit_invoice_id ON public.email_audit_log USING btree (invoice_id) TABLESPACE pg_default;
+CREATE INDEX IF NOT EXISTS idx_email_audit_sent_at ON public.email_audit_log USING btree (sent_at) TABLESPACE pg_default;
+
+-- =====================================================================
+-- 6. DROPDOWN OPTIONS TABLE (UI dropdowns)
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS public.dropdown_options (
+  id BIGSERIAL NOT NULL,
+  field_name TEXT NOT NULL,
+  value TEXT NOT NULL,
+  label TEXT NOT NULL,
+  is_default BOOLEAN DEFAULT false,
+  sort_order INTEGER DEFAULT 1,
+  is_active BOOLEAN DEFAULT true,
+  metadata JSONB DEFAULT '{}'::JSONB,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  CONSTRAINT dropdown_options_pkey PRIMARY KEY (id),
+  CONSTRAINT dropdown_options_field_name_value_key UNIQUE (field_name, value)
+) TABLESPACE pg_default;
+
+-- Dropdown options indexes
+CREATE INDEX IF NOT EXISTS dropdown_options_field_name_idx ON public.dropdown_options USING btree (field_name) TABLESPACE pg_default;
+CREATE INDEX IF NOT EXISTS dropdown_options_is_active_idx ON public.dropdown_options USING btree (is_active) TABLESPACE pg_default;
+
+-- =====================================================================
+-- 7. GEWERK LIST TABLE (German construction trades)
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS public.gewerk_list (
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  code VARCHAR(10) NOT NULL,
+  name VARCHAR(200) NOT NULL,
+  parent_code VARCHAR(10),
+  sort_order INTEGER DEFAULT 0,
+  created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+  CONSTRAINT gewerk_list_pkey PRIMARY KEY (id),
+  CONSTRAINT gewerk_list_code_key UNIQUE (code)
+) TABLESPACE pg_default;
+
+-- =====================================================================
+-- 8. INSERT DEFAULT DATA (Required for app to work)
+-- =====================================================================
+
+-- Insert default admin user (password: admin123)
+INSERT INTO users (username, hashed_password, email, full_name, is_active) 
+VALUES (
+  'admin',
+  '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/lewYGANtV.0B3GbVC', -- admin123
+  'admin@company.com',
+  'System Administrator',
+  true
+) ON CONFLICT (username) DO NOTHING;
+
+-- Insert sample dropdown options for project field
+INSERT INTO dropdown_options (field_name, value, label, is_default, sort_order, is_active) VALUES
+('projekt', 'project1', 'Bauprojekt 1', true, 1, true),
+('projekt', 'project2', 'Bauprojekt 2', false, 2, true),
+('projekt', 'project3', 'Bauprojekt 3', false, 3, true)
+ON CONFLICT (field_name, value) DO NOTHING;
+
+-- Insert sample dropdown options for gewerk field
+INSERT INTO dropdown_options (field_name, value, label, is_default, sort_order, is_active) VALUES
+('gewerk', 'elektro', 'Elektroinstallation', false, 1, true),
+('gewerk', 'sanitaer', 'Sanitärinstallation', false, 2, true),
+('gewerk', 'heizung', 'Heizungsinstallation', false, 3, true),
+('gewerk', 'maler', 'Malerarbeiten', false, 4, true)
+ON CONFLICT (field_name, value) DO NOTHING;
+
+-- Insert sample gewerk list items
+INSERT INTO gewerk_list (code, name, sort_order) VALUES
+('E001', 'Elektroinstallation', 1),
+('S001', 'Sanitärinstallation', 2),
+('H001', 'Heizungsinstallation', 3),
+('M001', 'Malerarbeiten', 4)
+ON CONFLICT (code) DO NOTHING;
+
+-- =====================================================================
+-- 9. ENABLE ROW LEVEL SECURITY (RLS) - Optional but recommended
+-- =====================================================================
+
+-- Enable RLS on tables (you can configure policies later)
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE invoices_clean ENABLE ROW LEVEL SECURITY;
+ALTER TABLE approval_tokens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE email_audit_log ENABLE ROW LEVEL SECURITY;
+ALTER TABLE dropdown_options ENABLE ROW LEVEL SECURITY;
+ALTER TABLE gewerk_list ENABLE ROW LEVEL SECURITY;
+
+-- Create basic policies (allow all for now - tighten later)
+CREATE POLICY "Allow all operations for authenticated users" ON users FOR ALL USING (true);
+CREATE POLICY "Allow all operations for authenticated users" ON invoices_clean FOR ALL USING (true);
+CREATE POLICY "Allow all operations for authenticated users" ON approval_tokens FOR ALL USING (true);
+CREATE POLICY "Allow all operations for authenticated users" ON email_audit_log FOR ALL USING (true);
+CREATE POLICY "Allow all operations for authenticated users" ON dropdown_options FOR ALL USING (true);
+CREATE POLICY "Allow all operations for authenticated users" ON gewerk_list FOR ALL USING (true);
+
+-- =====================================================================
+-- SETUP COMPLETE! 
+-- =====================================================================
+-- Next steps:
+-- 1. Create Supabase Storage Buckets (see instructions below)
+-- 2. Update your .env files with new Supabase credentials
+-- 3. Test your application connection
+-- =====================================================================
