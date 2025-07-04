@@ -1,14 +1,13 @@
-services:
+ services:
   # Backend API Service
   - type: web
     name: ocr-invoice-backend
     env: python
     region: frankfurt
-    plan: starter
     buildCommand: pip install -r requirements.txt
     startCommand: python render_start.py
     repo: https://github.com/Milan4321123/ocr-invoice-processor.git
-    branch: main
+    branch: deployy
     rootDir: backend
     envVars:
       - key: SUPABASE_URL
@@ -41,7 +40,7 @@ services:
     buildCommand: npm install && npm run build
     staticPublishPath: .next
     repo: https://github.com/Milan4321123/ocr-invoice-processor.git
-    branch: main
+    branch: deployy
     rootDir: frontend
     envVars:
       - key: NEXT_PUBLIC_SUPABASE_URL
