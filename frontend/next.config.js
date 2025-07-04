@@ -20,15 +20,16 @@ const nextConfig = {
     return config;
   },
   async rewrites() {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     return [
       // Proxy API calls to backend server
       {
         source: '/api/folder-watcher/:path*',
-        destination: 'http://localhost:8000/api/folder-watcher/:path*',
+        destination: `${apiUrl}/api/folder-watcher/:path*`,
       },
       {
         source: '/api/:path*',
-        destination: 'http://localhost:8000/api/:path*',
+        destination: `${apiUrl}/api/:path*`,
       },
     ];
   },
