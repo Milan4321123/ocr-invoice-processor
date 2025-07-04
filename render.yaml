@@ -8,7 +8,7 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: python render_start.py
     repo: https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git # Update with your actual repo
-    branch: main
+    branch: deploy
     rootDir: backend
     envVars:
       - key: SUPABASE_URL
@@ -42,7 +42,7 @@ services:
     buildCommand: npm install && npm run build
     staticPublishPath: .next
     repo: https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git # Update with your actual repo
-    branch: main
+    branch: deploy
     rootDir: frontend
     envVars:
       - key: NEXT_PUBLIC_SUPABASE_URL
