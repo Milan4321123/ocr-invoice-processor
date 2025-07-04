@@ -101,35 +101,84 @@ class UploadService:
     
     def validate_file(self, file_data: FileData) -> Tuple[bool, Optional[str]]:
         """
-        Validate file content and metadata
+        Validate file content and metadata with comprehensive duplicate checking
         Returns (is_valid, error_message)
         """
-        # Check if file is empty
+        # Step 1: Basic file validation
         if file_data.file_size == 0:
             return False, "Die Datei ist leer"
         
-        # Check file size
         if file_data.file_size > self.MAX_FILE_SIZE:
             return False, f"Datei ist zu groß. Maximum: {self.MAX_FILE_SIZE // (1024*1024)}MB"
         
-        # Validate content type
         if file_data.content_type not in self.SUPPORTED_CONTENT_TYPES:
             return False, "Nur PDF-Dateien sind erlaubt"
         
-        # Validate filename pattern for all uploads (unified validation)
+        # Step 2: Enhanced filename pattern validation
         if not re.match(self.FILENAME_PATTERN, file_data.filename):
-            return False, "Dateiname muss dem festen Muster folgen: EINGANGSDATUM_PROJEKT_GEWERK_LIEFERANT.pdf"
+            if file_data.source == UploadSource.FOLDER_WATCHER:
+                return False, f"❌ Dateiname '{file_data.filename}' entspricht nicht dem erforderlichen Muster:\n" \
+                             f"   Format: EINGANGSDATUM_PROJEKT_GEWERK_LIEFERANT.pdf\n" \
+                             f"   Beispiel: 20250704_OMEGA_ELEKTRO_Mueller.pdf\n" \
+                             f"   - EINGANGSDATUM: 8 Ziffern (JJJJMMTT)\n" \
+                             f"   - PROJEKT: Projektname ohne Unterstriche\n" \
+                             f"   - GEWERK: Gewerkebezeichnung\n" \
+                             f"   - LIEFERANT: Lieferantenname"
+            else:
+                return False, "Dateiname muss dem Muster folgen: EINGANGSDATUM_PROJEKT_GEWERK_LIEFERANT.pdf"
         
-        # Check for duplicate files by filename
-        if db_service.is_available:
+        # Step 3: Enhanced duplicate checking for folder watcher
+        if file_data.source == UploadSource.FOLDER_WATCHER and db_service.is_available:
+            
+            # 3a: Check for exact filename duplicates
+            duplicate_result = db_service.check_duplicate_by_filename(file_data.filename)
+            if duplicate_result.get("success") and duplicate_result.get("duplicate_found"):
+                existing_file = duplicate_result.get("existing_file", {})
+                return False, f"🚫 DUPLIKAT ERKANNT: Eine Datei mit dem Namen '{file_data.filename}' " \
+                             f"existiert bereits!\n" \
+                             f"   Ursprünglich hochgeladen: {existing_file.get('created_at', 'unbekannt')}\n" \
+                             f"   Dateigröße: {existing_file.get('file_size', 'unbekannt')} Bytes\n" \
+                             f"   Invoice ID: {existing_file.get('id', 'unbekannt')}"
+            
+            # 3b: Check for content similarity (same project/gewerk/lieferant)
+            similarity_result = db_service.check_duplicate_by_content_similarity(
+                file_data.filename, file_data.file_size, tolerance_bytes=2048
+            )
+            if similarity_result.get("success") and similarity_result.get("duplicate_found"):
+                similar_files = similarity_result.get("similar_files", [])
+                if similar_files:
+                    file_info = []
+                    for similar_file in similar_files[:3]:  # Show max 3 similar files
+                        file_info.append(f"   • {similar_file.get('file_name', 'unbekannt')} "
+                                       f"({similar_file.get('created_at', 'unbekannt')})")
+                    
+                    return False, f"⚠️ ÄHNLICHE DATEIEN GEFUNDEN: Es existieren bereits ähnliche Rechnungen " \
+                                 f"für dasselbe Projekt/Gewerk:\n" + "\n".join(file_info) + \
+                                 f"\n   Bitte prüfen Sie, ob diese Rechnung bereits erfasst wurde."
+            
+            # 3c: Handle database errors more strictly for folder watcher
+            if not duplicate_result.get("success"):
+                return False, f"❌ FEHLER BEI DUPLIKATSPRÜFUNG: {duplicate_result.get('error', 'Unbekannter Fehler')}\n" \
+                             f"   Aus Sicherheitsgründen wird der Upload blockiert."
+        
+        # Step 4: Basic duplicate checking for manual uploads
+        elif db_service.is_available:
             try:
-                # Query for existing files with the same filename
-                response = db_service.client.table("invoices_clean").select("id,file_name").eq("file_name", file_data.filename).execute()
+                response = db_service.client.table("invoices_clean").select("id,file_name,created_at").eq("file_name", file_data.filename).execute()
                 if response.data and len(response.data) > 0:
-                    return False, f"Eine Datei mit dem Namen '{file_data.filename}' existiert bereits"
+                    existing_file = response.data[0]
+                    logger.warning(f"Duplicate file detected: {file_data.filename} (existing ID: {existing_file['id']})")
+                    return False, f"Eine Datei mit dem Namen '{file_data.filename}' existiert bereits " \
+                                 f"(hochgeladen am {existing_file.get('created_at', 'unbekannt')})"
             except Exception as e:
+                logger.error(f"Error checking for duplicate files: {e}")
+                # For manual uploads, we log but don't fail completely
                 logger.warning(f"Could not check for duplicate files: {e}")
-                # Don't fail the upload just because we can't check for duplicates
+        else:
+            logger.warning("Database service not available - cannot check for duplicates")
+            if file_data.source == UploadSource.FOLDER_WATCHER:
+                return False, "❌ Datenbank nicht verfügbar - Duplikatsprüfung nicht möglich. " \
+                             "Upload aus Sicherheitsgründen blockiert."
         
         return True, None
     

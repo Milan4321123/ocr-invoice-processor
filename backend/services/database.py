@@ -1358,6 +1358,109 @@ class DatabaseService:
             logger.error(f"❌ Failed to get invoices with Skonto data: {e}")
             return {"success": False, "error": str(e)}
 
+    def check_duplicate_by_filename(self, filename: str) -> Dict[str, Any]:
+        """
+        Check if a file with the given filename already exists in the database
+        Returns detailed information about existing file if found
+        """
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable", "duplicate_found": False}
+        
+        try:
+            response = self._client.table(self.table_name).select(
+                "id,file_name,created_at,file_size"
+            ).eq("file_name", filename).execute()
+            
+            if response.data and len(response.data) > 0:
+                existing_file = response.data[0]
+                return {
+                    "success": True,
+                    "duplicate_found": True,
+                    "existing_file": {
+                        "id": existing_file.get("id"),
+                        "filename": existing_file.get("file_name"),
+                        "created_at": existing_file.get("created_at"),
+                        "file_size": existing_file.get("file_size")
+                    }
+                }
+            else:
+                return {"success": True, "duplicate_found": False}
+                
+        except Exception as e:
+            logger.error(f"Error checking for duplicate filename '{filename}': {e}")
+            return {"success": False, "error": str(e), "duplicate_found": False}
+    
+    def check_duplicate_by_file_hash(self, file_hash: str) -> Dict[str, Any]:
+        """
+        Check if a file with the given hash already exists in the database
+        Note: Requires file_hash column to be added to schema
+        """
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable", "duplicate_found": False}
+        
+        try:
+            # This would require adding a file_hash column to the schema
+            # For now, return not found since column doesn't exist yet
+            return {"success": True, "duplicate_found": False}
+                
+        except Exception as e:
+            logger.error(f"Error checking for duplicate file hash '{file_hash}': {e}")
+            return {"success": False, "error": str(e), "duplicate_found": False}
+    
+    def check_duplicate_by_content_similarity(self, filename: str, file_size: int, tolerance_bytes: int = 1024) -> Dict[str, Any]:
+        """
+        Check for files with similar content (same filename pattern and similar file size)
+        This can help detect re-uploads of the same invoice with minor modifications
+        """
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable", "duplicate_found": False}
+        
+        try:
+            # Extract pattern parts from filename
+            import re
+            pattern_match = re.match(r'^(\d{8})_([^_]+)_([^_]+)_(.+)\.pdf$', filename)
+            if not pattern_match:
+                return {"success": True, "duplicate_found": False}
+            
+            date_part, project_part, gewerk_part, lieferant_part = pattern_match.groups()
+            
+            # Query for files with similar file size and filename patterns
+            min_size = max(0, file_size - tolerance_bytes)
+            max_size = file_size + tolerance_bytes
+            
+            response = self._client.table(self.table_name).select(
+                "id,file_name,created_at,file_size"
+            ).gte("file_size", min_size).lte("file_size", max_size).execute()
+            
+            if response.data:
+                similar_files = []
+                for file_record in response.data:
+                    # Check if filename matches pattern and has similar components
+                    existing_filename = file_record.get("file_name", "")
+                    existing_match = re.match(r'^(\d{8})_([^_]+)_([^_]+)_(.+)\.pdf$', existing_filename)
+                    
+                    if existing_match:
+                        _, existing_project, existing_gewerk, existing_lieferant = existing_match.groups()
+                        
+                        # Check for similarity (case-insensitive)
+                        if (project_part.lower() == existing_project.lower() and
+                            gewerk_part.lower() == existing_gewerk.lower() and
+                            lieferant_part.lower() == existing_lieferant.lower()):
+                            similar_files.append(file_record)
+                
+                if similar_files:
+                    return {
+                        "success": True,
+                        "duplicate_found": True,
+                        "similar_files": similar_files
+                    }
+            
+            return {"success": True, "duplicate_found": False}
+                
+        except Exception as e:
+            logger.error(f"Error checking for content similarity for '{filename}': {e}")
+            return {"success": False, "error": str(e), "duplicate_found": False}
+
 # =============================================================================
 # GLOBAL INSTANCE - Single database service for entire application
 # =============================================================================
