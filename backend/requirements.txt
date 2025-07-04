@@ -2,10 +2,10 @@
 --only-binary=all
 --prefer-binary
 
-# Core FastAPI stack - stable versions with Pydantic v1
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-pydantic==1.10.13
+# Core FastAPI stack - compatible versions for Python 3.13
+fastapi==0.95.2
+uvicorn[standard]==0.23.2
+pydantic==1.10.12
 
 # Essential dependencies
 python-multipart==0.0.6
