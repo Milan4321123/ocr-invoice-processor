@@ -211,7 +211,7 @@ export default function SystemHealthDashboard() {
       <div className="min-h-screen gradient-bg-light flex items-center justify-center">
         <div className="text-center glass-card rounded-2xl p-8 animate-fade-in">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-          <p className="gradient-text">Loading system health...</p>
+          <p className="gradient-text">Systemstatus wird geladen...</p>
         </div>
       </div>
     );
@@ -223,8 +223,8 @@ export default function SystemHealthDashboard() {
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold gradient-text">System Health Dashboard</h1>
-              <p className="text-gray-700 mt-2">Monitor the health and status of all system components</p>
+              <h1 className="text-3xl font-bold gradient-text">Systemstatus Dashboard</h1>
+              <p className="text-gray-700 mt-2">Überwachen Sie den Zustand und Status aller Systemkomponenten</p>
             </div>
             <button
               onClick={fetchHealth}
@@ -236,7 +236,7 @@ export default function SystemHealthDashboard() {
               ) : (
                 '🔄'
               )}
-              Refresh
+              Aktualisieren
             </button>
           </div>
           

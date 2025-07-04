@@ -241,7 +241,7 @@ export default function PrufberichtPage() {
           <div className="glass-card p-8 text-center animate-pulse rounded-xl border shadow">
             <div className="flex items-center justify-center space-x-2">
               <RefreshCw className="h-6 w-6 animate-spin text-purple-600" />
-              <span className="text-lg font-medium text-gray-700">Loading Skonto Report...</span>
+              <span className="text-lg font-medium text-gray-700">Lade Skonto-Bericht...</span>
             </div>
           </div>
         </div>
@@ -259,13 +259,13 @@ export default function PrufberichtPage() {
         <div className="flex items-center justify-center min-h-screen">
           <div className="glass-card p-8 text-center max-w-md rounded-xl border shadow">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-800 mb-2">Error Loading Report</h2>
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">Fehler beim Laden des Berichts</h2>
             <p className="text-gray-600 mb-4">{error}</p>
             <button 
               onClick={() => window.location.reload()} 
               className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
             >
-              Try Again
+              Erneut versuchen
             </button>
           </div>
         </div>
@@ -292,17 +292,17 @@ export default function PrufberichtPage() {
                     Skonto Prüfbericht
                   </h1>
                   <p className="text-gray-600">
-                    Comprehensive analysis of discount opportunities and performance
+                    Umfassende Analyse von Skonto-Möglichkeiten und Leistung
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2 mt-4 md:mt-0">
                   <span className="inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-semibold bg-gradient-to-r from-green-100 to-green-200 text-green-700 border border-green-300">
                     <TrendingUp className="h-3 w-3 mr-1" />
-                    Real-time Analytics
+                    Echtzeit-Analysen
                   </span>
                   <span className="inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-semibold bg-gradient-to-r from-blue-100 to-blue-200 text-blue-700 border border-blue-300">
                     <Clock className="h-3 w-3 mr-1" />
-                    Auto-updated
+                    Automatisch aktualisiert
                   </span>
                 </div>
               </div>
@@ -312,88 +312,87 @@ export default function PrufberichtPage() {
           {/* Metrics Section */}
           {metrics && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
-              <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">
-                <div className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600 mb-1">Total Invoices</p>
-                      <p className="text-2xl font-bold text-gray-900">{metrics.totalInvoices.toLocaleString()}</p>
-                    </div>
-                    <div className="h-12 w-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-                      <AlertCircle className="h-6 w-6 text-white" />
+              <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">                  <div className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600 mb-1">Rechnungen gesamt</p>
+                        <p className="text-2xl font-bold text-gray-900">{metrics.totalInvoices.toLocaleString()}</p>
+                      </div>
+                      <div className="h-12 w-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                        <AlertCircle className="h-6 w-6 text-white" />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">
-                <div className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600 mb-1">Total Skonto</p>
-                      <p className="text-2xl font-bold text-gray-900">€{metrics.totalSkontoAmount.toLocaleString()}</p>
-                    </div>
-                    <div className="h-12 w-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
-                      <TrendingUp className="h-6 w-6 text-white" />
+                <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">
+                  <div className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600 mb-1">Skonto gesamt</p>
+                        <p className="text-2xl font-bold text-gray-900">€{metrics.totalSkontoAmount.toLocaleString()}</p>
+                      </div>
+                      <div className="h-12 w-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
+                        <TrendingUp className="h-6 w-6 text-white" />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">
-                <div className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600 mb-1">Captured</p>
-                      <p className="text-2xl font-bold text-green-600">€{metrics.capturedSkonto.toLocaleString()}</p>
-                    </div>
-                    <div className="h-12 w-12 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center">
-                      <CheckCircle className="h-6 w-6 text-white" />
+                <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">
+                  <div className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600 mb-1">Erfasst</p>
+                        <p className="text-2xl font-bold text-green-600">€{metrics.capturedSkonto.toLocaleString()}</p>
+                      </div>
+                      <div className="h-12 w-12 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+                        <CheckCircle className="h-6 w-6 text-white" />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">
-                <div className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600 mb-1">Missed</p>
-                      <p className="text-2xl font-bold text-red-600">€{metrics.missedSkonto.toLocaleString()}</p>
-                    </div>
-                    <div className="h-12 w-12 bg-gradient-to-r from-red-500 to-red-600 rounded-lg flex items-center justify-center">
-                      <XCircle className="h-6 w-6 text-white" />
+                <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">
+                  <div className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600 mb-1">Verpasst</p>
+                        <p className="text-2xl font-bold text-red-600">€{metrics.missedSkonto.toLocaleString()}</p>
+                      </div>
+                      <div className="h-12 w-12 bg-gradient-to-r from-red-500 to-red-600 rounded-lg flex items-center justify-center">
+                        <XCircle className="h-6 w-6 text-white" />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">
-                <div className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600 mb-1">Pending</p>
-                      <p className="text-2xl font-bold text-yellow-600">{metrics.pendingReview}</p>
-                    </div>
-                    <div className="h-12 w-12 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-lg flex items-center justify-center">
-                      <Clock className="h-6 w-6 text-white" />
+                <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">
+                  <div className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600 mb-1">Ausstehend</p>
+                        <p className="text-2xl font-bold text-yellow-600">{metrics.pendingReview}</p>
+                      </div>
+                      <div className="h-12 w-12 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-lg flex items-center justify-center">
+                        <Clock className="h-6 w-6 text-white" />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">
-                <div className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600 mb-1">Avg. Processing</p>
-                      <p className="text-2xl font-bold text-gray-900">{metrics.averageProcessingTime.toFixed(1)}d</p>
-                    </div>
-                    <div className="h-12 w-12 bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center">
-                      <Clock className="h-6 w-6 text-white" />
+                <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">
+                  <div className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600 mb-1">Ø Bearbeitung</p>
+                        <p className="text-2xl font-bold text-gray-900">{metrics.averageProcessingTime.toFixed(1)}T</p>
+                      </div>
+                      <div className="h-12 w-12 bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                        <Clock className="h-6 w-6 text-white" />
+                      </div>
                     </div>
                   </div>
-                </div>
               </div>
             </div>
           )}

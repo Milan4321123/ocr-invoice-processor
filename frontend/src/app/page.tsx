@@ -39,23 +39,23 @@ export default function HomePage() {
   const navigationCards = [
     {
       title: 'Dashboard',
-      description: 'Manage and process your invoices',
+      description: 'Rechnungen verwalten und bearbeiten',
       icon: LayoutDashboard,
       href: '/dashboard',
       gradient: 'from-blue-500 to-blue-600',
       bgGradient: 'from-blue-50 to-blue-100'
     },
     {
-      title: 'Upload',
-      description: 'Upload invoices with drag & drop',
+      title: 'Hochladen',
+      description: 'Rechnungen per Drag & Drop hochladen',
       icon: Upload,
       href: '/upload',
       gradient: 'from-emerald-500 to-emerald-600',
       bgGradient: 'from-emerald-50 to-emerald-100'
     },
     {
-      title: 'Folder Watcher',
-      description: 'Configure automatic file monitoring',
+      title: 'Ordnerüberwachung',
+      description: 'Automatische Dateiüberwachung konfigurieren',
       icon: FolderOpen,
       href: '/dashboard/folder-watcher',
       gradient: 'from-orange-500 to-orange-600',
@@ -63,23 +63,23 @@ export default function HomePage() {
     },
     {
       title: 'Prüfbericht',
-      description: 'View Skonto reports and analytics',
+      description: 'Skonto-Berichte und Analysen anzeigen',
       icon: BarChart3,
       href: '/prufbericht',
       gradient: 'from-purple-500 to-purple-600',
       bgGradient: 'from-purple-50 to-purple-100'
     },
     {
-      title: 'Health',
-      description: 'Monitor system health and status',
+      title: 'Systemstatus',
+      description: 'Systemzustand und Status überwachen',
       icon: Activity,
       href: '/health',
       gradient: 'from-green-500 to-green-600',
       bgGradient: 'from-green-50 to-green-100'
     },
     {
-      title: 'Invoices',
-      description: 'Quick access to invoice management',
+      title: 'Rechnungen',
+      description: 'Schnellzugriff auf Rechnungsverwaltung',
       icon: FileText,
       href: '/dashboard',
       gradient: 'from-indigo-500 to-indigo-600',
@@ -106,16 +106,16 @@ export default function HomePage() {
               </div>
               <h1 className="text-4xl font-bold mb-4">
                 <span className="bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                  Welcome to OCR Invoice Processor
+                  Willkommen beim OCR Rechnungsverarbeiter
                 </span>
               </h1>
               <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-                Streamline your invoice processing with AI-powered OCR technology and automated workflows
+                Optimieren Sie Ihre Rechnungsverarbeitung mit KI-gestützter OCR-Technologie und automatisierten Workflows
               </p>
               <div className="flex items-center justify-center mt-4">
                 <span className="inline-flex items-center rounded-full px-3 py-1 text-sm font-medium glass-card text-purple-700 border border-purple-200">
                   <Sparkles className="h-4 w-4 mr-1" />
-                  Modern Glass UI Design
+                  Modernes Glass UI Design
                 </span>
               </div>
             </div>
@@ -141,7 +141,7 @@ export default function HomePage() {
                     {card.description}
                   </p>
                   <div className="flex items-center justify-center text-purple-600 group-hover:text-purple-700 transition-colors">
-                    <span className="text-sm font-medium">Get Started</span>
+                    <span className="text-sm font-medium">Los geht's</span>
                     <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform duration-300" />
                   </div>
                 </div>
@@ -153,20 +153,20 @@ export default function HomePage() {
           <div className="mt-16">
             <div className="glass-card rounded-2xl p-8 border-0 shadow-xl animate-fade-in">
               <h2 className="text-2xl font-bold gradient-text text-center mb-8">
-                System Overview
+                Systemübersicht
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="text-center">
-                  <div className="text-3xl font-bold gradient-text mb-2">AI-Powered</div>
-                  <div className="text-gray-600">OCR Technology</div>
+                  <div className="text-3xl font-bold gradient-text mb-2">KI-gestützt</div>
+                  <div className="text-gray-600">OCR-Technologie</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-3xl font-bold gradient-text mb-2">Automated</div>
-                  <div className="text-gray-600">Workflow Processing</div>
+                  <div className="text-3xl font-bold gradient-text mb-2">Automatisiert</div>
+                  <div className="text-gray-600">Workflow-Verarbeitung</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-3xl font-bold gradient-text mb-2">Real-time</div>
-                  <div className="text-gray-600">Status Tracking</div>
+                  <div className="text-3xl font-bold gradient-text mb-2">Echtzeit</div>
+                  <div className="text-gray-600">Status-Verfolgung</div>
                 </div>
               </div>
             </div>
