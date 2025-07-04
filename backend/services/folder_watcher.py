@@ -858,3 +858,6 @@ class FolderWatcherService:
         except Exception as e:
             logger.error(f"❌ Error during folder scan: {str(e)}")
             return {"success": False, "error": str(e)}
+
+# Global service instance
+folder_watcher_service = FolderWatcherService()
