@@ -1,4 +1,4 @@
- services:
+services:
 # Backend API Service
   - type: web
     name: ocr-invoice-backend
@@ -6,11 +6,9 @@
     region: frankfurt
     dockerfilePath: ./backend/Dockerfile
     repo: https://github.com/Milan4321123/ocr-invoice-processor.git
-    branch: deployy
+    branch: lala
     rootDir: backend
     plan: free
-    buildCommand: echo "Docker build handles dependencies"
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1
     envVars:
       - key: SUPABASE_URL
         value: https://bdtcfypvadryfeabqnlc.supabase.co
@@ -45,11 +43,9 @@
     region: frankfurt
     dockerfilePath: ./frontend/Dockerfile
     repo: https://github.com/Milan4321123/ocr-invoice-processor.git
-    branch: deployy
+    branch: lala
     rootDir: frontend
     plan: free
-    buildCommand: npm run build
-    startCommand: node server.js
     envVars:
       - key: NEXT_PUBLIC_SUPABASE_URL
         value: https://bdtcfypvadryfeabqnlc.supabase.co
