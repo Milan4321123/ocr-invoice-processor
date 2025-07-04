@@ -158,7 +158,7 @@ export default function DiagnosticsPage() {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'Origin': window.location.origin
+          'Origin': typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
         }
       });
 
@@ -296,7 +296,7 @@ export default function DiagnosticsPage() {
               🔄 Retry All Tests
             </button>
             <button
-              onClick={() => window.location.reload()}
+              onClick={() => typeof window !== 'undefined' && window.location.reload()}
               className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded"
             >
               🔄 Reload Page
@@ -308,8 +308,8 @@ export default function DiagnosticsPage() {
         <div className="bg-white rounded-lg shadow-md p-6 mt-6">
           <h3 className="text-lg font-semibold mb-4">Debug Information</h3>
           <div className="text-sm space-y-2">
-            <p><strong>Current URL:</strong> {window.location.href}</p>
-            <p><strong>User Agent:</strong> {navigator.userAgent}</p>
+            <p><strong>Current URL:</strong> {typeof window !== 'undefined' ? window.location.href : 'Server-side rendering'}</p>
+            <p><strong>User Agent:</strong> {typeof navigator !== 'undefined' ? navigator.userAgent : 'Not available'}</p>
             <p><strong>Timestamp:</strong> {new Date().toISOString()}</p>
           </div>
         </div>

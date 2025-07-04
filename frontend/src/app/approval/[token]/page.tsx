@@ -25,7 +25,7 @@ export default function ApprovalPage() {
   const [result, setResult] = useState<ApprovalResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const token = params.token as string;
+  const token = params?.token as string;
 
   useEffect(() => {
     if (token) {
