@@ -3,6 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { testSupabaseConnection } from '@/lib/supabase';
 
+// Force dynamic rendering to prevent static generation errors
+export const dynamic = 'force-dynamic';
+
 export default function ConnectivityTestPage() {
   const [backendStatus, setBackendStatus] = useState<string>('Testing...');
   const [supabaseStatus, setSupabaseStatus] = useState<string>('Testing...');

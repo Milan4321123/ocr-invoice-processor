@@ -1,13 +1,28 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Test function to verify Supabase connection
 export async function testSupabaseConnection() {
   try {
+    // Check if environment variables are properly configured
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      return { 
+        success: false, 
+        error: 'Supabase environment variables not configured' 
+      };
+    }
+
+    if (process.env.NEXT_PUBLIC_SUPABASE_URL === 'https://placeholder.supabase.co') {
+      return { 
+        success: false, 
+        error: 'Supabase URL is using placeholder value - please configure environment variables' 
+      };
+    }
+
     const { data, error } = await supabase
       .from('users')
       .select('count')
