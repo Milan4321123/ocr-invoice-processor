@@ -9,7 +9,7 @@ httpx>=0.24.0,<0.25.0
 pytest-mock==3.12.0
 
 # Additional dependencies for data validation
-pydantic==2.3.0
+pydantic==1.10.12
 
 # Folder watching for automatic processing
 watchdog==3.0.0
@@ -22,7 +22,7 @@ PyJWT==2.8.0
 # Jinja2 for HTML email templating
 Jinja2==3.1.2
 # Cryptography for additional security features
-cryptography==41.0.7
+cryptography==3.4.8
 
 # Authentication dependencies
 passlib[bcrypt]==1.7.4
