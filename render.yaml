@@ -4,11 +4,11 @@ services:
     name: ocr-invoice-backend
     env: python
     region: frankfurt
-    plan: free
+    plan: starter
     buildCommand: pip install -r requirements.txt
     startCommand: python render_start.py
-    repo: https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git # Update with your actual repo
-    branch: deploy
+    repo: https://github.com/Milan4321123/ocr-invoice-processor.git
+    branch: main
     rootDir: backend
     envVars:
       - key: SUPABASE_URL
@@ -38,11 +38,10 @@ services:
   - type: web
     name: ocr-invoice-frontend
     env: static
-    plan: free
     buildCommand: npm install && npm run build
     staticPublishPath: .next
-    repo: https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git # Update with your actual repo
-    branch: deploy
+    repo: https://github.com/Milan4321123/ocr-invoice-processor.git
+    branch: main
     rootDir: frontend
     envVars:
       - key: NEXT_PUBLIC_SUPABASE_URL
