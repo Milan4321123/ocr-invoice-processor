@@ -45,6 +45,7 @@ backend/keys/
 !package.json
 !package-lock.json
 !tsconfig.json
+!**/manifest.json
 
 # IDEs
 .vscode/
