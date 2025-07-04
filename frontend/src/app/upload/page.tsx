@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Dropzone from '../../components/Dropzone'
 import toast, { Toaster } from 'react-hot-toast'
-import { toastConfig } from '../../lib/toast-config'
 
 interface UploadedFile {
   id: string
@@ -55,7 +54,20 @@ export default function UploadPage() {
 
   return (
     <div className="min-h-screen gradient-bg-light pt-20 pb-12"> {/* Added modern background */}
-      <Toaster {...toastConfig} />
+      <Toaster 
+        position="bottom-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#ffffff',
+            color: '#374151',
+            border: '1px solid #e5e7eb',
+            borderRadius: '12px',
+            fontSize: '14px',
+            padding: '16px 20px',
+          }
+        }}
+      />
       
       <div className="max-w-2xl mx-auto px-2 sm:px-4">
         <div className="mb-8">
