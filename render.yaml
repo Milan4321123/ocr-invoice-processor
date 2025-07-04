@@ -38,7 +38,6 @@ services:
   - type: web
     name: ocr-invoice-frontend
     env: static
-    region: frankfurt
     plan: free
     buildCommand: npm install && npm run build
     staticPublishPath: .next
