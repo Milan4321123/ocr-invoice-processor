@@ -5,13 +5,18 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
+# Install dependencies (including dev dependencies needed for build)
 RUN npm install
 
 # Copy source code
 COPY . .
 
-EXPOSE 3000
+# Build the application for production
+RUN npm run build
 
-# Start development server
-CMD ["npm", "run", "dev"]
+# Use dynamic port from Render
+ENV PORT=10000
+EXPOSE $PORT
+
+# Start production server
+CMD ["npm", "start"]
