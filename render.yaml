@@ -35,10 +35,9 @@
   # Frontend Next.js Application
   - type: web
     name: ocr-invoice-frontend
-    env: node
+    env: docker
     region: frankfurt
-    buildCommand: npm install && npm run build
-    startCommand: npm start
+    dockerfilePath: ./frontend/Dockerfile
     repo: https://github.com/Milan4321123/ocr-invoice-processor.git
     branch: deployy
     rootDir: frontend
@@ -49,10 +48,10 @@
         sync: false # This will be set manually in Render dashboard for security
       - key: NEXT_PUBLIC_API_URL
         value: https://ocr-invoice-processor.onrender.com
-      - key: NODE_VERSION
-        value: "18"
+      - key: NODE_ENV
+        value: "production"
       - key: PORT
-        value: "3000"
+        value: "10000"
 
 # Optional: Database (if you want to use Render's PostgreSQL instead of Supabase)
 # databases:
