@@ -33,8 +33,9 @@ class DatabaseService:
     
     def _initialize_client(self):
         """Initialize the Supabase client using your .env credentials"""
-        url = os.getenv("SUPA_URL")
-        key = os.getenv("SUPA_KEY")
+        # Try multiple environment variable names for flexibility
+        url = os.getenv("SUPABASE_URL") or os.getenv("SUPA_URL")
+        key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPA_KEY")
         
         if url and key:
             try:
@@ -45,6 +46,7 @@ class DatabaseService:
                 self._client = None
         else:
             logger.warning("⚠️ Database credentials missing. Running in offline mode.")
+            logger.warning(f"Available env vars: SUPABASE_URL={bool(os.getenv('SUPABASE_URL'))}, SUPABASE_ANON_KEY={bool(os.getenv('SUPABASE_ANON_KEY'))}, SUPA_URL={bool(os.getenv('SUPA_URL'))}, SUPA_KEY={bool(os.getenv('SUPA_KEY'))}")
     
     @property
     def client(self) -> Optional[Client]:
