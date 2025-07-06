@@ -31,7 +31,7 @@ async def test_template_differences():
     # Test completion template
     completion_context = {
         'editor_name': 'Test Editor',
-        'editor_email': 'test@example.com',
+        'editor_email': 'incognizant321@gmail.com',
         'completion_date': '15.01.2025 um 10:30',
         'timestamp': '2025-01-15T10:30:00',
         'invoice_number': 'TEST-001',

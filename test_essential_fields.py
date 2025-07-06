@@ -37,7 +37,7 @@ async def test_essential_fields():
     # Test context
     context = {
         'editor_name': 'Test Editor',
-        'editor_email': 'test@example.com',
+        'editor_email': 'incognizant321@gmail.com',
         'completion_date': '15.01.2025 um 10:30',
         'timestamp': '2025-01-15T10:30:00',
         'currency': 'EUR',

@@ -8,7 +8,11 @@ This script tests the complete backend workflow:
 3. Dashboard data retrieval, filtering, and invoice actions
 4. Invoice editor operations (load, edit, save)
 5. Dropdown management (get options, add new options, save changes)
-6. Workflow progression (complete invoice, send to Bauleiter)
+6. Workflow progr                    "rechnungspruefung_email": "incognizant321@gmail.com"
+                },
+                "completion_data": {
+                    "completed_by": "incognizant321@gmail.com",
+                    "editor_email": "incognizant321@gmail.com",n (complete invoice, send to Bauleiter)
 7. Skonto processing (create Skonto invoice, notifications, decisions)
 8. Email notifications (test sending, reminders)
 9. Data persistence verification across all operations
@@ -372,10 +376,10 @@ class OCRInvoiceE2ETest:
                     "skonto_prozent": 2.5,
                     "rechnungsart": "rechnung",
                     "kfw_anrechenbar": False,
-                    "rechnungspruefung_email": "test@example.com"
+                    "rechnungspruefung_email": "incognizant321@gmail.com"
                 },
                 "editor_info": {
-                    "editor_email": "test@example.com",
+                    "editor_email": "incognizant321@gmail.com",
                     "editor_name": "Test Editor"
                 }
             }
@@ -441,11 +445,11 @@ class OCRInvoiceE2ETest:
         try:
             completion_data = {
                 "fields": {
-                    "rechnungspruefung_email": "test@example.com"
+                    "rechnungspruefung_email": "incognizant321@gmail.com"
                 },
                 "completion_info": {
-                    "completed_by": "test@example.com",
-                    "editor_email": "test@example.com",
+                    "completed_by": "incognizant321@gmail.com",
+                    "editor_email": "incognizant321@gmail.com",
                     "editor_name": "Test Editor",
                     "completed_at": datetime.now().isoformat(),
                     "review_status": "completed_review",
@@ -471,10 +475,10 @@ class OCRInvoiceE2ETest:
         # Test 2: Test sending to Bauleiter
         try:
             bauleiter_data = {
-                "bauleiter_email": "bauleiter@test.com",
+                "bauleiter_email": "incognizant321@gmail.com",
                 "sent_by": "test_user",
                 "editor_name": "Test Editor",
-                "editor_email": "test@example.com"
+                "editor_email": "incognizant321@gmail.com"
             }
             
             response = self.session.post(
@@ -618,7 +622,7 @@ class OCRInvoiceE2ETest:
             # Test editor notification
             invoice_id = self.test_data.get("uploaded_invoice_id")
             email_data = {
-                "recipient_email": "test@example.com",
+                "recipient_email": "incognizant321@gmail.com",
                 "recipient_name": "Test User",
                 "invoice_data": {
                     "id": invoice_id,

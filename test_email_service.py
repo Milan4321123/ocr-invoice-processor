@@ -37,7 +37,7 @@ def test_email_service():
                     # Test editor notification email (this is typically what fails)
                     email_data = {
                         "invoice_id": invoice_id,
-                        "editor_email": "test@example.com",
+                        "editor_email": "incognizant321@gmail.com",
                         "editor_name": "Test User",
                         "changes_summary": [
                             {"field": "rechnungsbetrag", "old_value": "", "new_value": "1000.00"}

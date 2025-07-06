@@ -44,7 +44,7 @@ def create_test_invoice():
         "status": "completed",  # Set as completed
         "review_status": "completed_review",
         "skonto_decision": "pending",  # This should make it appear in Prüfbericht
-        "editor_email": "test@example.com",
+        "editor_email": "incognizant321@gmail.com",
         "editor_name": "Test Editor",
         "edit_completed_at": datetime.now().isoformat()
     }

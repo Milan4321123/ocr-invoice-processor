@@ -45,7 +45,7 @@ def create_test_invoice_with_skonto():
         "reviewed_by": "Test Reviewer",
         "reviewed_at": datetime.now().isoformat(),
         "review_notes": "Test invoice for Skonto functionality",
-        "editor_email": "editor@test.com",
+        "editor_email": "incognizant321@gmail.com",
         "editor_name": "Test Editor",
         "edit_completed_at": datetime.now().isoformat(),
         "approval_status": "approved",

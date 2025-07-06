@@ -536,7 +536,7 @@ async def send_invoice_to_bauleiter(
         try:
             # Prepare email data
             editor_name = request_data.get("editor_name", sent_by)
-            editor_email = request_data.get("editor_email", f"{sent_by}@company.com")
+            editor_email = request_data.get("editor_email", f"{sent_by}@incognizant321.com")
             changes_summary = request_data.get("changes_summary", [])
             
             # Send approval request email using existing service
@@ -627,7 +627,7 @@ async def send_skonto_reminder(
         # Use provided email or fall back to default stakeholder
         if not recipient_email:
             # Default to bauleiter_email or a configured default
-            recipient_email = invoice_data.get("bauleiter_email") or "default@company.com"
+            recipient_email = invoice_data.get("bauleiter_email") or "incognizant321@gmail.com"
             logger.info(f"📧 Using default recipient email: {recipient_email}")
         
         # Send Skonto reminder email

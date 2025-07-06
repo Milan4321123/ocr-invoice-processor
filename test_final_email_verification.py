@@ -53,7 +53,7 @@ async def test_final_verification():
     # Test context
     context = {
         'editor_name': 'Max Mustermann',
-        'editor_email': 'max.mustermann@test.com',
+        'editor_email': 'incognizant321@gmail.com',
         'completion_date': '03.07.2025 um 18:30',
         'timestamp': '2025-07-03T18:30:00',
         'currency': 'EUR',

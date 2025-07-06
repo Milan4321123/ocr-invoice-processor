@@ -35,7 +35,7 @@ def test_skonto_configuration():
     # Step 2: Update configuration with custom email
     print("\n🔧 Step 2: Updating configuration with custom email...")
     new_config = {
-        "default_recipient_email": "customfinance@mycompany.com",
+        "default_recipient_email": "incognizant321@gmail.com",
         "dry_run": True  # Set to true for testing
     }
     
@@ -74,7 +74,7 @@ def test_skonto_configuration():
                 # Send manual reminder
                 reminder_request = {
                     "invoice_ids": invoice_ids,
-                    "recipient_email": "testuser@mycompany.com",
+                    "recipient_email": "incognizant321@gmail.com",
                     "recipient_name": "Test User"
                 }
                 

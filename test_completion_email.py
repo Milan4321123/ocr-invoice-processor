@@ -36,9 +36,9 @@ def test_completion_email():
                     # Test Bauleiter approval email (completion email)
                     email_data = {
                         "invoice_id": invoice_id,
-                        "bauleiter_email": "test@example.com",
+                        "bauleiter_email": "incognizant321@gmail.com",
                         "editor_name": "Test User",
-                        "editor_email": "editor@example.com",
+                        "editor_email": "incognizant321@gmail.com",
                         "changes_summary": [
                             {"field": "rechnungsbetrag", "old_value": "", "new_value": "1000.00"}
                         ]

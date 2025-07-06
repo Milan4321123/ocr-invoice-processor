@@ -64,7 +64,7 @@ async def test_context_aware_emails():
         try:
             result_summary = await email_service.send_editor_notification(
                 invoice_data=MOCK_INCOMPLETE_INVOICE_DATA,
-                editor_email="editor@test.com",
+                editor_email="incognizant321@gmail.com",
                 editor_name="Test Editor",
                 changes_summary=[],
                 request_id="test-123",
@@ -82,7 +82,7 @@ async def test_context_aware_emails():
         try:
             result_completion = await email_service.send_editor_notification(
                 invoice_data=MOCK_INVOICE_DATA,
-                editor_email="editor@test.com", 
+                editor_email="incognizant321@gmail.com", 
                 editor_name="Test Editor",
                 changes_summary=[],
                 request_id="test-456",
@@ -140,7 +140,7 @@ def test_template_content():
         summary_html = summary_template.render(
             completion_date="2025-01-20 14:30",
             editor_name="Test Editor",
-            editor_email="editor@test.com",
+            editor_email="incognizant321@gmail.com",
             invoice_number="INV-2025-002",
             timestamp="2025-01-20T14:30:00",
             request_id="test-123"
@@ -159,7 +159,7 @@ def test_template_content():
         completion_html = completion_template.render(
             completion_date="2025-01-20 14:30",
             editor_name="Test Editor", 
-            editor_email="editor@test.com",
+            editor_email="incognizant321@gmail.com",
             invoice_number="INV-2025-001",
             timestamp="2025-01-20T14:30:00",
             request_id="test-456",

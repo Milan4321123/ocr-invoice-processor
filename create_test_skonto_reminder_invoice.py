@@ -40,8 +40,8 @@ def create_test_skonto_invoice():
         "skonto_decision": "pending",  # Important: needs to be pending for reminders
         "rechnungsart": "Baurechnung",
         "kfw_anrechenbare_kosten": True,
-        "rechnungspruefung": "test@company.com",
-        "bauleiter_email": "bauleiter@company.com",  # This will receive the reminder
+        "rechnungspruefung": "incognizant321@gmail.com",
+        "bauleiter_email": "incognizant321@gmail.com",  # This will receive the reminder
         "weiter_berechnen_an": "Test Customer",
         "status": "completed",  # Completed processing
         "review_status": "completed_review",
