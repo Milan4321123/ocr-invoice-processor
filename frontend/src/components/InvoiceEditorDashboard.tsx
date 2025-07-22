@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import PDFViewer from './PDFViewer';
+import PDFViewer from './PDFViewerClean';
 import CleanInvoiceForm, { GermanInvoiceFields } from './CleanInvoiceForm';
 import { FileText, Eye, Edit3, AlertTriangle, CheckCircle, Monitor, FileInput } from 'lucide-react';
 
@@ -28,6 +28,7 @@ export default function InvoiceEditorDashboard({
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
   const [pdfNumPages, setPdfNumPages] = useState<number>(0);
   const [mobileView, setMobileView] = useState<'pdf' | 'form'>('pdf'); // For mobile toggle
+  const [showBottomInfo, setShowBottomInfo] = useState<boolean>(false);
 
   // Load invoice data if not provided initially
   useEffect(() => {
@@ -237,120 +238,125 @@ export default function InvoiceEditorDashboard({
   }
 
   return (
-    <div className="h-screen bg-gray-50 flex flex-col">
-      {/* Modern Header */}
-      <header className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="flex items-center justify-between px-6 py-4">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-lg">
-              <FileText className="h-5 w-5 text-blue-600" />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold text-gray-900 truncate max-w-md">
-                {filename}
-              </h1>
-              <p className="text-sm text-gray-500">Rechnungs-ID: {invoiceId}</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center space-x-4">
-            {/* Mobile View Toggle */}
-            <div className="lg:hidden flex bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => setMobileView('pdf')}
-                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                  mobileView === 'pdf' 
-                    ? 'bg-white text-blue-600 shadow-sm' 
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <Monitor className="h-4 w-4" />
-                <span>PDF</span>
-              </button>
-              <button
-                onClick={() => setMobileView('form')}
-                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                  mobileView === 'form' 
-                    ? 'bg-white text-blue-600 shadow-sm' 
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <FileInput className="h-4 w-4" />
-                <span>Formular</span>
-              </button>
-            </div>
-
-            {/* PDF Info */}
-            {pdfNumPages > 0 && (
-              <div className="hidden sm:flex items-center space-x-2 px-3 py-2 bg-gray-50 rounded-lg">
-                <Eye className="h-4 w-4 text-gray-500" />
-                <span className="text-sm text-gray-600">{pdfNumPages} Seite{pdfNumPages !== 1 ? 'n' : ''}</span>
-              </div>
-            )}
-
-            {/* Unsaved Changes Indicator */}
-            {hasUnsavedChanges && (
-              <div className="flex items-center space-x-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
-                <Edit3 className="h-4 w-4 text-amber-600" />
-                <span className="text-sm text-amber-700 font-medium">Ungespeicherte Änderungen</span>
-              </div>
-            )}
+    <div className="h-screen bg-white flex flex-col">
+      {/* Minimal Header - Only for Mobile Toggle */}
+      <header className="lg:hidden bg-white border-b border-gray-200 py-2 px-4">
+        <div className="flex justify-center">
+          <div className="flex bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setMobileView('pdf')}
+              className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                mobileView === 'pdf' 
+                  ? 'bg-white text-blue-600 shadow-sm' 
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Monitor className="h-4 w-4" />
+              <span>PDF</span>
+            </button>
+            <button
+              onClick={() => setMobileView('form')}
+              className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                mobileView === 'form' 
+                  ? 'bg-white text-blue-600 shadow-sm' 
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <FileInput className="h-4 w-4" />
+              <span>Formular</span>
+            </button>
           </div>
         </div>
       </header>
 
-      {/* Main Content - Modern Split Screen */}
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-gray-100">
-        {/* Left Side - Enhanced PDF Viewer */}
-        <div className={`w-full lg:w-1/2 bg-white border-b lg:border-b-0 lg:border-r border-gray-200 h-1/2 lg:h-full ${
-          mobileView === 'pdf' ? 'block' : 'hidden lg:block'
-        }`}>
-          {pdfUrl ? (
-            <div className="h-full flex flex-col">
-              <div className="bg-gray-50 border-b border-gray-200 px-4 py-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">PDF-Dokument</span>
-                  {pdfNumPages > 0 && (
-                    <span className="text-xs text-gray-500">{pdfNumPages} Seite{pdfNumPages !== 1 ? 'n' : ''}</span>
-                  )}
+      {/* Main Content - Clean Full-Screen Split */}
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        {/* PDF Viewer - Full Height, Clean Display */}
+        <div className={`lg:flex-1 lg:w-1/2 ${mobileView === 'pdf' ? 'flex' : 'hidden lg:flex'} flex-col bg-gray-900`}>
+          <div className="flex-1 h-full">
+            {pdfUrl ? (
+              <PDFViewer
+                pdfUrl={pdfUrl}
+                onLoadSuccess={handlePdfLoadSuccess}
+                onLoadError={handlePdfLoadError}
+                className="h-full w-full"
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full bg-gray-800">
+                <div className="text-center text-gray-400">
+                  <FileText className="h-16 w-16 mx-auto mb-4" />
+                  <p className="text-lg">Kein PDF-Dokument verfügbar</p>
                 </div>
               </div>
-              <div className="flex-1">
-                <PDFViewer
-                  pdfUrl={pdfUrl}
-                  onLoadSuccess={handlePdfLoadSuccess}
-                  onLoadError={handlePdfLoadError}
-                  className="h-full"
-                />
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-full bg-gray-50">
-              <div className="text-center text-gray-500">
-                <div className="w-16 h-16 mx-auto mb-4 bg-gray-200 rounded-lg flex items-center justify-center">
-                  <FileText className="h-8 w-8 text-gray-400" />
-                </div>
-                <p className="text-sm">Kein PDF-Dokument verfügbar</p>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
-        {/* Right Side - Enhanced Invoice Form */}
-        <div className={`w-full lg:w-1/2 bg-gray-50 h-1/2 lg:h-full ${
-          mobileView === 'form' ? 'block' : 'hidden lg:block'
-        }`}>
-          <CleanInvoiceForm
-            fields={fields}
-            onFieldChange={(fieldName: string, value: any) => handleFieldChange(fieldName as keyof GermanInvoiceFields, value)}
-            onSave={() => handleSave(fields)}
-            onComplete={handleComplete}
-            isSaving={isSaving}
-            isCompleting={isCompleting}
-            className="h-full"
-          />
+        {/* Form Section - Clean, Focused Editing */}
+        <div className={`lg:flex-1 lg:w-1/2 ${mobileView === 'form' ? 'flex' : 'hidden lg:flex'} flex-col bg-white`}>
+          <div className="flex-1 h-full overflow-hidden">
+            <CleanInvoiceForm
+              fields={fields}
+              onFieldChange={(fieldName: string, value: any) => handleFieldChange(fieldName as keyof GermanInvoiceFields, value)}
+              onSave={() => handleSave(fields)}
+              onComplete={handleComplete}
+              isSaving={isSaving}
+              isCompleting={isCompleting}
+              className="h-full"
+              onShowBottomInfo={setShowBottomInfo}
+            />
+          </div>
         </div>
       </div>
+
+      {/* Bottom Info Panel - Invoice Name, PDF Info & Actions */}
+      {showBottomInfo && (
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-r from-gray-800 via-gray-900 to-gray-800 text-white px-6 py-4 shadow-2xl backdrop-blur-sm z-30">
+          <div className="flex items-center justify-between">
+            {/* Left - Invoice Info */}
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-8 h-8 bg-blue-600 rounded-lg">
+                  <FileText className="h-4 w-4 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-white truncate max-w-md">
+                    {filename}
+                  </h3>
+                  <p className="text-xs text-gray-300">Rechnungs-ID: {invoiceId}</p>
+                </div>
+              </div>
+              
+              {/* PDF Info */}
+              {pdfNumPages > 0 && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-gray-700 rounded-lg">
+                  <Eye className="h-4 w-4 text-gray-300" />
+                  <span className="text-sm text-gray-300">{pdfNumPages} Seite{pdfNumPages !== 1 ? 'n' : ''}</span>
+                </div>
+              )}
+
+              {/* Unsaved Changes Indicator */}
+              {hasUnsavedChanges && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-amber-600 rounded-lg">
+                  <Edit3 className="h-4 w-4 text-white" />
+                  <span className="text-sm text-white font-medium">Ungespeicherte Änderungen</span>
+                </div>
+              )}
+            </div>
+
+            {/* Right - Close Button */}
+            <button
+              onClick={() => setShowBottomInfo(false)}
+              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+              title="Schließen"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

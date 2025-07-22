@@ -488,105 +488,7 @@ export default function CleanInvoiceDashboard() {
           </div>
         )}
 
-        {/* Enhanced Stats with Bauleiter Workflow */}
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-8">
-          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                <FileText className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600">Rechnungen gesamt</p>
-                <p className="text-2xl font-bold gradient-text">{invoices.length}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center">
-                <CheckCircle className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600">Genehmigt</p>
-                <p className="text-2xl font-bold gradient-text">
-                  {invoices.filter(inv => inv.status === 'approved_by_bauleiter').length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
-                <Clock className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600">Bei Bauleiter</p>
-                <p className="text-2xl font-bold gradient-text">
-                  {invoices.filter(inv => inv.status === 'in_review_by_bauleiter').length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
-                <Clock className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600">In Bearbeitung</p>
-                <p className="text-2xl font-bold gradient-text">
-                  {invoices.filter(inv => 
-                    (inv.status === 'edited' && inv.review_status === 'under_review') ||
-                    (inv.status === 'completed' && inv.review_status === 'completed_review' && 
-                     !['in_review_by_bauleiter', 'approved_by_bauleiter', 'rejected_by_bauleiter'].includes(inv.status || ''))
-                  ).length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
-                <Clock className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600">Nicht begonnen</p>
-                <p className="text-2xl font-bold gradient-text">
-                  {invoices.filter(inv => 
-                    !['completed', 'edited', 'in_review_by_bauleiter', 'approved_by_bauleiter', 'rejected_by_bauleiter'].includes(inv.status || '')
-                  ).length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center">
-                <DollarSign className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600">Gesamtbetrag</p>
-                <p className="text-2xl font-bold gradient-text">
-                  {formatCurrency(
-                    invoices.reduce((sum, inv) => sum + (inv.rechnungsbetrag || 0), 0)
-                  )}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Folder Watcher Widget */}
-        <div className="mb-8">
-          <FolderWatcherWidget />
-        </div>
-
-        {/* Invoice List */}
+        {/* Invoice List - MOVED TO TOP */}
         <div className="glass-card border-0 shadow-xl rounded-xl overflow-hidden animate-fade-in">
           <div className="px-4 lg:px-6 py-4 border-b border-white/20 bg-gradient-to-r from-purple-50 to-blue-50">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between space-y-3 lg:space-y-0">
@@ -882,6 +784,104 @@ export default function CleanInvoiceDashboard() {
               </div>
             </>
           )}
+        </div>
+
+        {/* Enhanced Stats with Bauleiter Workflow - MOVED BELOW INVOICE TABLE */}
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-8 mt-8">
+          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+                <FileText className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">Rechnungen gesamt</p>
+                <p className="text-2xl font-bold gradient-text">{invoices.length}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center">
+                <CheckCircle className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">Genehmigt</p>
+                <p className="text-2xl font-bold gradient-text">
+                  {invoices.filter(inv => inv.status === 'approved_by_bauleiter').length}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
+                <Clock className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">Bei Bauleiter</p>
+                <p className="text-2xl font-bold gradient-text">
+                  {invoices.filter(inv => inv.status === 'in_review_by_bauleiter').length}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                <Clock className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">In Bearbeitung</p>
+                <p className="text-2xl font-bold gradient-text">
+                  {invoices.filter(inv => 
+                    (inv.status === 'edited' && inv.review_status === 'under_review') ||
+                    (inv.status === 'completed' && inv.review_status === 'completed_review' && 
+                     !['in_review_by_bauleiter', 'approved_by_bauleiter', 'rejected_by_bauleiter'].includes(inv.status || ''))
+                  ).length}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
+                <Clock className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">Nicht begonnen</p>
+                <p className="text-2xl font-bold gradient-text">
+                  {invoices.filter(inv => 
+                    !['completed', 'edited', 'in_review_by_bauleiter', 'approved_by_bauleiter', 'rejected_by_bauleiter'].includes(inv.status || '')
+                  ).length}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center">
+                <DollarSign className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">Gesamtbetrag</p>
+                <p className="text-2xl font-bold gradient-text">
+                  {formatCurrency(
+                    invoices.reduce((sum, inv) => sum + (inv.rechnungsbetrag || 0), 0)
+                  )}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Folder Watcher Widget - MOVED BELOW STATS */}
+        <div className="mb-8">
+          <FolderWatcherWidget />
         </div>
 
         {/* Delete Confirmation Dialog */}

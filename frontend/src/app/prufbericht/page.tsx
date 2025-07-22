@@ -309,7 +309,165 @@ export default function PrufberichtPage() {
             </div>
           </div>
 
-          {/* Metrics Section */}
+          {/* Filters and Controls - MOVED TO TOP */}
+          <div className="glass-card border-0 shadow-lg mb-6 rounded-xl">
+            <div className="p-6">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="flex flex-col md:flex-row gap-4 flex-1">
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm font-medium text-gray-700">Filter by Status:</span>
+                    <select 
+                      value={filterStatus} 
+                      onChange={(e) => setFilterStatus(e.target.value)}
+                      className="w-40 bg-white/50 border border-white/20 rounded-md px-3 py-1 text-sm"
+                    >
+                      <option value="all">All Status</option>
+                      <option value="captured">Captured</option>
+                      <option value="missed">Missed</option>
+                      <option value="pending">Pending</option>
+                      <option value="expired">Expired</option>
+                    </select>
+                  </div>
+                  
+                  <input
+                    placeholder="Search invoices or vendors..."
+                    value={searchTerm}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
+                    className="max-w-xs bg-white/50 border border-white/20 rounded-md px-3 py-1 text-sm placeholder:text-gray-500"
+                  />
+                </div>
+                
+                <button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg px-4 py-2 rounded-md text-sm font-medium transition-colors inline-flex items-center gap-2">
+                  <Download className="h-4 w-4" />
+                  Export Report
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Invoices Table - MOVED TO TOP */}
+          <div className="glass-card border-0 shadow-xl rounded-xl mb-8">
+            <div className="border-b border-white/20 p-6">
+              <h3 className="text-xl font-semibold text-gray-800">
+                Skonto Invoice Details ({filteredInvoices.length} invoices)
+              </h3>
+            </div>
+            <div className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vendor</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Skonto</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deadline</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reminder</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredInvoices.map((invoice, index) => (
+                      <tr 
+                        key={invoice.id} 
+                        className="hover:bg-white/50 transition-colors duration-200"
+                        style={{ animationDelay: `${index * 0.1}s` }}
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">{invoice.invoiceNumber}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">{invoice.vendor}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">€{invoice.amount.toLocaleString()}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {invoice.skontoRate}% (€{invoice.skontoAmount.toLocaleString()})
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {new Date(invoice.skontoDeadline).toLocaleDateString()}
+                            {invoice.daysRemaining !== undefined && (
+                              <div className={`text-xs ${invoice.daysRemaining > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {invoice.daysRemaining > 0 ? `${invoice.daysRemaining} days left` : `${Math.abs(invoice.daysRemaining)} days overdue`}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {getStatusBadge(invoice.status)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ${
+                            invoice.reminderSent 
+                              ? 'bg-green-50 text-green-700 border border-green-200' 
+                              : 'bg-gray-50 text-gray-500 border border-gray-200'
+                          }`}>
+                            <Mail className="h-3 w-3" />
+                            {invoice.reminderSent ? 'Sent' : 'Not Sent'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            {invoice.status === 'pending' && !invoice.reminderSent && (
+                              <button
+                                onClick={() => handleSendReminder(invoice.id)}
+                                disabled={actionLoading === invoice.id}
+                                className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg px-3 py-1 rounded-md text-xs font-medium transition-colors inline-flex items-center gap-1 disabled:opacity-50"
+                              >
+                                {actionLoading === invoice.id ? (
+                                  <RefreshCw className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Mail className="h-3 w-3" />
+                                )}
+                                Send Reminder
+                              </button>
+                            )}
+                            
+                            {(invoice.status === 'pending' || invoice.status === 'expired') && (
+                              <>
+                                <button
+                                  onClick={() => handleMarkAsTaken(invoice.id)}
+                                  disabled={actionLoading === invoice.id}
+                                  className="bg-green-600 hover:bg-green-700 text-white shadow-lg px-3 py-1 rounded-md text-xs font-medium transition-colors inline-flex items-center gap-1 disabled:opacity-50"
+                                >
+                                  {actionLoading === invoice.id ? (
+                                    <RefreshCw className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <ThumbsUp className="h-3 w-3" />
+                                  )}
+                                  Taken
+                                </button>
+                                <button
+                                  onClick={() => handleMarkAsMissed(invoice.id)}
+                                  disabled={actionLoading === invoice.id}
+                                  className="bg-red-600 hover:bg-red-700 text-white shadow-lg px-3 py-1 rounded-md text-xs font-medium transition-colors inline-flex items-center gap-1 disabled:opacity-50"
+                                >
+                                  {actionLoading === invoice.id ? (
+                                    <RefreshCw className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <ThumbsDown className="h-3 w-3" />
+                                  )}
+                                  Missed
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* Metrics Section - MOVED BELOW TABLE */}
           {metrics && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
               <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">                  <div className="p-6">
@@ -396,179 +554,6 @@ export default function PrufberichtPage() {
               </div>
             </div>
           )}
-
-          {/* Filters and Controls */}
-          <div className="glass-card border-0 shadow-lg mb-6 rounded-xl">
-            <div className="p-6">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div className="flex flex-col md:flex-row gap-4 flex-1">
-                  <div className="flex items-center gap-2">
-                    <Filter className="h-4 w-4 text-gray-500" />
-                    <span className="text-sm font-medium text-gray-700">Filter by Status:</span>
-                    <select 
-                      value={filterStatus} 
-                      onChange={(e) => setFilterStatus(e.target.value)}
-                      className="w-40 bg-white/50 border border-white/20 rounded-md px-3 py-1 text-sm"
-                    >
-                      <option value="all">All Status</option>
-                      <option value="captured">Captured</option>
-                      <option value="missed">Missed</option>
-                      <option value="pending">Pending</option>
-                      <option value="expired">Expired</option>
-                    </select>
-                  </div>
-                  
-                  <input
-                    placeholder="Search invoices or vendors..."
-                    value={searchTerm}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-                    className="max-w-xs bg-white/50 border border-white/20 rounded-md px-3 py-1 text-sm placeholder:text-gray-500"
-                  />
-                </div>
-                
-                <button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg px-4 py-2 rounded-md text-sm font-medium transition-colors inline-flex items-center gap-2">
-                  <Download className="h-4 w-4" />
-                  Export Report
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Invoices Table */}
-          <div className="glass-card border-0 shadow-xl rounded-xl">
-            <div className="border-b border-white/20 p-6">
-              <h3 className="text-xl font-semibold text-gray-800">
-                Skonto Invoice Details ({filteredInvoices.length} invoices)
-              </h3>
-            </div>
-            <div className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
-                    <tr>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vendor</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Skonto</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deadline</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reminder</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {filteredInvoices.map((invoice, index) => (
-                      <tr 
-                        key={invoice.id} 
-                        className="hover:bg-white/50 transition-colors duration-200"
-                        style={{ animationDelay: `${index * 0.1}s` }}
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{invoice.invoiceNumber}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{invoice.vendor}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">€{invoice.amount.toLocaleString()}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">
-                            {invoice.skontoRate}% (€{invoice.skontoAmount.toLocaleString()})
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">
-                            {new Date(invoice.skontoDeadline).toLocaleDateString()}
-                            {invoice.daysRemaining !== undefined && (
-                              <div className={`text-xs ${invoice.daysRemaining > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {invoice.daysRemaining > 0 ? `${invoice.daysRemaining} days left` : `${Math.abs(invoice.daysRemaining)} days overdue`}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {getStatusBadge(invoice.status)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ${
-                            invoice.reminderSent 
-                              ? 'bg-green-50 text-green-700 border border-green-200' 
-                              : 'bg-gray-50 text-gray-500 border border-gray-200'
-                          }`}>
-                            <Mail className="h-3 w-3" />
-                            {invoice.reminderSent ? 'Sent' : 'Not Sent'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <div className="flex space-x-2">
-                            {/* Send Reminder Button */}
-                            <button 
-                              onClick={() => handleSendReminder(invoice.id)}
-                              disabled={actionLoading === invoice.id}
-                              className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-md transition-colors ${
-                                invoice.reminderSent 
-                                  ? 'text-green-600 bg-green-50 border border-green-200' 
-                                  : 'text-blue-600 bg-blue-50 hover:bg-blue-100 hover:text-blue-700'
-                              } disabled:opacity-50 disabled:cursor-not-allowed`}
-                              title={invoice.reminderSent ? "Reminder already sent" : "Send Skonto Reminder"}
-                            >
-                              <Mail className="h-3 w-3 mr-1" />
-                              {invoice.reminderSent ? 'Sent' : 'Reminder'}
-                            </button>
-                            
-                            {/* Mark as Taken Button */}
-                            <button 
-                              onClick={() => handleMarkAsTaken(invoice.id)}
-                              disabled={actionLoading === invoice.id}
-                              className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-md transition-colors ${
-                                invoice.status === 'captured'
-                                  ? 'text-green-800 bg-green-200 border border-green-300 cursor-default'
-                                  : 'text-green-600 bg-green-50 hover:bg-green-100 hover:text-green-700'
-                              } disabled:opacity-50 disabled:cursor-not-allowed`}
-                              title={invoice.status === 'captured' ? "Already marked as taken" : "Mark Skonto as Taken"}
-                            >
-                              <ThumbsUp className="h-3 w-3 mr-1" />
-                              {invoice.status === 'captured' ? 'Captured' : 'Take'}
-                            </button>
-                            
-                            {/* Mark as Missed Button */}
-                            <button 
-                              onClick={() => handleMarkAsMissed(invoice.id)}
-                              disabled={actionLoading === invoice.id}
-                              className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-md transition-colors ${
-                                invoice.status === 'missed'
-                                  ? 'text-red-800 bg-red-200 border border-red-300 cursor-default'
-                                  : 'text-red-600 bg-red-50 hover:bg-red-100 hover:text-red-700'
-                              } disabled:opacity-50 disabled:cursor-not-allowed`}
-                              title={invoice.status === 'missed' ? "Already marked as missed" : "Mark Skonto as Missed"}
-                            >
-                              <ThumbsDown className="h-3 w-3 mr-1" />
-                              {invoice.status === 'missed' ? 'Missed' : 'Miss'}
-                            </button>
-                            
-                            {actionLoading === invoice.id && (
-                              <div className="inline-flex items-center px-2 py-1">
-                                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-purple-600"></div>
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              
-              {filteredInvoices.length === 0 && (
-                <div className="text-center py-12">
-                  <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No invoices found</h3>
-                  <p className="text-gray-500">Try adjusting your search criteria or filters.</p>
-                </div>
-              )}
-            </div>
-          </div>
         </div>
       </div>
     </div>

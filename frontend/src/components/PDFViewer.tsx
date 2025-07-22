@@ -44,6 +44,16 @@ export default function PDFViewer({
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [showToolbar, setShowToolbar] = useState<boolean>(false);
+  const [scrollContainer, setScrollContainer] = useState<HTMLDivElement | null>(null);
+
+  // Handle scroll to show/hide toolbar
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLDivElement;
+    const { scrollTop, scrollHeight, clientHeight } = target;
+    const isNearBottom = scrollTop + clientHeight >= scrollHeight - 50; // 50px threshold
+    setShowToolbar(isNearBottom);
+  };
 
   const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
@@ -159,125 +169,87 @@ export default function PDFViewer({
 
   return (
     <div className={containerClasses} tabIndex={0}>
-      {/* PDF Controls Toolbar - Compact Design */}
-      <div className="flex items-center justify-between px-2 py-1.5 bg-gray-50 border-b border-gray-200">
-        {/* Left side controls */}
-        <div className="flex items-center space-x-1">
-          {/* Back/Close button when in fullscreen */}
-          {isFullscreen && (
-            <>
-              <button
-                onClick={toggleFullscreen}
-                className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
-                title="Back to Editor (ESC)"
-              >
-                <ArrowLeft size={16} />
-              </button>
-              <div className="h-4 w-px bg-gray-300 mx-1" />
-            </>
-          )}
-          
+      {/* Minimal PDF Controls - Clean Focus */}
+      <div className="flex items-center justify-between px-3 py-2 bg-gray-800 text-white">
+        {/* Left - Essential Zoom Controls */}
+        <div className="flex items-center space-x-2">
           <button
             onClick={handleZoomOut}
-            className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
+            className="p-1 text-gray-300 hover:text-white hover:bg-gray-700 rounded transition-colors"
             title="Zoom Out (-)"
             disabled={scale <= 0.5}
           >
-            <ZoomOut size={16} />
+            <ZoomOut size={14} />
           </button>
           
-          <span className="text-xs text-gray-600 min-w-[50px] text-center px-1">
+          <span className="text-xs text-gray-300 min-w-[45px] text-center">
             {Math.round(scale * 100)}%
           </span>
           
           <button
             onClick={handleZoomIn}
-            className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
+            className="p-1 text-gray-300 hover:text-white hover:bg-gray-700 rounded transition-colors"
             title="Zoom In (+)"
             disabled={scale >= 3.0}
           >
-            <ZoomIn size={16} />
-          </button>
-
-          <div className="h-4 w-px bg-gray-300 mx-1" />
-
-          <button
-            onClick={handleRotate}
-            className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
-            title="Rotate"
-          >
-            <RotateCw size={16} />
+            <ZoomIn size={14} />
           </button>
         </div>
 
-        {/* Center - Page Navigation - Compact */}
+        {/* Center - Essential Page Navigation */}
         {numPages > 0 && (
-          <div className="flex items-center space-x-1">
+          <div className="flex items-center space-x-2">
             <button
               onClick={handlePrevPage}
               disabled={pageNumber <= 1}
-              className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-1 text-gray-300 hover:text-white hover:bg-gray-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               title="Previous Page (←)"
             >
-              <ChevronLeft size={16} />
+              <ChevronLeft size={14} />
             </button>
 
-            <div className="flex items-center space-x-1">
-              <input
-                type="number"
-                value={pageNumber}
-                onChange={handlePageInputChange}
-                className="w-10 px-1 py-0.5 text-xs text-center border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                min={1}
-                max={numPages}
-              />
-              <span className="text-xs text-gray-600">/ {numPages}</span>
+            <div className="flex items-center space-x-1 text-xs">
+              <span className="text-gray-300">{pageNumber}</span>
+              <span className="text-gray-500">/</span>
+              <span className="text-gray-300">{numPages}</span>
             </div>
 
             <button
               onClick={handleNextPage}
               disabled={pageNumber >= numPages}
-              className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-1 text-gray-300 hover:text-white hover:bg-gray-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               title="Next Page (→)"
             >
-              <ChevronRight size={16} />
+              <ChevronRight size={14} />
             </button>
           </div>
         )}
 
-        {/* Right side controls - Compact */}
-        <div className="flex items-center space-x-1">
-          <button
-            onClick={handleDownload}
-            className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
-            title="Download PDF"
-          >
-            <Download size={16} />
-          </button>
-
+        {/* Right - Fullscreen Only */}
+        <div className="flex items-center">
           <button
             onClick={toggleFullscreen}
-            className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
-            title={isFullscreen ? "Exit Fullscreen (ESC)" : "Fullscreen (Ctrl+F)"}
+            className="p-1 text-gray-300 hover:text-white hover:bg-gray-700 rounded transition-colors"
+            title={isFullscreen ? "Exit Fullscreen (ESC)" : "Fullscreen"}
           >
-            {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+            {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </button>
         </div>
       </div>
 
-      {/* PDF Content Area - Enhanced scrolling with maximum space */}
+      {/* PDF Content Area - Clean Full Display */}
       <div 
-        className="flex-1 bg-gray-100 pdf-content-area overflow-auto" 
+        className="flex-1 bg-gray-900 pdf-content-area overflow-auto" 
         style={{ 
-          height: isFullscreen ? 'calc(100vh - 60px)' : '620px',
-          maxHeight: isFullscreen ? 'calc(100vh - 60px)' : '620px',
-          minHeight: '200px',
+          height: isFullscreen ? 'calc(100vh - 44px)' : 'calc(100vh - 44px)',
+          maxHeight: isFullscreen ? 'calc(100vh - 44px)' : '100%',
+          minHeight: '400px',
           position: 'relative'
         }}
       >
         {error ? (
-          <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-            <div className="text-lg font-medium mb-2">Unable to load PDF</div>
+          <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+            <div className="text-lg font-medium mb-2">PDF nicht verfügbar</div>
             <div className="text-sm">{error}</div>
           </div>
         ) : (
