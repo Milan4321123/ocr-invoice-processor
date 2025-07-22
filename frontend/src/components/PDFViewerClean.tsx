@@ -28,15 +28,13 @@ interface PDFViewerProps {
   onLoadSuccess?: (numPages: number) => void;
   onLoadError?: (error: any) => void;
   className?: string;
-  onShowBottomInfo?: (show: boolean) => void;
 }
 
 export default function PDFViewer({ 
   pdfUrl, 
   onLoadSuccess, 
   onLoadError,
-  className = "",
-  onShowBottomInfo
+  className = ""
 }: PDFViewerProps) {
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(1);
@@ -45,7 +43,6 @@ export default function PDFViewer({
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [showToolbar, setShowToolbar] = useState<boolean>(false);
 
   const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
@@ -61,15 +58,6 @@ export default function PDFViewer({
     setIsLoading(false);
     onLoadError?.(error);
   }, [onLoadError]);
-
-  // Handle scroll to show/hide toolbar
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLDivElement;
-    const { scrollTop, scrollHeight, clientHeight } = target;
-    const isNearBottom = scrollTop + clientHeight >= scrollHeight - 50; // 50px threshold
-    setShowToolbar(isNearBottom);
-    onShowBottomInfo?.(isNearBottom); // Trigger bottom info panel in parent
-  };
 
   // Navigation functions
   const handlePrevPage = () => {
@@ -163,13 +151,8 @@ export default function PDFViewer({
   return (
     <div className={containerClasses} tabIndex={0}>
       {/* Clean PDF Content Area - Full Display */}
-      <div 
-        className="flex-1 bg-gray-900 pdf-content-area overflow-auto relative" 
-        style={{ 
-          height: isFullscreen ? '100vh' : '100%',
-          minHeight: '400px'
-        }}
-        onScroll={handleScroll}
+            <div 
+        className={`relative w-full h-full bg-gray-900 overflow-auto ${className}`}
       >
         {error ? (
           <div className="flex flex-col items-center justify-center h-64 text-gray-400">
@@ -209,102 +192,6 @@ export default function PDFViewer({
                   renderAnnotationLayer={true}
                 />
               </Document>
-          </div>
-        )}
-        
-        {/* Floating PDF Toolbar - Only visible when scrolled to bottom */}
-        {showToolbar && (
-          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white rounded-lg shadow-lg px-4 py-2 z-20">
-            <div className="flex items-center space-x-4">
-              {/* Zoom Controls */}
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={handleZoomOut}
-                  className="p-1 text-gray-300 hover:text-white hover:bg-gray-700 rounded transition-colors"
-                  title="Zoom Out (-)"
-                  disabled={scale <= 0.5}
-                >
-                  <ZoomOut size={16} />
-                </button>
-                
-                <span className="text-sm text-gray-300 min-w-[50px] text-center">
-                  {Math.round(scale * 100)}%
-                </span>
-                
-                <button
-                  onClick={handleZoomIn}
-                  className="p-1 text-gray-300 hover:text-white hover:bg-gray-700 rounded transition-colors"
-                  title="Zoom In (+)"
-                  disabled={scale >= 3.0}
-                >
-                  <ZoomIn size={16} />
-                </button>
-              </div>
-
-              {/* Page Navigation */}
-              {numPages > 0 && (
-                <div className="flex items-center space-x-2 border-l border-gray-600 pl-4">
-                  <button
-                    onClick={handlePrevPage}
-                    disabled={pageNumber <= 1}
-                    className="p-1 text-gray-300 hover:text-white hover:bg-gray-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Vorherige Seite (←)"
-                  >
-                    <ChevronLeft size={16} />
-                  </button>
-                  
-                  <span className="text-sm text-gray-300 min-w-[60px] text-center">
-                    {pageNumber} / {numPages}
-                  </span>
-                  
-                  <button
-                    onClick={handleNextPage}
-                    disabled={pageNumber >= numPages}
-                    className="p-1 text-gray-300 hover:text-white hover:bg-gray-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Nächste Seite (→)"
-                  >
-                    <ChevronRight size={16} />
-                  </button>
-                </div>
-              )}
-
-              {/* Additional Controls */}
-              <div className="flex items-center space-x-2 border-l border-gray-600 pl-4">
-                <button
-                  onClick={handleRotate}
-                  className="p-1 text-gray-300 hover:text-white hover:bg-gray-700 rounded transition-colors"
-                  title="Drehen"
-                >
-                  <RotateCw size={16} />
-                </button>
-                
-                <button
-                  onClick={handleFullscreen}
-                  className="p-1 text-gray-300 hover:text-white hover:bg-gray-700 rounded transition-colors"
-                  title={isFullscreen ? 'Vollbild verlassen (Esc)' : 'Vollbild (F)'}
-                >
-                  {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-                </button>
-                
-                <button
-                  onClick={handleDownload}
-                  className="p-1 text-gray-300 hover:text-white hover:bg-gray-700 rounded transition-colors"
-                  title="PDF herunterladen"
-                >
-                  <Download size={16} />
-                </button>
-
-                {isFullscreen && (
-                  <button
-                    onClick={() => setIsFullscreen(false)}
-                    className="p-1 text-gray-300 hover:text-white hover:bg-gray-700 rounded transition-colors"
-                    title="Schließen (Esc)"
-                  >
-                    <X size={16} />
-                  </button>
-                )}
-              </div>
-            </div>
           </div>
         )}
       </div>

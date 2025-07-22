@@ -28,7 +28,6 @@ export default function InvoiceEditorDashboard({
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
   const [pdfNumPages, setPdfNumPages] = useState<number>(0);
   const [mobileView, setMobileView] = useState<'pdf' | 'form'>('pdf'); // For mobile toggle
-  const [showBottomInfo, setShowBottomInfo] = useState<boolean>(false);
 
   // Load invoice data if not provided initially
   useEffect(() => {
@@ -303,60 +302,10 @@ export default function InvoiceEditorDashboard({
               isSaving={isSaving}
               isCompleting={isCompleting}
               className="h-full"
-              onShowBottomInfo={setShowBottomInfo}
             />
           </div>
         </div>
       </div>
-
-      {/* Bottom Info Panel - Invoice Name, PDF Info & Actions */}
-      {showBottomInfo && (
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-r from-gray-800 via-gray-900 to-gray-800 text-white px-6 py-4 shadow-2xl backdrop-blur-sm z-30">
-          <div className="flex items-center justify-between">
-            {/* Left - Invoice Info */}
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-8 h-8 bg-blue-600 rounded-lg">
-                  <FileText className="h-4 w-4 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-white truncate max-w-md">
-                    {filename}
-                  </h3>
-                  <p className="text-xs text-gray-300">Rechnungs-ID: {invoiceId}</p>
-                </div>
-              </div>
-              
-              {/* PDF Info */}
-              {pdfNumPages > 0 && (
-                <div className="flex items-center gap-2 px-3 py-2 bg-gray-700 rounded-lg">
-                  <Eye className="h-4 w-4 text-gray-300" />
-                  <span className="text-sm text-gray-300">{pdfNumPages} Seite{pdfNumPages !== 1 ? 'n' : ''}</span>
-                </div>
-              )}
-
-              {/* Unsaved Changes Indicator */}
-              {hasUnsavedChanges && (
-                <div className="flex items-center gap-2 px-3 py-2 bg-amber-600 rounded-lg">
-                  <Edit3 className="h-4 w-4 text-white" />
-                  <span className="text-sm text-white font-medium">Ungespeicherte Änderungen</span>
-                </div>
-              )}
-            </div>
-
-            {/* Right - Close Button */}
-            <button
-              onClick={() => setShowBottomInfo(false)}
-              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
-              title="Schließen"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

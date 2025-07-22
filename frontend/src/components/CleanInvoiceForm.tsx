@@ -38,7 +38,6 @@ interface CleanInvoiceFormProps {
   isSaving?: boolean;
   isCompleting?: boolean;
   className?: string;
-  onShowBottomInfo?: (show: boolean) => void;
 }
 
 const CleanInvoiceForm: React.FC<CleanInvoiceFormProps> = ({
@@ -48,8 +47,7 @@ const CleanInvoiceForm: React.FC<CleanInvoiceFormProps> = ({
   onComplete,
   isSaving = false,
   isCompleting = false,
-  className = "",
-  onShowBottomInfo
+  className = ""
 }) => {
   const [dropdownOptions, setDropdownOptions] = useState<Record<string, DropdownOption[]>>({
     rechnungsempfaenger: [],
@@ -65,17 +63,6 @@ const CleanInvoiceForm: React.FC<CleanInvoiceFormProps> = ({
   const [showInvoiceSaveConfirmation, setShowInvoiceSaveConfirmation] = useState(false);
   const [showInvoiceCompleteConfirmation, setShowInvoiceCompleteConfirmation] = useState(false);
   const [confirmationText, setConfirmationText] = useState('');
-  const [showBottomActions, setShowBottomActions] = useState(false);
-  const [scrollContainer, setScrollContainer] = useState<HTMLDivElement | null>(null);
-
-  // Handle scroll to show/hide bottom actions
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLDivElement;
-    const { scrollTop, scrollHeight, clientHeight } = target;
-    const isNearBottom = scrollTop + clientHeight >= scrollHeight - 50; // 50px threshold
-    setShowBottomActions(isNearBottom);
-    onShowBottomInfo?.(isNearBottom); // Trigger bottom info panel in parent
-  };
 
   // Load dropdown options from API
   const loadDropdownOptions = async () => {
@@ -547,9 +534,7 @@ const CleanInvoiceForm: React.FC<CleanInvoiceFormProps> = ({
 
       {/* Form Content - Full Height Scrollable */}
       <div 
-        className="flex-1 overflow-y-auto bg-gray-50 relative"
-        onScroll={handleScroll}
-        ref={setScrollContainer}
+        className="flex-1 overflow-y-auto bg-gray-50 relative pb-24"
       >
         <div className="p-6">
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -792,16 +777,12 @@ const CleanInvoiceForm: React.FC<CleanInvoiceFormProps> = ({
             </button>
           </div>
         )}
-          </div>
-        </div>
-      </div>
 
-      {/* Elegant Bottom Action Panel - Only visible when scrolled to bottom */}
-      {showBottomActions && (
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-r from-white via-gray-50 to-white border-t border-gray-200 px-6 py-4 shadow-xl backdrop-blur-sm z-20">
+        {/* Static Action Bar at Bottom */}
+        <div className="mt-8 pt-6 border-t border-gray-200">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              {/* Elegant Status Indicators */}
+              {/* Status Indicators */}
               {!fields.rechnungspruefung_email?.trim() && (
                 <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
                   <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
@@ -811,50 +792,50 @@ const CleanInvoiceForm: React.FC<CleanInvoiceFormProps> = ({
                 </div>
               )}
               
-              {/* Progress Indicator */}
-              <div className="flex items-center gap-2 text-gray-600 text-sm">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>Bereit zum Speichern</span>
-              </div>
+              {/* Ready Indicator */}
+              {fields.rechnungspruefung_email?.trim() && (
+                <div className="flex items-center gap-2 text-green-600 text-sm">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>Bereit zum Speichern</span>
+                </div>
+              )}
             </div>
             
-            {/* Elegant Action Buttons */}
+            {/* Action Buttons */}
             <div className="flex items-center gap-3">
               {/* Dropdown Changes Save Button */}
-              <button
-                onClick={showSaveConfirmationDialog}
-                disabled={isCommittingChanges || pendingChanges.length === 0}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all duration-300 ${
-                  pendingChanges.length > 0 
-                    ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5' 
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                }`}
-              >
-                {isCommittingChanges ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Speichern...</span>
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                    </svg>
-                    <span>Dropdown-Änderungen</span>
-                  </>
-                )}
-              </button>
+              {pendingChanges.length > 0 && (
+                <button
+                  onClick={showSaveConfirmationDialog}
+                  disabled={isCommittingChanges}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all duration-300 bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {isCommittingChanges ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Speichern...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      </svg>
+                      <span>Dropdown-Änderungen ({pendingChanges.length})</span>
+                    </>
+                  )}
+                </button>
+              )}
 
               {/* Main Invoice Save Button */}
               <button
                 onClick={handleSave}
                 disabled={isSaving || isCompleting || !fields.rechnungspruefung_email?.trim()}
-                className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${
+                className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium transition-all duration-300 ${
                   !fields.rechnungspruefung_email?.trim()
                     ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5'
+                    : 'bg-green-600 hover:bg-green-700 text-white'
                 } disabled:bg-gray-400`}
               >
                 {isSaving ? (
@@ -877,10 +858,10 @@ const CleanInvoiceForm: React.FC<CleanInvoiceFormProps> = ({
                 <button
                   onClick={handleComplete}
                   disabled={isSaving || isCompleting || !fields.rechnungspruefung_email?.trim()}
-                  className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${
+                  className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium transition-all duration-300 ${
                     !fields.rechnungspruefung_email?.trim()
                       ? 'bg-gray-400 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white'
                   } disabled:bg-gray-400`}
                 >
                   {isCompleting ? (
@@ -901,7 +882,9 @@ const CleanInvoiceForm: React.FC<CleanInvoiceFormProps> = ({
             </div>
           </div>
         </div>
-      )}
+          </div>
+        </div>
+      </div>
 
       {/* Save Confirmation Dialog */}
       {showSaveConfirmation && (
