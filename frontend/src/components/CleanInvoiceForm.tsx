@@ -781,45 +781,35 @@ const CleanInvoiceForm: React.FC<CleanInvoiceFormProps> = ({
         {/* Static Action Bar at Bottom */}
         <div className="mt-8 pt-6 border-t border-gray-200">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               {/* Status Indicators */}
               {!fields.rechnungspruefung_email?.trim() && (
-                <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                  <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                <div className="flex items-center gap-2 px-2 py-1 bg-red-50 border border-red-200 rounded text-red-700 text-xs">
+                  <svg className="w-3 h-3 text-red-500" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                   </svg>
-                  <span className="font-medium">E-Mail-Adresse erforderlich</span>
-                </div>
-              )}
-              
-              {/* Ready Indicator */}
-              {fields.rechnungspruefung_email?.trim() && (
-                <div className="flex items-center gap-2 text-green-600 text-sm">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span>Bereit zum Speichern</span>
+                  <span className="font-medium">E-Mail erforderlich</span>
                 </div>
               )}
             </div>
             
-            {/* Action Buttons */}
-            <div className="flex items-center gap-3">
+            {/* Compact Action Buttons */}
+            <div className="flex items-center gap-2">
               {/* Dropdown Changes Save Button */}
               {pendingChanges.length > 0 && (
                 <button
                   onClick={showSaveConfirmationDialog}
                   disabled={isCommittingChanges}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all duration-300 bg-blue-600 hover:bg-blue-700 text-white"
+                  className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium transition-all duration-300 bg-blue-600 hover:bg-blue-700 text-white"
                 >
                   {isCommittingChanges ? (
                     <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                       <span>Speichern...</span>
                     </>
                   ) : (
                     <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                       </svg>
                       <span>Dropdown-Änderungen ({pendingChanges.length})</span>
@@ -832,7 +822,7 @@ const CleanInvoiceForm: React.FC<CleanInvoiceFormProps> = ({
               <button
                 onClick={handleSave}
                 disabled={isSaving || isCompleting || !fields.rechnungspruefung_email?.trim()}
-                className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium transition-all duration-300 ${
+                className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium transition-all duration-300 ${
                   !fields.rechnungspruefung_email?.trim()
                     ? 'bg-gray-400 cursor-not-allowed'
                     : 'bg-green-600 hover:bg-green-700 text-white'
@@ -840,12 +830,12 @@ const CleanInvoiceForm: React.FC<CleanInvoiceFormProps> = ({
               >
                 {isSaving ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     <span>Speichern...</span>
                   </>
                 ) : (
                   <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                     <span>Rechnung speichern</span>
@@ -858,7 +848,7 @@ const CleanInvoiceForm: React.FC<CleanInvoiceFormProps> = ({
                 <button
                   onClick={handleComplete}
                   disabled={isSaving || isCompleting || !fields.rechnungspruefung_email?.trim()}
-                  className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium transition-all duration-300 ${
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium transition-all duration-300 ${
                     !fields.rechnungspruefung_email?.trim()
                       ? 'bg-gray-400 cursor-not-allowed'
                       : 'bg-blue-600 hover:bg-blue-700 text-white'
@@ -866,12 +856,12 @@ const CleanInvoiceForm: React.FC<CleanInvoiceFormProps> = ({
                 >
                   {isCompleting ? (
                     <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                       <span>Abschließen...</span>
                     </>
                   ) : (
                     <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       <span>Bearbeitung abschließen</span>

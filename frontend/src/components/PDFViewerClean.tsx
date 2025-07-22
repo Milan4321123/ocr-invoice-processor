@@ -43,6 +43,7 @@ export default function PDFViewer({
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [showToolbar, setShowToolbar] = useState<boolean>(false);
 
   const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
@@ -58,6 +59,14 @@ export default function PDFViewer({
     setIsLoading(false);
     onLoadError?.(error);
   }, [onLoadError]);
+
+  // Handle scroll to show toolbar only when scrolled to bottom
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLDivElement;
+    const { scrollTop, scrollHeight, clientHeight } = target;
+    const isAtBottom = scrollTop + clientHeight >= scrollHeight - 10; // 10px threshold
+    setShowToolbar(isAtBottom);
+  };
 
   // Navigation functions
   const handlePrevPage = () => {
@@ -153,6 +162,7 @@ export default function PDFViewer({
       {/* Clean PDF Content Area - Full Display */}
             <div 
         className={`relative w-full h-full bg-gray-900 overflow-auto ${className}`}
+        onScroll={handleScroll}
       >
         {error ? (
           <div className="flex flex-col items-center justify-center h-64 text-gray-400">
@@ -192,6 +202,92 @@ export default function PDFViewer({
                   renderAnnotationLayer={true}
                 />
               </Document>
+          </div>
+        )}
+
+        {/* PDF Toolbar - Only visible when scrolled to bottom */}
+        {showToolbar && (
+          <div className="absolute bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-600 px-4 py-2 z-10">
+            <div className="flex items-center justify-between">
+              {/* Left - Page Navigation */}
+              {numPages > 0 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handlePrevPage}
+                    disabled={pageNumber <= 1}
+                    className="p-1 text-gray-300 hover:text-white hover:bg-gray-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Vorherige Seite (←)"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  
+                  <span className="text-xs text-gray-300 min-w-[50px] text-center">
+                    {pageNumber} / {numPages}
+                  </span>
+                  
+                  <button
+                    onClick={handleNextPage}
+                    disabled={pageNumber >= numPages}
+                    className="p-1 text-gray-300 hover:text-white hover:bg-gray-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Nächste Seite (→)"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              )}
+
+              {/* Center - Zoom Controls */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleZoomOut}
+                  className="p-1 text-gray-300 hover:text-white hover:bg-gray-700 rounded transition-colors"
+                  title="Zoom Out (-)"
+                  disabled={scale <= 0.5}
+                >
+                  <ZoomOut size={14} />
+                </button>
+                
+                <span className="text-xs text-gray-300 min-w-[40px] text-center">
+                  {Math.round(scale * 100)}%
+                </span>
+                
+                <button
+                  onClick={handleZoomIn}
+                  className="p-1 text-gray-300 hover:text-white hover:bg-gray-700 rounded transition-colors"
+                  title="Zoom In (+)"
+                  disabled={scale >= 3.0}
+                >
+                  <ZoomIn size={14} />
+                </button>
+              </div>
+
+              {/* Right - Additional Controls */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleRotate}
+                  className="p-1 text-gray-300 hover:text-white hover:bg-gray-700 rounded transition-colors"
+                  title="Drehen"
+                >
+                  <RotateCw size={14} />
+                </button>
+                
+                <button
+                  onClick={handleFullscreen}
+                  className="p-1 text-gray-300 hover:text-white hover:bg-gray-700 rounded transition-colors"
+                  title={isFullscreen ? 'Vollbild verlassen (Esc)' : 'Vollbild (F)'}
+                >
+                  {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                </button>
+                
+                <button
+                  onClick={handleDownload}
+                  className="p-1 text-gray-300 hover:text-white hover:bg-gray-700 rounded transition-colors"
+                  title="PDF herunterladen"
+                >
+                  <Download size={14} />
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
