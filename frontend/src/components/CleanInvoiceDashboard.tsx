@@ -21,6 +21,7 @@ import {
 import FolderWatcherWidget from './FolderWatcherWidget'
 import DeleteConfirmationDialog from './DeleteConfirmationDialog'
 import InvoiceMobileCard from './InvoiceMobileCard'
+import { buildApiUrl, API_CONFIG } from '@/config/api'
 
 interface CleanInvoice {
   id: string
@@ -78,8 +79,7 @@ export default function CleanInvoiceDashboard() {
     try {
       setLoading(true)
       setError(null)
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      const response = await fetch(`${apiUrl}/api/invoices`)
+      const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.INVOICES.BASE))
       
       if (!response.ok) {
         throw new Error(`Failed to fetch invoices: ${response.statusText}`)
@@ -98,8 +98,7 @@ export default function CleanInvoiceDashboard() {
 
   const deleteInvoice = async (id: string, filename: string) => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      const response = await fetch(`${apiUrl}/api/invoices/${id}`, {
+      const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.INVOICES.DELETE(id)), {
         method: 'DELETE'
       })
 
@@ -166,8 +165,6 @@ export default function CleanInvoiceDashboard() {
         return;
       }
       
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      
       // Use the new send-to-bauleiter endpoint for better status tracking
       const requestData = {
         bauleiter_email: bauleiterEmail,
@@ -184,7 +181,7 @@ export default function CleanInvoiceDashboard() {
         ]
       };
 
-      const response = await fetch(`${apiUrl}/api/invoices/${invoice.id}/send-to-bauleiter`, {
+      const response = await fetch(buildApiUrl(`/api/invoices/${invoice.id}/send-to-bauleiter`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

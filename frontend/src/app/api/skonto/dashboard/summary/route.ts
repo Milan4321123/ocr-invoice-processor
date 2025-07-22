@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { buildApiUrl, API_CONFIG } from '@/config/api';
 
 export async function GET(request: NextRequest) {
   try {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    
-    const response = await fetch(`${apiUrl}/api/skonto/dashboard/summary`, {
+    const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.SKONTO.SUMMARY), {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

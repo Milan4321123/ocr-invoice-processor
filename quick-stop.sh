@@ -3,7 +3,7 @@
 # Quick Stop Script for OCR Invoice Processor
 echo "🛑 Stopping OCR Invoice Processor..."
 
-docker-compose down
+docker-compose -f docker-compose.simple.yml down
 
 echo "✅ OCR Invoice Processor Stopped!"
 echo ""

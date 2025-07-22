@@ -15,9 +15,14 @@ cd ocr-invoice-processor
 
 **2. Start Application:**
 ```bash
+# Quick Start Options
 ./quick-start.sh        # Simple start
-# OR
 ./docker-start.sh       # Full setup with health checks
+
+# Advanced Docker Management
+./docker-manager.sh start    # Start with full management
+./docker-manager.sh status   # Check health status
+./docker-manager.sh logs     # View real-time logs
 ```
 
 **3. Access Application:**
@@ -198,7 +203,59 @@ cd ocr-invoice-processor
 
 ---
 
-## 🔍 Troubleshooting
+## � Docker Management
+
+### Smart Docker Manager
+The project includes an intelligent Docker management script that simplifies container operations:
+
+**macOS/Linux:**
+```bash
+./docker-manager.sh [command]
+```
+
+**Windows:**
+```batch
+docker-manager.bat [command]
+```
+
+### Available Commands
+
+| Command | Description | Use Case |
+|---------|-------------|-----------|
+| `start` | Build and start all containers | First-time setup or daily startup |
+| `status` | Check health of all services | Verify everything is running |
+| `stop` | Stop all containers gracefully | End of day shutdown |
+| `restart` | Restart all services | Apply configuration changes |
+| `logs` | Show real-time application logs | Debug issues or monitor activity |
+| `rebuild` | Clean rebuild all containers | After major code changes |
+| `cleanup` | Remove all containers and data | Reset to clean state |
+| `open` | Open application in browser | Quick access to UI |
+
+### Example Usage
+```bash
+# Start the application (recommended)
+./docker-manager.sh start
+
+# Check if everything is healthy
+./docker-manager.sh status
+
+# View live logs for debugging
+./docker-manager.sh logs
+
+# Open the application in your browser
+./docker-manager.sh open
+```
+
+### Service Health Monitoring
+The script automatically checks:
+- ✅ **Backend API** (http://localhost:8000) - Invoice processing
+- ✅ **Frontend UI** (http://localhost:3000) - User interface
+- ✅ **Container Status** - Running/stopped states
+- ✅ **Docker Engine** - Available and responding
+
+---
+
+## �🔍 Troubleshooting
 
 ### Quick Diagnostics
 ```bash

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { buildApiUrl, API_CONFIG } from '@/config/api';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,14 +14,12 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    
     // Forward the login request to the backend
     const backendFormData = new FormData();
     backendFormData.append('username', username);
     backendFormData.append('password', password);
     
-    const response = await fetch(`${apiUrl}/api/auth/login`, {
+    const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.AUTH.LOGIN), {
       method: 'POST',
       body: backendFormData,
     });

@@ -1,24 +1,6 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database (local development)
-  db:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-ocr_invoices}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./database:/docker-entrypoint-initdb.d
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
   # Backend API Service
   backend:
     build:
@@ -31,7 +13,7 @@ services:
       - ./backend/keys:/app/keys:ro
       - ./logs:/app/logs
     environment:
-      # Database Configuration
+      # Database Configuration (Supabase)
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
@@ -62,9 +44,6 @@ services:
       - BASE_URL=${BASE_URL:-http://localhost:8000}
       - SKONTO_DEFAULT_RECIPIENT=${SKONTO_DEFAULT_RECIPIENT}
       
-    depends_on:
-      db:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 30s
@@ -84,6 +63,7 @@ services:
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      - INTERNAL_API_URL=http://backend:8000  # Internal Docker network URL
     depends_on:
       backend:
         condition: service_healthy
@@ -110,7 +90,6 @@ services:
       - production
 
 volumes:
-  postgres_data:
   logs:
 
 networks:

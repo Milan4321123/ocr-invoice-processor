@@ -14,6 +14,10 @@ services:
       - ./backend:/app
       - ./backend/keys:/app/keys:ro
       - ./logs:/app/logs
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+      - 1.1.1.1
     environment:
       # Database Configuration
       - SUPABASE_URL=${SUPABASE_URL}
@@ -28,8 +32,11 @@ services:
       - ENABLE_OCR=${ENABLE_OCR:-false}
       - USE_MOCK_OCR=${USE_MOCK_OCR:-true}
       
-      # Development Settings
-      - DEBUG=true
+      # JWT Secret
+      - JWT_SECRET=${JWT_SECRET:-development-secret-key}
+      
+      # Development settings
+      - DEBUG=${DEBUG:-true}
       - RELOAD=true
       
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
@@ -45,6 +52,10 @@ services:
       - ./frontend:/app
       - /app/node_modules
       - /app/.next
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+      - 1.1.1.1
     environment:
       - NODE_ENV=development
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
@@ -56,4 +67,6 @@ services:
 
 networks:
   default:
-    name: ocr-invoice-dev-network
+    driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: 1500

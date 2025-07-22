@@ -10,8 +10,8 @@ if [ ! -f ".env" ]; then
     exit 1
 fi
 
-# Start with Docker Compose
-docker-compose up -d
+# Start with simple Docker Compose (no nginx)
+docker-compose -f docker-compose.simple.yml up -d
 
 echo ""
 echo "✅ OCR Invoice Processor Started!"
@@ -20,4 +20,4 @@ echo "🔧 Backend:  http://localhost:8000"
 echo "📋 API Docs: http://localhost:8000/docs"
 echo ""
 echo "💡 Stop with: ./quick-stop.sh"
-echo "💡 View logs: docker-compose logs -f"
+echo "💡 View logs: docker-compose -f docker-compose.simple.yml logs -f"
