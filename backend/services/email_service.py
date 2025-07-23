@@ -137,23 +137,23 @@ class EmailService:
                     <h3>📋 Rechnungsdaten</h3>
                     <div class="detail-row">
                         <span class="detail-label">Rechnungsempfänger:</span>
-                        <span class="detail-value">{{ rechnungsempfaenger or 'Nicht verfügbar' }}</span>
+                        <span class="detail-value">{{ rechnungsempfaenger or 'Nicht eingegeben' }}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Rechnungssteller:</span>
-                        <span class="detail-value">{{ rechnungssteller or supplier_name or 'Nicht verfügbar' }}</span>
+                        <span class="detail-value">{{ rechnungssteller or supplier_name or 'Nicht eingegeben' }}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Projekt:</span>
-                        <span class="detail-value">{{ projekt or 'Projekt auswählen...' }}</span>
+                        <span class="detail-value">{{ projekt or 'Nicht eingegeben' }}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Gewerk:</span>
-                        <span class="detail-value">{{ gewerk or 'Gewerk auswählen...' }}</span>
+                        <span class="detail-value">{{ gewerk or 'Nicht eingegeben' }}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Weiter berechnen an:</span>
-                        <span class="detail-value">{{ weiter_berechnen_an or 'Abteilung oder Kontakt auswählen...' }}</span>
+                        <span class="detail-value">{{ weiter_berechnen_an or 'Nicht eingegeben' }}</span>
                     </div>
                 </div>
 
@@ -166,27 +166,27 @@ class EmailService:
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Rechnungseingang:</span>
-                        <span class="detail-value">{{ rechnungseingang or 'dd.mm.yyyy' }}</span>
+                        <span class="detail-value">{{ rechnungseingang or 'Nicht eingegeben' }}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Fälligkeit:</span>
-                        <span class="detail-value">{{ faelligkeit or 'dd.mm.yyyy' }}</span>
+                        <span class="detail-value">{{ faelligkeit or 'Nicht eingegeben' }}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Skonto Datum:</span>
-                        <span class="detail-value">{{ skonto_datum or 'dd.mm.yyyy' }}</span>
+                        <span class="detail-value">{{ skonto_datum or 'Nicht eingegeben' }}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Skonto Prozent:</span>
-                        <span class="detail-value">{{ skonto_prozent or '0.00' }}%</span>
+                        <span class="detail-value">{{ skonto_prozent or 'Nicht eingegeben' }}{% if skonto_prozent and skonto_prozent != 'Nicht eingegeben' %}%{% endif %}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Rechnungsart:</span>
-                        <span class="detail-value">{{ rechnungsart or 'Typ auswählen...' }}</span>
+                        <span class="detail-value">{{ rechnungsart or 'Nicht eingegeben' }}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">KfW anrechenbar:</span>
-                        <span class="detail-value">{{ kfw_anrechenbare_kosten or 'Nicht angegeben' }}</span>
+                        <span class="detail-value">{{ kfw_anrechenbare_kosten or 'Nicht eingegeben' }}</span>
                     </div>
                 </div>
             </div>
@@ -309,7 +309,7 @@ class EmailService:
             <!-- Invoice Summary -->
             <div class="invoice-summary">
                 <h2 style="margin: 0 0 15px 0; color: #2d3748;">📄 {{ invoice_number or 'Rechnung ohne Nummer' }}</h2>
-                <p style="margin: 0; font-size: 16px;"><strong>Lieferant:</strong> {{ supplier_name or 'Nicht verfügbar' }}</p>
+                <p style="margin: 0; font-size: 16px;"><strong>Lieferant:</strong> {{ supplier_name or 'Nicht eingegeben' }}</p>
                 <p style="margin: 5px 0 0 0; color: #718096;">Status: <span class="status-badge">Zur Genehmigung</span></p>
             </div>
 
@@ -333,19 +333,19 @@ class EmailService:
                     <h3>📋 Grunddaten</h3>
                     <div class="detail-row">
                         <span class="detail-label">Rechnungsnummer:</span>
-                        <span class="detail-value">{{ invoice_number or 'Nicht verfügbar' }}</span>
+                        <span class="detail-value">{{ invoice_number or 'Nicht eingegeben' }}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Rechnungsempfänger:</span>
-                        <span class="detail-value">{{ rechnungsempfaenger or 'Nicht verfügbar' }}</span>
+                        <span class="detail-value">{{ rechnungsempfaenger or 'Nicht eingegeben' }}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Rechnungssteller:</span>
-                        <span class="detail-value">{{ rechnungssteller or supplier_name or 'Nicht verfügbar' }}</span>
+                        <span class="detail-value">{{ rechnungssteller or supplier_name or 'Nicht eingegeben' }}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Rechnungsdatum:</span>
-                        <span class="detail-value">{{ invoice_date or 'Nicht verfügbar' }}</span>
+                        <span class="detail-value">{{ invoice_date or 'Nicht eingegeben' }}</span>
                     </div>
                 </div>
 
@@ -846,6 +846,16 @@ class EmailService:
         Only marks invoice as completed after successful email send.
         """
         try:
+            # Helper function to clean placeholder values
+            def clean_field_value(value):
+                """Replace placeholder/default values with 'Nicht eingegeben'"""
+                if not value or value in [
+                    'Projekt auswählen...', 'Gewerk auswählen...', 'Abteilung oder Kontakt auswählen...',
+                    'Typ auswählen...', 'dd.mm.yyyy', 'mm.yyyy', 'yyyy', '0.00', '0,00'
+                ]:
+                    return 'Nicht eingegeben'
+                return value
+
             # Prepare comprehensive template context with ALL invoice fields
             context = {
                 # Editor and timing information
@@ -856,40 +866,40 @@ class EmailService:
                 "request_id": request_id or "N/A",
                 
                 # Basic invoice information
-                "invoice_number": invoice_data.get("rechnungsnummer"),
-                "supplier_name": invoice_data.get("lieferant"),
-                "invoice_date": invoice_data.get("rechnungsdatum"),
+                "invoice_number": clean_field_value(invoice_data.get("rechnungsnummer")),
+                "supplier_name": clean_field_value(invoice_data.get("lieferant")),
+                "invoice_date": clean_field_value(invoice_data.get("rechnungsdatum")),
                 "total_amount": invoice_data.get("rechnungsbetrag"),
                 "currency": invoice_data.get("currency", "EUR"),
                 "status": "Bearbeitung abgeschlossen",
                 
                 # Comprehensive invoice fields
-                "rechnungsempfaenger": invoice_data.get("rechnungsempfaenger"),
-                "rechnungssteller": invoice_data.get("rechnungssteller"),
-                "rechnungseingang": invoice_data.get("rechnungseingang"),
+                "rechnungsempfaenger": clean_field_value(invoice_data.get("rechnungsempfaenger")),
+                "rechnungssteller": clean_field_value(invoice_data.get("rechnungssteller")),
+                "rechnungseingang": clean_field_value(invoice_data.get("rechnungseingang")),
                 
                 # Project and trade information
-                "projekt": invoice_data.get("projekt"),
-                "gewerk": invoice_data.get("gewerk"),
-                "kostenstelle": invoice_data.get("kostenstelle"),
-                "weiter_berechnen_an": invoice_data.get("weiter_berechnen_an"),
+                "projekt": clean_field_value(invoice_data.get("projekt")),
+                "gewerk": clean_field_value(invoice_data.get("gewerk")),
+                "kostenstelle": clean_field_value(invoice_data.get("kostenstelle")),
+                "weiter_berechnen_an": clean_field_value(invoice_data.get("weiter_berechnen_an")),
                 
                 # Financial details
                 "rechnungsbetrag": invoice_data.get("rechnungsbetrag"),
-                "faelligkeit": invoice_data.get("faelligkeit"),
-                "skonto_datum": invoice_data.get("skonto_datum"),
-                "skonto_prozent": invoice_data.get("skonto_prozent"),
-                "rechnungsart": invoice_data.get("rechnungsart"),
-                "kfw_anrechenbare_kosten": invoice_data.get("kfw_anrechenbare_kosten"),
+                "faelligkeit": clean_field_value(invoice_data.get("faelligkeit")),
+                "skonto_datum": clean_field_value(invoice_data.get("skonto_datum")),
+                "skonto_prozent": clean_field_value(invoice_data.get("skonto_prozent")),
+                "rechnungsart": clean_field_value(invoice_data.get("rechnungsart")),
+                "kfw_anrechenbare_kosten": clean_field_value(invoice_data.get("kfw_anrechenbare_kosten")),
                 
                 # Additional information
-                "netto_brutto": invoice_data.get("netto_brutto"),
-                "mwst_satz": invoice_data.get("mwst_satz"),
-                "kontierung": invoice_data.get("kontierung"),
+                "netto_brutto": clean_field_value(invoice_data.get("netto_brutto")),
+                "mwst_satz": clean_field_value(invoice_data.get("mwst_satz")),
+                "kontierung": clean_field_value(invoice_data.get("kontierung")),
                 
                 # Workflow information
-                "bauleiter_email": invoice_data.get("bauleiter_email"),
-                "rechnungspruefung_email": invoice_data.get("rechnungspruefung_email"),
+                "bauleiter_email": clean_field_value(invoice_data.get("bauleiter_email")),
+                "rechnungspruefung_email": clean_field_value(invoice_data.get("rechnungspruefung_email")),
                 
                 # PDF link
                 "pdf_url": None,
@@ -981,6 +991,16 @@ class EmailService:
             if invoice_data.get("file_path"):
                 pdf_url = f"https://bdtcfypvadryfeabqnlc.supabase.co/storage/v1/object/public/invoices/{invoice_data['file_path']}"
             
+            # Helper function to clean placeholder values
+            def clean_field_value(value):
+                """Replace placeholder/default values with 'Nicht eingegeben'"""
+                if not value or value in [
+                    'Projekt auswählen...', 'Gewerk auswählen...', 'Abteilung oder Kontakt auswählen...',
+                    'Typ auswählen...', 'dd.mm.yyyy', 'mm.yyyy', 'yyyy', '0.00', '0,00'
+                ]:
+                    return 'Nicht eingegeben'
+                return value
+
             # Prepare comprehensive template context with ALL invoice fields
             context = {
                 # Email metadata
@@ -996,18 +1016,18 @@ class EmailService:
                 "pdf_url": pdf_url,
                 
                 # Basic invoice information
-                "invoice_number": invoice_data.get("rechnungsnummer"),
-                "supplier_name": invoice_data.get("lieferant"),
-                "invoice_date": invoice_data.get("rechnungsdatum"),
+                "invoice_number": clean_field_value(invoice_data.get("rechnungsnummer")),
+                "supplier_name": clean_field_value(invoice_data.get("lieferant")),
+                "invoice_date": clean_field_value(invoice_data.get("rechnungsdatum")),
                 "total_amount": invoice_data.get("rechnungsbetrag"),
                 "currency": invoice_data.get("currency", "EUR"),
                 
                 # German business fields - comprehensive invoice data
-                "rechnungsempfaenger": invoice_data.get("rechnungsempfaenger"),
-                "rechnungssteller": invoice_data.get("rechnungssteller"),
-                "projekt": invoice_data.get("projekt"),
-                "gewerk": invoice_data.get("gewerk"),
-                "kostenstelle": invoice_data.get("kostenstelle"),
+                "rechnungsempfaenger": clean_field_value(invoice_data.get("rechnungsempfaenger")),
+                "rechnungssteller": clean_field_value(invoice_data.get("rechnungssteller")),
+                "projekt": clean_field_value(invoice_data.get("projekt")),
+                "gewerk": clean_field_value(invoice_data.get("gewerk")),
+                "kostenstelle": clean_field_value(invoice_data.get("kostenstelle")),
                 "rechnungseingang": invoice_data.get("rechnungseingang"),
                 "faelligkeit": invoice_data.get("faelligkeit"),
                 "skonto_datum": invoice_data.get("skonto_datum"),
