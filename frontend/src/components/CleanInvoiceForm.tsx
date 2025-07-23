@@ -754,6 +754,18 @@ const CleanInvoiceForm: React.FC<CleanInvoiceFormProps> = ({
                   Bitte geben Sie eine gültige E-Mail-Adresse ein
                 </p>
               )}
+              
+              {/* Highlighted warning to prevent email mistakes and SendGrid bounce issues */}
+              <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm font-semibold text-yellow-800 flex items-center gap-2">
+                  <span className="text-lg">⚠️</span>
+                  Wichtiger Hinweis zur E-Mail-Adresse
+                </p>
+                <p className="text-xs text-yellow-700 mt-1">
+                  Bitte geben Sie eine <strong>korrekte E-Mail-Adresse</strong> ein. Diese wird für alle Erinnerungen und Benachrichtigungen verwendet. 
+                  Falsche E-Mail-Adressen führen zu fehlgeschlagenen Zustellungen.
+                </p>
+              </div>
             </div>
           </div>
         </div>
