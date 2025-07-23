@@ -173,6 +173,48 @@ async def get_invoices_with_skonto_due(days_ahead: int = 7):
             detail=f"Failed to get invoices with Skonto due: {str(e)}"
         )
 
+@router.delete("/invoices/all")
+async def delete_all_invoices():
+    """
+    Delete ALL invoices with comprehensive cleanup.
+    ⚠️ WARNING: This will permanently delete all invoices in the system!
+    Removes all invoice records, associated Skonto data, and file storage.
+    """
+    
+    if not db_service.is_available:
+        raise HTTPException(status_code=503, detail="Database service not available")
+    
+    try:
+        logger.warning("🚨 BULK DELETION REQUESTED - Deleting ALL invoices from system")
+        
+        # Use enhanced database service method with comprehensive cleanup
+        result = db_service.delete_all_invoices()
+        
+        if result["success"]:
+            deletion_summary = result.get("deletion_summary", {})
+            
+            logger.info(f"✅ Bulk deletion completed: {deletion_summary}")
+            
+            return {
+                "message": "All invoices deleted successfully",
+                "status": "success",
+                "summary": {
+                    "total_deleted": deletion_summary.get("total_deleted", 0),
+                    "skonto_data_cleaned": deletion_summary.get("skonto_data_cleaned", 0),
+                    "storage_files_cleaned": deletion_summary.get("storage_files_cleaned", 0),
+                    "failed_deletions": deletion_summary.get("failed_deletions", 0)
+                },
+                "warning": "All invoice data has been permanently removed from the system"
+            }
+        else:
+            raise Exception(result["error"])
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete all invoices: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete all invoices: {str(e)}")
+
 @router.get("/invoices/{invoice_id}")
 async def get_invoice(invoice_id: str = Path(..., description="The invoice ID")):
     """Get a specific invoice by ID"""
