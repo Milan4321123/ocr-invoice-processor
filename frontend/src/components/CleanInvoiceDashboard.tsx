@@ -70,6 +70,11 @@ export default function CleanInvoiceDashboard() {
     fileName: '',
     uploadSource: 'unknown'
   })
+  const [deleteAllDialog, setDeleteAllDialog] = useState<{
+    isOpen: boolean
+  }>({
+    isOpen: false
+  })
 
   useEffect(() => {
     fetchInvoices()
@@ -144,6 +149,67 @@ export default function CleanInvoiceDashboard() {
       const errorMessage = err instanceof Error ? err.message : 'Rechnung konnte nicht gelöscht werden'
       toast.error(errorMessage)
     }
+  }
+
+  const deleteAllInvoices = async () => {
+    try {
+      toast.loading('Alle Rechnungen werden gelöscht...', { id: 'delete-all' })
+      
+      const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.INVOICES.DELETE_ALL), {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        throw new Error('Rechnungen konnten nicht gelöscht werden')
+      }
+
+      const result = await response.json()
+      
+      // Create comprehensive success message
+      const summary = result.summary || {}
+      let successMessage = `✅ Alle Rechnungen erfolgreich gelöscht!\n\n`
+      successMessage += `📊 Zusammenfassung:\n`
+      successMessage += `• ${summary.total_deleted || 0} Rechnungen gelöscht\n`
+      successMessage += `• ${summary.skonto_data_cleaned || 0} Skonto-Datensätze bereinigt\n`
+      successMessage += `• ${summary.storage_files_cleaned || 0} Dateien aus Speicher entfernt`
+      
+      if (summary.failed_deletions > 0) {
+        successMessage += `\n⚠️ ${summary.failed_deletions} Löschungen fehlgeschlagen`
+      }
+
+      toast.success(successMessage, { 
+        id: 'delete-all',
+        duration: 8000,
+        style: {
+          maxWidth: '500px',
+          whiteSpace: 'pre-line'
+        }
+      })
+      
+      // Log deletion details for debugging
+      console.log('Bulk deletion completed:', result)
+      
+      await fetchInvoices() // Refresh the list
+      
+      // Close delete all dialog
+      setDeleteAllDialog({ isOpen: false })
+      
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Rechnungen konnten nicht gelöscht werden'
+      toast.error(errorMessage, { id: 'delete-all' })
+    }
+  }
+
+  const openDeleteAllDialog = () => {
+    if (invoices.length === 0) {
+      toast.error('Keine Rechnungen zum Löschen vorhanden')
+      return
+    }
+    setDeleteAllDialog({ isOpen: true })
+  }
+
+  const closeDeleteAllDialog = () => {
+    setDeleteAllDialog({ isOpen: false })
   }
 
   const sendToBauleiter = async (invoice: CleanInvoice) => {
@@ -494,8 +560,21 @@ export default function CleanInvoiceDashboard() {
             <div className="flex flex-col lg:flex-row lg:items-center justify-between space-y-3 lg:space-y-0">
               <h2 className="text-lg font-semibold gradient-text">Rechnungen</h2>
               
-              {/* Search Input */}
-              <div className="flex items-center space-x-3">
+              {/* Actions and Search */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-3 sm:space-y-0 sm:space-x-3">
+                {/* Delete All Button */}
+                {invoices.length > 0 && (
+                  <button
+                    onClick={openDeleteAllDialog}
+                    className="flex items-center justify-center space-x-2 px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-all transform hover:scale-105 shadow-lg text-sm font-medium"
+                    title={`Alle ${invoices.length} Rechnungen löschen`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span>Alle löschen ({invoices.length})</span>
+                  </button>
+                )}
+                
+                {/* Search Input */}
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Search className="h-4 w-4 text-gray-400" />
@@ -892,6 +971,87 @@ export default function CleanInvoiceDashboard() {
           onConfirm={handleDeleteConfirm}
           onCancel={closeDeleteDialog}
         />
+
+        {/* Delete All Confirmation Dialog */}
+        {deleteAllDialog.isOpen && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+              <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+                <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+              </div>
+
+              <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+              <div className="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <div className="sm:flex sm:items-start">
+                    <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                      <AlertTriangle className="h-6 w-6 text-red-600" />
+                    </div>
+                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                      <h3 className="text-lg leading-6 font-medium text-gray-900">
+                        Alle Rechnungen löschen
+                      </h3>
+                      <div className="mt-2">
+                        <p className="text-sm text-gray-500">
+                          ⚠️ <strong>WARNUNG:</strong> Diese Aktion löscht <strong>ALLE {invoices.length} Rechnungen</strong> dauerhaft aus dem System!
+                        </p>
+                        <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200">
+                          <p className="text-sm text-red-700 font-medium">Diese Aktion wird:</p>
+                          <ul className="mt-2 text-sm text-red-600 list-disc list-inside space-y-1">
+                            <li>Alle Rechnungsdatensätze löschen</li>
+                            <li>Alle Skonto-Daten bereinigen</li>
+                            <li>Alle Dateien aus dem Speicher entfernen</li>
+                            <li><strong>Kann NICHT rückgängig gemacht werden!</strong></li>
+                          </ul>
+                        </div>
+                        <div className="mt-4">
+                          <p className="text-sm text-gray-600">
+                            Geben Sie <strong>"ALLE LÖSCHEN"</strong> ein, um zu bestätigen:
+                          </p>
+                          <input
+                            type="text"
+                            id="confirm-delete-all"
+                            className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                            placeholder="ALLE LÖSCHEN"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && (e.target as HTMLInputElement).value === 'ALLE LÖSCHEN') {
+                                deleteAllInvoices();
+                              }
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                  <button
+                    type="button"
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
+                    onClick={() => {
+                      const input = document.getElementById('confirm-delete-all') as HTMLInputElement;
+                      if (input?.value === 'ALLE LÖSCHEN') {
+                        deleteAllInvoices();
+                      } else {
+                        toast.error('Bitte geben Sie "ALLE LÖSCHEN" ein, um zu bestätigen');
+                      }
+                    }}
+                  >
+                    Alle Rechnungen löschen
+                  </button>
+                  <button
+                    type="button"
+                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
+                    onClick={closeDeleteAllDialog}
+                  >
+                    Abbrechen
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   )

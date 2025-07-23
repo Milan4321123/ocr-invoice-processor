@@ -65,6 +65,7 @@ export const API_CONFIG = {
       EDITOR: (id: string) => `/api/invoices/${id}/editor`,
       COMPLETE: (id: string) => `/api/invoices/${id}/complete`,
       DELETE: (id: string) => `/api/invoices/${id}`,
+      DELETE_ALL: '/api/invoices/all',
     },
     
     // Upload
