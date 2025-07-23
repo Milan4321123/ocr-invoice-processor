@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { AlertCircle, TrendingUp, Clock, CheckCircle, XCircle, Filter, Download, RefreshCw, Mail, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { AlertCircle, TrendingUp, Clock, CheckCircle, XCircle, Filter, Download, RefreshCw, Mail, ThumbsUp, ThumbsDown, Settings, Play, Pause, Zap, Timer } from 'lucide-react';
 
 interface SkontoMetrics {
   totalInvoices: number;
@@ -26,9 +26,23 @@ interface SkontoInvoice {
   reminderSent?: boolean;
 }
 
+interface SchedulerStatus {
+  enabled: boolean;
+  is_running: boolean;
+  stats: {
+    total_runs: number;
+    total_reminders_sent: number;
+    total_errors: number;
+    last_error: string | null;
+  };
+  last_run: string | null;
+  next_run: string | null;
+}
+
 export default function PrufberichtPage() {
   const [metrics, setMetrics] = useState<SkontoMetrics | null>(null);
   const [invoices, setInvoices] = useState<SkontoInvoice[]>([]);
+  const [schedulerStatus, setSchedulerStatus] = useState<SchedulerStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -40,9 +54,10 @@ export default function PrufberichtPage() {
       setLoading(true);
       
       // Fetch real data from Skonto API endpoints
-      const [metricsResponse, opportunitiesResponse] = await Promise.all([
+      const [metricsResponse, opportunitiesResponse, schedulerResponse] = await Promise.all([
         fetch('/api/skonto/dashboard/summary'),
-        fetch('/api/skonto/dashboard/opportunities?urgency=all&limit=200') // Max limit is 200
+        fetch('/api/skonto/dashboard/opportunities?urgency=all&limit=200'), // Max limit is 200
+        fetch('/api/skonto/scheduler/status')
       ]);
 
       if (!metricsResponse.ok || !opportunitiesResponse.ok) {
@@ -51,6 +66,13 @@ export default function PrufberichtPage() {
 
       const metricsData = await metricsResponse.json();
       const opportunitiesData = await opportunitiesResponse.json();
+      
+      // Fetch scheduler status (non-critical)
+      let schedulerData = null;
+      if (schedulerResponse.ok) {
+        const schedulerResult = await schedulerResponse.json();
+        schedulerData = schedulerResult.scheduler_status;
+      }
 
       console.log('📊 Metrics data:', metricsData);
       console.log('📋 Opportunities data:', opportunitiesData);
@@ -108,6 +130,7 @@ export default function PrufberichtPage() {
 
       setMetrics(transformedMetrics);
       setInvoices(transformedInvoices);
+      setSchedulerStatus(schedulerData);
       setError(null);
       
     } catch (error) {
@@ -304,6 +327,21 @@ export default function PrufberichtPage() {
                     <Clock className="h-3 w-3 mr-1" />
                     Automatisch aktualisiert
                   </span>
+                  {/* Scheduler Status Indicator */}
+                  {schedulerStatus && (
+                    <span className={`inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-semibold border ${
+                      schedulerStatus.enabled && schedulerStatus.is_running
+                        ? 'bg-gradient-to-r from-green-100 to-green-200 text-green-700 border-green-300'
+                        : 'bg-gradient-to-r from-red-100 to-red-200 text-red-700 border-red-300'
+                    }`}>
+                      {schedulerStatus.enabled && schedulerStatus.is_running ? (
+                        <Play className="h-3 w-3 mr-1" />
+                      ) : (
+                        <Pause className="h-3 w-3 mr-1" />
+                      )}
+                      Reminder Scheduler {schedulerStatus.enabled && schedulerStatus.is_running ? 'Active' : 'Inactive'}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -345,6 +383,47 @@ export default function PrufberichtPage() {
               </div>
             </div>
           </div>
+
+          {/* Scheduler Statistics */}
+          {schedulerStatus && (
+            <div className="glass-card border-0 shadow-lg mb-6 rounded-xl">
+              <div className="p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Settings className="h-5 w-5 text-gray-600" />
+                  <h3 className="text-lg font-semibold text-gray-800">Automatic Reminder System</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="text-center p-3 bg-white/30 rounded-lg">
+                    <div className="text-lg font-bold text-gray-900">{schedulerStatus.stats.total_runs}</div>
+                    <div className="text-xs text-gray-600">Total Checks</div>
+                  </div>
+                  <div className="text-center p-3 bg-white/30 rounded-lg">
+                    <div className="text-lg font-bold text-green-600">{schedulerStatus.stats.total_reminders_sent}</div>
+                    <div className="text-xs text-gray-600">Reminders Sent</div>
+                  </div>
+                  <div className="text-center p-3 bg-white/30 rounded-lg">
+                    <div className="text-lg font-bold text-blue-600">
+                      {schedulerStatus.last_run ? new Date(schedulerStatus.last_run).toLocaleDateString() : 'Never'}
+                    </div>
+                    <div className="text-xs text-gray-600">Last Check</div>
+                  </div>
+                  <div className="text-center p-3 bg-white/30 rounded-lg">
+                    <div className="text-lg font-bold text-purple-600">
+                      {schedulerStatus.next_run ? new Date(schedulerStatus.next_run).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Not scheduled'}
+                    </div>
+                    <div className="text-xs text-gray-600">Next Check</div>
+                  </div>
+                </div>
+                {schedulerStatus.stats.total_errors > 0 && (
+                  <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="text-sm text-red-700">
+                      ⚠️ {schedulerStatus.stats.total_errors} error(s) detected. Check system logs.
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Invoices Table - MOVED TO TOP */}
           <div className="glass-card border-0 shadow-xl rounded-xl mb-8">

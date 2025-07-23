@@ -777,3 +777,173 @@ async def update_invoice(
             status_code=500,
             detail=f"Failed to update invoice: {str(e)}"
         )
+
+@router.put("/invoices/{invoice_id}/approve")
+async def approve_invoice(
+    invoice_id: str = Path(..., description="Invoice ID"),
+    request_data: Dict[str, Any] = None
+):
+    """
+    Approve an invoice (for control panel use).
+    """
+    try:
+        logger.info(f"✅ Approving invoice {invoice_id} via control panel")
+        
+        # Get invoice data first
+        invoice_result = db_service.get_invoice(invoice_id)
+        if not invoice_result["success"]:
+            raise HTTPException(status_code=404, detail=f"Invoice not found: {invoice_result['error']}")
+        
+        # Update invoice status using existing database service
+        result = db_service.update_invoice_bauleiter_decision(
+            invoice_id=invoice_id,
+            decision="approved",
+            decided_by=request_data.get("decided_by", "control_panel") if request_data else "control_panel",
+            decision_notes="Approved via control panel"
+        )
+        
+        if result["success"]:
+            logger.info(f"✅ Invoice {invoice_id} approved successfully")
+            return {
+                "success": True,
+                "message": "Invoice approved successfully",
+                "invoice_id": invoice_id,
+                "status": "approved_by_bauleiter",
+                "approved_at": datetime.utcnow().isoformat()
+            }
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to approve invoice: {result.get('error')}"
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to approve invoice {invoice_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to approve invoice: {str(e)}"
+        )
+
+@router.put("/invoices/{invoice_id}/reject")
+async def reject_invoice(
+    invoice_id: str = Path(..., description="Invoice ID"),
+    request_data: Dict[str, Any] = None
+):
+    """
+    Reject an invoice (for control panel use).
+    """
+    try:
+        logger.info(f"❌ Rejecting invoice {invoice_id} via control panel")
+        
+        # Get invoice data first
+        invoice_result = db_service.get_invoice(invoice_id)
+        if not invoice_result["success"]:
+            raise HTTPException(status_code=404, detail=f"Invoice not found: {invoice_result['error']}")
+        
+        # Update invoice status using existing database service
+        result = db_service.update_invoice_bauleiter_decision(
+            invoice_id=invoice_id,
+            decision="rejected",
+            decided_by=request_data.get("decided_by", "control_panel") if request_data else "control_panel",
+            decision_notes="Rejected via control panel"
+        )
+        
+        if result["success"]:
+            logger.info(f"❌ Invoice {invoice_id} rejected successfully")
+            return {
+                "success": True,
+                "message": "Invoice rejected successfully",
+                "invoice_id": invoice_id,
+                "status": "rejected_by_bauleiter",
+                "rejected_at": datetime.utcnow().isoformat()
+            }
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to reject invoice: {result.get('error')}"
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to reject invoice {invoice_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to reject invoice: {str(e)}"
+        )
+
+@router.put("/invoices/{invoice_id}/skonto-decision")
+async def make_skonto_decision(
+    invoice_id: str = Path(..., description="Invoice ID"),
+    request_data: Dict[str, Any] = None
+):
+    """
+    Make a Skonto decision for an invoice (take or skip).
+    """
+    try:
+        if not request_data:
+            raise HTTPException(status_code=400, detail="Request data is required")
+        
+        decision = request_data.get("decision")  # "take_skonto" or "skip_skonto"
+        decided_by = request_data.get("decided_by", "control_panel")
+        
+        if decision not in ["take_skonto", "skip_skonto"]:
+            raise HTTPException(status_code=400, detail="Decision must be 'take_skonto' or 'skip_skonto'")
+        
+        logger.info(f"💰 Making Skonto decision '{decision}' for invoice {invoice_id}")
+        
+        # Get invoice data first
+        invoice_result = db_service.get_invoice(invoice_id)
+        if not invoice_result["success"]:
+            raise HTTPException(status_code=404, detail=f"Invoice not found: {invoice_result['error']}")
+        
+        invoice_data = invoice_result["data"]
+        
+        # Prepare update data - only use fields that exist in database
+        update_data = {
+            "skonto_decision": decision,
+        }
+        
+        # Calculate savings if taking skonto
+        if decision == "take_skonto":
+            amount = invoice_data.get("rechnungsbetrag")
+            percentage = invoice_data.get("skonto_prozent")
+            if amount and percentage:
+                try:
+                    update_data["actual_skonto_savings"] = float(amount) * float(percentage) / 100
+                except (ValueError, TypeError):
+                    logger.warning(f"Could not calculate Skonto savings for invoice {invoice_id}")
+        else:
+            # If skipping skonto, set savings to 0
+            update_data["actual_skonto_savings"] = 0.0
+        
+        # Update invoice in database
+        result = db_service.update_invoice(invoice_id, update_data)
+        
+        if result["success"]:
+            action_text = "genommen" if decision == "take_skonto" else "übersprungen"
+            logger.info(f"💰 Skonto {action_text} for invoice {invoice_id}")
+            return {
+                "success": True,
+                "message": f"Skonto {action_text} successfully",
+                "invoice_id": invoice_id,
+                "decision": decision,
+                "decided_by": decided_by,
+                "savings": update_data.get("actual_skonto_savings", 0)
+            }
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to update Skonto decision: {result.get('error')}"
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to make Skonto decision for invoice {invoice_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to make Skonto decision: {str(e)}"
+        )

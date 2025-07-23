@@ -1113,7 +1113,7 @@ class DatabaseService:
             return {"success": False, "error": "Database unavailable"}
         
         try:
-            from datetime import datetime, timedelta
+            from datetime import timedelta
             
             # Calculate the date range for Skonto due
             today = datetime.now().date()

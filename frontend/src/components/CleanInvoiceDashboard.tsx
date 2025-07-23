@@ -526,9 +526,17 @@ export default function CleanInvoiceDashboard() {
                 href="/bauleiter"
                 className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 transition-all transform hover:scale-105 shadow-lg"
               >
-                <span>⚙️</span>
-                <span>Control</span>
+                <span>👨‍💼</span>
+                <span>Bauleiter Dashboard</span>
               </a>
+              
+              <Link 
+                href="/control"
+                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all transform hover:scale-105 shadow-lg"
+              >
+                <span>⚙️</span>
+                <span>Control Panel</span>
+              </Link>
               
               <button
                 onClick={fetchInvoices}
