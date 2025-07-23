@@ -78,11 +78,16 @@ class EmailService:
         .content { padding: 30px; }
         .success-summary { background: #d4edda; border-left: 4px solid #28a745; padding: 20px; margin: 20px 0; border-radius: 8px; }
         .invoice-details { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 25px 0; }
-        .detail-section { background: #ffffff; border: 1px solid #e1e5e9; border-radius: 8px; padding: 20px; }
-        .detail-section h3 { color: #28a745; margin-top: 0; margin-bottom: 15px; font-size: 16px; font-weight: 600; border-bottom: 2px solid #f0f2f7; padding-bottom: 8px; }
-        .detail-row { display: flex; justify-content: space-between; margin-bottom: 12px; padding: 8px 0; border-bottom: 1px solid #f5f7fa; }
-        .detail-label { font-weight: 600; color: #4a5568; min-width: 140px; }
-        .detail-value { color: #2d3748; flex: 1; text-align: right; }
+        .detail-section { background: #ffffff; border: 1px solid #e1e5e9; border-radius: 12px; padding: 25px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .detail-section h3 { color: #28a745; margin-top: 0; margin-bottom: 20px; font-size: 18px; font-weight: 600; border-bottom: 3px solid #28a745; padding-bottom: 10px; display: flex; align-items: center; }
+        .detail-section h3:before { content: ""; width: 4px; height: 20px; background: #28a745; margin-right: 10px; border-radius: 2px; }
+        .detail-row { display: flex; justify-content: space-between; margin-bottom: 15px; padding: 12px 0; border-bottom: 1px solid #f5f7fa; align-items: center; }
+        .detail-row:last-child { border-bottom: none; margin-bottom: 0; }
+        .detail-label { font-weight: 600; color: #4a5568; min-width: 160px; font-size: 14px; }
+        .detail-value { color: #2d3748; flex: 1; text-align: right; font-size: 14px; padding: 6px 12px; background: #f8f9fa; border-radius: 6px; border-left: 3px solid #28a745; }
+        .detail-value.amount { font-weight: bold; color: #28a745; background: #f0f9f4; border-left-color: #28a745; }
+        .detail-value.date { font-family: 'Courier New', monospace; background: #f8f9ff; border-left-color: #4299e1; }
+        .detail-value.text { background: #fefefe; border-left-color: #718096; }
         .amount-highlight { background: #e6fffa; border: 2px solid #38b2ac; border-radius: 8px; padding: 15px; text-align: center; margin: 20px 0; }
         .amount-highlight .amount { font-size: 24px; font-weight: bold; color: #38b2ac; }
         .changes-section { background: #f0f8ff; border: 1px solid #b3d9ff; border-radius: 8px; padding: 20px; margin: 20px 0; }
@@ -113,7 +118,7 @@ class EmailService:
             <!-- Success Summary -->
             <div class="success-summary">
                 <h2 style="margin: 0 0 15px 0; color: #155724;">🎉 Bearbeitung erfolgreich abgeschlossen</h2>
-                <p style="margin: 0; font-size: 16px;"><strong>{{ invoice_number or 'Rechnung ohne Nummer' }}</strong> wurde vollständig erfasst und ist bereit für die Genehmigung.</p>
+                <p style="margin: 0; font-size: 16px;"><strong>{{ invoice_display_name }}</strong> wurde vollständig erfasst und ist bereit für die Genehmigung.</p>
                 <p style="margin: 5px 0 0 0; color: #155724;">Status: <span class="status-badge">{{ status }}</span></p>
             </div>
 
@@ -137,23 +142,31 @@ class EmailService:
                     <h3>📋 Rechnungsdaten</h3>
                     <div class="detail-row">
                         <span class="detail-label">Rechnungsempfänger:</span>
-                        <span class="detail-value">{{ rechnungsempfaenger or 'Nicht eingegeben' }}</span>
+                        <span class="detail-value text">{{ rechnungsempfaenger or 'Nicht eingegeben' }}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Rechnungssteller:</span>
-                        <span class="detail-value">{{ rechnungssteller or supplier_name or 'Nicht eingegeben' }}</span>
+                        <span class="detail-value text">{{ rechnungssteller or supplier_name or 'Nicht eingegeben' }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Rechnungsdatum:</span>
+                        <span class="detail-value date">{{ invoice_date or 'Nicht eingegeben' }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Rechnungseingang:</span>
+                        <span class="detail-value date">{{ rechnungseingang or 'Nicht eingegeben' }}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Projekt:</span>
-                        <span class="detail-value">{{ projekt or 'Nicht eingegeben' }}</span>
+                        <span class="detail-value text">{{ projekt or 'Nicht eingegeben' }}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Gewerk:</span>
-                        <span class="detail-value">{{ gewerk or 'Nicht eingegeben' }}</span>
+                        <span class="detail-value text">{{ gewerk or 'Nicht eingegeben' }}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Weiter berechnen an:</span>
-                        <span class="detail-value">{{ weiter_berechnen_an or 'Nicht eingegeben' }}</span>
+                        <span class="detail-value text">{{ weiter_berechnen_an or 'Nicht eingegeben' }}</span>
                     </div>
                 </div>
 
@@ -162,42 +175,38 @@ class EmailService:
                     <h3>💰 Finanzdaten</h3>
                     <div class="detail-row">
                         <span class="detail-label">Rechnungsbetrag:</span>
-                        <span class="detail-value"><strong>{{ total_amount or rechnungsbetrag or '0.00' }}{% if currency %} {{ currency }}{% else %} EUR{% endif %}</strong></span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Rechnungseingang:</span>
-                        <span class="detail-value">{{ rechnungseingang or 'Nicht eingegeben' }}</span>
+                        <span class="detail-value amount"><strong>{{ total_amount or rechnungsbetrag or '0.00' }}{% if currency %} {{ currency }}{% else %} EUR{% endif %}</strong></span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Fälligkeit:</span>
-                        <span class="detail-value">{{ faelligkeit or 'Nicht eingegeben' }}</span>
+                        <span class="detail-value date">{{ faelligkeit or 'Nicht eingegeben' }}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Skonto Datum:</span>
-                        <span class="detail-value">{{ skonto_datum or 'Nicht eingegeben' }}</span>
+                        <span class="detail-value date">{{ skonto_datum or 'Nicht eingegeben' }}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Skonto Prozent:</span>
-                        <span class="detail-value">{{ skonto_prozent or 'Nicht eingegeben' }}{% if skonto_prozent and skonto_prozent != 'Nicht eingegeben' %}%{% endif %}</span>
+                        <span class="detail-value amount">{{ skonto_prozent or 'Nicht eingegeben' }}{% if skonto_prozent and skonto_prozent != 'Nicht eingegeben' %}%{% endif %}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Rechnungsart:</span>
-                        <span class="detail-value">{{ rechnungsart or 'Nicht eingegeben' }}</span>
+                        <span class="detail-value text">{{ rechnungsart or 'Nicht eingegeben' }}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">KfW anrechenbar:</span>
-                        <span class="detail-value">{{ kfw_anrechenbare_kosten or 'Nicht eingegeben' }}</span>
+                        <span class="detail-value text">{{ kfw_anrechenbare_kosten or 'Nicht eingegeben' }}</span>
                     </div>
                 </div>
             </div>
 
-            <!-- PDF Link -->
-            {% if pdf_url %}
+            <!-- PDF Link - Visual Only -->
+            {% if has_pdf %}
             <div class="pdf-link">
                 <strong>📄 Original Rechnung anzeigen:</strong><br>
-                <a href="{{ pdf_url }}" target="_blank" class="view-btn">PDF öffnen</a>
+                <div style="display: inline-block; padding: 12px 24px; background: #e2e8f0; color: #718096; border-radius: 6px; margin: 10px; font-weight: 500; font-size: 14px; cursor: not-allowed;">PDF öffnen (Nicht verfügbar)</div>
                 <p style="font-size: 12px; color: #718096; margin: 10px 0 0 0;">
-                    Klicken Sie hier, um die Original-Rechnung als PDF zu öffnen
+                    Diese Funktion ist aktuell nicht verfügbar - PDF wird lokal gespeichert
                 </p>
             </div>
             {% endif %}
@@ -253,7 +262,7 @@ class EmailService:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rechnung zur Genehmigung - {{ invoice_number or 'N/A' }}</title>
+    <title>Rechnung zur Genehmigung - {{ invoice_display_name or 'N/A' }}</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 900px; margin: 0 auto; padding: 20px; background-color: #f5f7fa; }
         .container { background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); overflow: hidden; }
@@ -262,36 +271,27 @@ class EmailService:
         .header p { margin: 10px 0 0 0; opacity: 0.9; }
         .content { padding: 30px; }
         .invoice-summary { background: #f8f9fc; border-left: 4px solid #667eea; padding: 20px; margin: 20px 0; border-radius: 8px; }
-        .invoice-details { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 25px 0; }
-        .detail-section { background: #ffffff; border: 1px solid #e1e5e9; border-radius: 8px; padding: 20px; }
+        .detail-section { background: #ffffff; border: 1px solid #e1e5e9; border-radius: 8px; padding: 20px; margin: 20px 0; }
         .detail-section h3 { color: #667eea; margin-top: 0; margin-bottom: 15px; font-size: 16px; font-weight: 600; border-bottom: 2px solid #f0f2f7; padding-bottom: 8px; }
-        .detail-row { display: flex; justify-content: space-between; margin-bottom: 12px; padding: 8px 0; border-bottom: 1px solid #f5f7fa; }
-        .detail-label { font-weight: 600; color: #4a5568; min-width: 140px; }
-        .detail-value { color: #2d3748; flex: 1; text-align: right; }
         .amount-highlight { background: #e6fffa; border: 2px solid #38b2ac; border-radius: 8px; padding: 15px; text-align: center; margin: 20px 0; }
         .amount-highlight .amount { font-size: 24px; font-weight: bold; color: #38b2ac; }
         .changes-section { background: #fff5f5; border: 1px solid #fed7d7; border-radius: 8px; padding: 20px; margin: 20px 0; }
-        .change-item { background: white; padding: 12px; margin: 8px 0; border-left: 4px solid #4299e1; border-radius: 4px; }
-        .pdf-link { background: #e6f7ff; border: 1px solid #91d5ff; border-radius: 8px; padding: 15px; margin: 20px 0; text-align: center; }
-        .pdf-link a { color: #1890ff; text-decoration: none; font-weight: 600; }
+        .pdf-section { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 15px; margin: 20px 0; text-align: center; }
         .action-buttons { background: #f7fafc; border-radius: 12px; padding: 30px; text-align: center; margin: 30px 0; }
         .action-buttons h3 { color: #2d3748; margin-bottom: 20px; }
         .approve-btn { display: inline-block; padding: 16px 32px; background: linear-gradient(135deg, #48bb78 0%, #38a169 100%); color: white; text-decoration: none; border-radius: 8px; margin: 10px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(72, 187, 120, 0.3); transition: all 0.3s ease; }
         .approve-btn:hover { box-shadow: 0 6px 8px rgba(72, 187, 120, 0.4); transform: translateY(-2px); }
         .reject-btn { display: inline-block; padding: 16px 32px; background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%); color: white; text-decoration: none; border-radius: 8px; margin: 10px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(245, 101, 101, 0.3); transition: all 0.3s ease; }
         .reject-btn:hover { box-shadow: 0 6px 8px rgba(245, 101, 101, 0.4); transform: translateY(-2px); }
-        .view-btn { display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%); color: white; text-decoration: none; border-radius: 6px; margin: 10px; font-weight: 500; font-size: 14px; }
         .footer { background: #f7fafc; padding: 25px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #718096; }
         .security-notice { background: #fffbeb; border: 1px solid #f6e05e; border-radius: 8px; padding: 15px; margin: 20px 0; }
         .security-notice strong { color: #744210; }
         .status-badge { display: inline-block; padding: 4px 12px; background: #48bb78; color: white; border-radius: 20px; font-size: 12px; font-weight: 600; }
-        .priority-high { border-left-color: #f56565; }
-        .priority-medium { border-left-color: #ed8936; }
-        .priority-low { border-left-color: #48bb78; }
+        .amount { color: #28a745 !important; font-weight: 600; }
+        .date { color: #007bff !important; }
+        .text { color: #333; }
         @media (max-width: 768px) {
-            .invoice-details { grid-template-columns: 1fr; }
-            .detail-row { flex-direction: column; }
-            .detail-value { text-align: left; margin-top: 5px; }
+            .detail-grid { grid-template-columns: 1fr !important; }
             .action-buttons { padding: 20px; }
             .approve-btn, .reject-btn { display: block; margin: 10px 0; }
         }
@@ -308,8 +308,8 @@ class EmailService:
         <div class="content">
             <!-- Invoice Summary -->
             <div class="invoice-summary">
-                <h2 style="margin: 0 0 15px 0; color: #2d3748;">📄 {{ invoice_number or 'Rechnung ohne Nummer' }}</h2>
-                <p style="margin: 0; font-size: 16px;"><strong>Lieferant:</strong> {{ supplier_name or 'Nicht eingegeben' }}</p>
+                <h2 style="margin: 0 0 15px 0; color: #2d3748;">📄 {{ invoice_display_name }}</h2>
+                <p style="margin: 0; font-size: 16px;"><strong>Lieferant:</strong> {{ supplier_name }}</p>
                 <p style="margin: 5px 0 0 0; color: #718096;">Status: <span class="status-badge">Zur Genehmigung</span></p>
             </div>
 
@@ -326,96 +326,89 @@ class EmailService:
             </div>
             {% endif %}
 
-            <!-- Detailed Invoice Information -->
-            <div class="invoice-details">
-                <!-- Basic Information -->
-                <div class="detail-section">
-                    <h3>📋 Grunddaten</h3>
-                    <div class="detail-row">
-                        <span class="detail-label">Rechnungsnummer:</span>
-                        <span class="detail-value">{{ invoice_number or 'Nicht eingegeben' }}</span>
+            <!-- Rechnungsdaten Section -->
+            <div class="detail-section">
+                <h3>📋 Rechnungsdaten</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;" class="detail-grid">
+                    <div>
+                        <strong style="color: #495057; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Rechnungsempfänger</strong>
+                        <div style="margin-top: 4px; padding: 6px 0; color: #333; border-bottom: 1px solid #eee;" class="text">{{ rechnungsempfaenger }}</div>
                     </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Rechnungsempfänger:</span>
-                        <span class="detail-value">{{ rechnungsempfaenger or 'Nicht eingegeben' }}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Rechnungssteller:</span>
-                        <span class="detail-value">{{ rechnungssteller or supplier_name or 'Nicht eingegeben' }}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Rechnungsdatum:</span>
-                        <span class="detail-value">{{ invoice_date or 'Nicht eingegeben' }}</span>
+                    <div>
+                        <strong style="color: #495057; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Rechnungssteller</strong>
+                        <div style="margin-top: 4px; padding: 6px 0; color: #333; border-bottom: 1px solid #eee;" class="text">{{ rechnungssteller }}</div>
                     </div>
                 </div>
-
-                <!-- Project & Trade Information -->
-                <div class="detail-section">
-                    <h3>🏗️ Projekt & Gewerk</h3>
-                    <div class="detail-row">
-                        <span class="detail-label">Projekt:</span>
-                        <span class="detail-value">{{ projekt or 'Projekt auswählen...' }}</span>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;" class="detail-grid">
+                    <div>
+                        <strong style="color: #495057; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Rechnungsdatum</strong>
+                        <div style="margin-top: 4px; padding: 6px 0; color: #333; border-bottom: 1px solid #eee;" class="date">{{ invoice_date }}</div>
                     </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Gewerk:</span>
-                        <span class="detail-value">{{ gewerk or 'Gewerk auswählen...' }}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Weiter berechnen an:</span>
-                        <span class="detail-value">{{ weiter_berechnen_an or 'Abteilung oder Kontakt auswählen...' }}</span>
+                    <div>
+                        <strong style="color: #495057; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Rechnungseingang</strong>
+                        <div style="margin-top: 4px; padding: 6px 0; color: #333; border-bottom: 1px solid #eee;" class="date">{{ rechnungseingang }}</div>
                     </div>
                 </div>
-
-                <!-- Financial Information -->
-                <div class="detail-section">
-                    <h3>💰 Finanzdaten</h3>
-                    <div class="detail-row">
-                        <span class="detail-label">Rechnungsbetrag:</span>
-                        <span class="detail-value"><strong>{{ total_amount or rechnungsbetrag or '0.00' }}{% if currency %} {{ currency }}{% else %} EUR{% endif %}</strong></span>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;" class="detail-grid">
+                    <div>
+                        <strong style="color: #495057; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Projekt</strong>
+                        <div style="margin-top: 4px; padding: 6px 0; color: #333; border-bottom: 1px solid #eee;" class="text">{{ projekt }}</div>
                     </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Rechnungseingang:</span>
-                        <span class="detail-value">{{ rechnungseingang or 'dd.mm.yyyy' }}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Fälligkeit:</span>
-                        <span class="detail-value">{{ faelligkeit or 'dd.mm.yyyy' }}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Skonto Datum:</span>
-                        <span class="detail-value">{{ skonto_datum or 'dd.mm.yyyy' }}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Skonto Prozent:</span>
-                        <span class="detail-value">{{ skonto_prozent or '0.00' }}%</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Rechnungsart:</span>
-                        <span class="detail-value">{{ rechnungsart or 'Typ auswählen...' }}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">KfW anrechenbar:</span>
-                        <span class="detail-value">{{ kfw_anrechenbare_kosten or 'Nicht angegeben' }}</span>
+                    <div>
+                        <strong style="color: #495057; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Gewerk</strong>
+                        <div style="margin-top: 4px; padding: 6px 0; color: #333; border-bottom: 1px solid #eee;" class="text">{{ gewerk }}</div>
                     </div>
                 </div>
-
-
             </div>
 
-            <!-- PDF Link -->
-            {% if pdf_url %}
-            <div class="pdf-link">
-                <strong>📄 Original Rechnung anzeigen:</strong><br>
-                <a href="{{ pdf_url }}" target="_blank" class="view-btn">PDF öffnen</a>
-                <p style="font-size: 12px; color: #718096; margin: 10px 0 0 0;">
-                    Klicken Sie hier, um die Original-Rechnung als PDF zu öffnen
-                </p>
+            <!-- Finanzdaten Section -->
+            <div class="detail-section">
+                <h3>💰 Finanzdaten</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;" class="detail-grid">
+                    <div>
+                        <strong style="color: #495057; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Fälligkeit</strong>
+                        <div style="margin-top: 4px; padding: 6px 0; color: #333; border-bottom: 1px solid #eee;" class="date">{{ faelligkeit }}</div>
+                    </div>
+                    <div>
+                        <strong style="color: #495057; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Skonto bis</strong>
+                        <div style="margin-top: 4px; padding: 6px 0; color: #333; border-bottom: 1px solid #eee;" class="date">{{ skonto_datum }}</div>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;" class="detail-grid">
+                    <div>
+                        <strong style="color: #495057; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Skonto</strong>
+                        <div style="margin-top: 4px; padding: 6px 0; color: #333; border-bottom: 1px solid #eee;" class="amount">{{ skonto_prozent }}%</div>
+                    </div>
+                    <div>
+                        <strong style="color: #495057; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Rechnungsart</strong>
+                        <div style="margin-top: 4px; padding: 6px 0; color: #333; border-bottom: 1px solid #eee;" class="text">{{ rechnungsart }}</div>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;" class="detail-grid">
+                    <div>
+                        <strong style="color: #495057; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Weiter berechnen an</strong>
+                        <div style="margin-top: 4px; padding: 6px 0; color: #333; border-bottom: 1px solid #eee;" class="text">{{ weiter_berechnen_an }}</div>
+                    </div>
+                    <div>
+                        <strong style="color: #495057; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">KfW anrechenbar</strong>
+                        <div style="margin-top: 4px; padding: 6px 0; color: #333; border-bottom: 1px solid #eee;" class="text">{{ kfw_anrechenbare_kosten }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PDF Link (Non-functional) -->
+            {% if has_pdf %}
+            <div class="pdf-section">
+                <div style="display: inline-block; padding: 8px 16px; background: #6c757d; color: white; border-radius: 4px; font-size: 14px;">
+                    📄 PDF nicht verfügbar
+                </div>
+                <p style="margin: 8px 0 0 0; font-size: 13px; color: #6c757d;">PDF-Ansicht wird nach der Unternehmens-Konfiguration verfügbar sein</p>
             </div>
             {% endif %}
 
-            <!-- Simple Processing Summary -->
+            <!-- Processing Summary -->
             <div class="changes-section">
-                <h3 style="color: #28a745; margin-top: 0;">� Rechnung bereit zur Genehmigung</h3>
+                <h3 style="color: #28a745; margin-top: 0;">✅ Rechnung bereit zur Genehmigung</h3>
                 <p style="color: #4a5568; margin-bottom: 15px; font-size: 16px;">
                     Die Rechnung wurde vollständig bearbeitet und alle erforderlichen Daten wurden erfasst. 
                     Die Rechnung ist jetzt bereit für Ihre Prüfung und Genehmigung.
@@ -423,26 +416,26 @@ class EmailService:
                 <div style="background: #e3f2fd; border: 1px solid #90caf9; border-radius: 8px; padding: 15px; margin: 15px 0;">
                     <strong>✅ Status:</strong> Bearbeitung abgeschlossen
                     <br><strong>👤 Bearbeitet von:</strong> {{ editor_name }} ({{ editor_email }})
-                    <br><strong>📅 Bearbeitet am:</strong> {{ sent_by_date }}
+                    <br><strong>📅 Bearbeitet am:</strong> {{ submission_date }}
                     <br><strong>⏱ Wartet auf:</strong> Ihre Genehmigung
                 </div>
             </div>
 
-            <!-- Action Buttons -->
+            <!-- Action Buttons (Non-functional) -->
             <div class="action-buttons">
                 <h3>🎯 Genehmigung erforderlich</h3>
                 <p style="color: #4a5568; margin-bottom: 25px;">
-                    Bitte prüfen Sie die Rechnung sorgfältig und treffen Sie eine Entscheidung:
+                    Die Genehmigungsfunktion wird nach der Unternehmens-Konfiguration verfügbar sein:
                 </p>
-                <a href="{{ approve_url }}" class="approve-btn">
-                    ✅ RECHNUNG GENEHMIGEN
-                </a>
-                <a href="{{ reject_url }}" class="reject-btn">
-                    ❌ RECHNUNG ABLEHNEN
-                </a>
+                <div style="display: inline-block; padding: 16px 32px; background: #6c757d; color: white; border-radius: 8px; margin: 10px; font-weight: 600; font-size: 16px; cursor: not-allowed;">
+                    ✅ RECHNUNG GENEHMIGEN - Nicht verfügbar
+                </div>
+                <div style="display: inline-block; padding: 16px 32px; background: #6c757d; color: white; border-radius: 8px; margin: 10px; font-weight: 600; font-size: 16px; cursor: not-allowed;">
+                    ❌ RECHNUNG ABLEHNEN - Nicht verfügbar
+                </div>
                 <br><br>
                 <p style="font-size: 14px; color: #718096;">
-                    Nach Ihrer Entscheidung wird das System automatisch die nächsten Schritte einleiten.
+                    Die Genehmigungsfunktion wird aktiviert, sobald die Unternehmens-Konfiguration abgeschlossen ist.
                 </p>
             </div>
 
@@ -544,118 +537,136 @@ class EmailService:
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🎯 Skonto-Erinnerung - Handlung erforderlich</title>
     <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
-        .header { background: linear-gradient(135deg, #f39c12, #e67e22); color: white; padding: 25px; border-radius: 8px; margin-bottom: 20px; text-align: center; }
-        .header h1 { margin: 0; font-size: 28px; }
-        .content { background: white; padding: 25px; border: 1px solid #e0e0e0; border-radius: 8px; }
-        .alert-box { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0; }
-        .invoice-details { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }
-        .skonto-info { background: #e8f5e8; border-left: 4px solid #28a745; padding: 15px; margin: 20px 0; }
-        .savings-calculation { background: #f0f8ff; border: 1px solid #b3d9ff; padding: 15px; border-radius: 5px; margin: 15px 0; }
-        .action-buttons { text-align: center; margin: 30px 0; }
-        .action-btn { display: inline-block; padding: 15px 30px; margin: 10px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px; }
-        .take-skonto-btn { background: #28a745; color: white; }
-        .skip-skonto-btn { background: #6c757d; color: white; }
-        .action-btn:hover { opacity: 0.9; }
-        .deadline-warning { background: #ffecec; border: 1px solid #ff9999; padding: 15px; border-radius: 5px; margin: 20px 0; color: #d63031; text-align: center; }
-        .footer { margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px; font-size: 0.9em; color: #666; }
-        .security-notice { background: #e8f4f8; border: 1px solid #bee5eb; padding: 15px; border-radius: 5px; margin: 20px 0; }
-        .detail-row { display: flex; justify-content: space-between; margin: 8px 0; }
-        .detail-label { font-weight: bold; }
-        .detail-value { color: #495057; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 900px; margin: 0 auto; padding: 20px; background-color: #f5f7fa; }
+        .container { background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #f39c12, #e67e22); color: white; padding: 30px; border-radius: 8px 8px 0 0; text-align: center; }
+        .header h1 { margin: 0; font-size: 28px; font-weight: 600; }
+        .header p { margin: 10px 0 0 0; opacity: 0.9; font-size: 18px; }
+        .content { padding: 30px; }
+        .alert-box { background: #fff3cd; border-left: 4px solid #f39c12; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .invoice-summary { background: #f8f9fc; border-left: 4px solid #f39c12; padding: 20px; margin: 20px 0; border-radius: 8px; }
+        .detail-section { background: #ffffff; border: 1px solid #e1e5e9; border-radius: 8px; padding: 20px; margin: 20px 0; }
+        .detail-section h3 { color: #f39c12; margin-top: 0; margin-bottom: 15px; font-size: 18px; font-weight: 600; border-bottom: 3px solid #f39c12; padding-bottom: 10px; }
+        .skonto-highlight { background: #e8f5e8; border: 2px solid #28a745; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0; }
+        .skonto-highlight .amount { font-size: 24px; font-weight: bold; color: #28a745; }
+        .savings-calculation { background: #f0f8ff; border: 1px solid #b3d9ff; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center; }
+        .action-buttons { background: #f7fafc; border-radius: 12px; padding: 30px; text-align: center; margin: 30px 0; }
+        .deadline-warning { background: #ffecec; border: 1px solid #ff9999; padding: 20px; border-radius: 8px; margin: 20px 0; color: #d63031; text-align: center; }
+        .footer { background: #f7fafc; padding: 25px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #718096; }
+        .security-notice { background: #fffbeb; border: 1px solid #f6e05e; border-radius: 8px; padding: 15px; margin: 20px 0; }
+        .amount { color: #28a745 !important; font-weight: 600; }
+        .date { color: #007bff !important; }
+        .text { color: #333; }
+        @media (max-width: 768px) {
+            .detail-grid { grid-template-columns: 1fr !important; }
+            .action-buttons { padding: 20px; }
+        }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>🎯 Skonto-Erinnerung</h1>
-        <p style="margin: 10px 0 0 0; font-size: 18px;">Handlung erforderlich - Skonto läuft bald ab!</p>
-    </div>
-    
-    <div class="content">
-        <div class="alert-box">
-            <strong>⏰ ZEITKRITISCH:</strong> Das Skonto für diese Rechnung läuft in {{ days_until_expiry }} Tag(en) ab. 
-            Bitte treffen Sie eine Entscheidung, um potenzielle Einsparungen nicht zu verpassen.
+    <div class="container">
+        <div class="header">
+            <h1>🎯 Skonto-Erinnerung</h1>
+            <p>Handlung erforderlich - Skonto läuft bald ab!</p>
         </div>
         
-        <h2>📋 Rechnung Details</h2>
-        <div class="invoice-details">
-            <div class="detail-row">
-                <span class="detail-label">Rechnungsnummer:</span>
-                <span class="detail-value">{{ invoice_number or 'Nicht verfügbar' }}</span>
+        <div class="content">
+            <div class="alert-box">
+                <strong>⏰ ZEITKRITISCH:</strong> Das Skonto für diese Rechnung läuft in {{ days_until_expiry }} Tag(en) ab. 
+                Eine Entscheidung wäre erforderlich, um potenzielle Einsparungen nicht zu verpassen.
             </div>
-            <div class="detail-row">
-                <span class="detail-label">Lieferant:</span>
-                <span class="detail-value">{{ supplier_name or 'Nicht verfügbar' }}</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Rechnungsdatum:</span>
-                <span class="detail-value">{{ invoice_date or 'Nicht verfügbar' }}</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Rechnungsbetrag:</span>
-                <span class="detail-value">{{ total_amount or 'Nicht verfügbar' }}{% if currency %} {{ currency }}{% endif %}</span>
-            </div>
-        </div>
-        
-        <div class="skonto-info">
-            <h3>💰 Skonto Information</h3>
-            <div class="detail-row">
-                <span class="detail-label">Skonto Prozent:</span>
-                <span class="detail-value">{{ skonto_prozent }}%</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Skonto bis:</span>
-                <span class="detail-value">{{ skonto_datum }}</span>
-            </div>
-        </div>
-        
-        {% if potential_savings %}
-        <div class="savings-calculation">
-            <h4>📊 Potenzielle Einsparung</h4>
-            <p style="font-size: 18px; font-weight: bold; color: #28a745;">
-                {{ potential_savings }} {{ currency }}
-            </p>
-            <small>Berechnung: {{ total_amount }} × {{ skonto_prozent }}% = {{ potential_savings }} {{ currency }}</small>
-        </div>
-        {% endif %}
-        
-        {% if days_until_expiry <= 3 %}
-        <div class="deadline-warning">
-            <strong>🚨 DRINGEND: Nur noch {{ days_until_expiry }} Tag(en) bis zum Skonto-Ablauf!</strong>
-        </div>
-        {% endif %}
-        
-        <div class="action-buttons">
-            <h3>🎯 Entscheidung erforderlich</h3>
-            <p style="color: #4a5568; margin-bottom: 25px;">
-                Möchten Sie das Skonto in Anspruch nehmen oder überspringen?
-            </p>
-            <a href="{{ take_skonto_url }}" class="action-btn take-skonto-btn">
-                ✅ SKONTO NEHMEN ({{ potential_savings }} {{ currency }} sparen)
-            </a>
-            <a href="{{ skip_skonto_url }}" class="action-btn skip-skonto-btn">
-                ⏭️ SKONTO ÜBERSPRINGEN
-            </a>
-            <br><br>
-            <p style="font-size: 14px; color: #718096;">
-                Nach Ihrer Entscheidung wird das System automatisch die entsprechenden Schritte einleiten.
-            </p>
-        </div>
 
-        <div class="security-notice">
-            <strong>🔒 Sicherheitshinweis:</strong> Diese Aktionslinks sind verschlüsselt und verfallen automatisch in 7 Tagen. 
-            Klicken Sie nur auf Links in E-Mails, die Sie erwartet haben. Bei Verdacht auf Manipulation kontaktieren Sie sofort den System-Administrator.
+            <!-- Invoice Summary -->
+            <div class="invoice-summary">
+                <h2 style="margin: 0 0 15px 0; color: #2d3748;">📄 {{ invoice_display_name }}</h2>
+                <p style="margin: 0; font-size: 16px;"><strong>Lieferant:</strong> {{ supplier_name }}</p>
+                <p style="margin: 5px 0 0 0; color: #718096;">Rechnungsdatum: {{ invoice_date }}</p>
+            </div>
+
+            <!-- Skonto Highlight -->
+            {% if potential_savings %}
+            <div class="skonto-highlight">
+                <div style="color: #4a5568; margin-bottom: 5px;">Potenzielle Skonto-Einsparung</div>
+                <div class="amount">{{ potential_savings }} {{ currency }}</div>
+                <div style="color: #718096; font-size: 14px; margin-top: 8px;">
+                    {{ skonto_prozent }}% Skonto bis {{ skonto_datum }}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Invoice Details -->
+            <div class="detail-section">
+                <h3>📋 Rechnungsdetails</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;" class="detail-grid">
+                    <div>
+                        <strong style="color: #495057; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Rechnungsbetrag</strong>
+                        <div style="margin-top: 4px; padding: 6px 0; color: #333; border-bottom: 1px solid #eee;" class="amount">{{ total_amount }}{% if currency %} {{ currency }}{% endif %}</div>
+                    </div>
+                    <div>
+                        <strong style="color: #495057; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Rechnungsdatum</strong>
+                        <div style="margin-top: 4px; padding: 6px 0; color: #333; border-bottom: 1px solid #eee;" class="date">{{ invoice_date }}</div>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;" class="detail-grid">
+                    <div>
+                        <strong style="color: #495057; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Skonto Prozent</strong>
+                        <div style="margin-top: 4px; padding: 6px 0; color: #333; border-bottom: 1px solid #eee;" class="amount">{{ skonto_prozent }}%</div>
+                    </div>
+                    <div>
+                        <strong style="color: #495057; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Skonto bis</strong>
+                        <div style="margin-top: 4px; padding: 6px 0; color: #333; border-bottom: 1px solid #eee;" class="date">{{ skonto_datum }}</div>
+                    </div>
+                </div>
+            </div>
+
+            {% if potential_savings %}
+            <div class="savings-calculation">
+                <h4 style="margin: 0 0 15px 0; color: #28a745;">📊 Einsparungsberechnung</h4>
+                <p style="font-size: 18px; font-weight: bold; color: #28a745; margin: 10px 0;">
+                    {{ potential_savings }} {{ currency }}
+                </p>
+                <small style="color: #666;">Berechnung: {{ total_amount }} × {{ skonto_prozent }}% = {{ potential_savings }} {{ currency }}</small>
+            </div>
+            {% endif %}
+
+            {% if days_until_expiry <= 3 %}
+            <div class="deadline-warning">
+                <strong>🚨 DRINGEND: Nur noch {{ days_until_expiry }} Tag(en) bis zum Skonto-Ablauf!</strong>
+            </div>
+            {% endif %}
+
+            <!-- Action Buttons (Non-functional) -->
+            <div class="action-buttons">
+                <h3>🎯 Entscheidung erforderlich</h3>
+                <p style="color: #4a5568; margin-bottom: 25px;">
+                    Die Skonto-Entscheidungsfunktion wird nach der Unternehmens-Konfiguration verfügbar sein:
+                </p>
+                <div style="display: inline-block; padding: 15px 30px; background: #6c757d; color: white; border-radius: 8px; margin: 10px; font-weight: 600; font-size: 16px; cursor: not-allowed;">
+                    ✅ SKONTO NEHMEN - Nicht verfügbar
+                </div>
+                <div style="display: inline-block; padding: 15px 30px; background: #6c757d; color: white; border-radius: 8px; margin: 10px; font-weight: 600; font-size: 16px; cursor: not-allowed;">
+                    ⏭️ SKONTO ÜBERSPRINGEN - Nicht verfügbar
+                </div>
+                <br><br>
+                <p style="font-size: 14px; color: #718096;">
+                    Die Skonto-Entscheidungsfunktion wird aktiviert, sobald die Unternehmens-Konfiguration abgeschlossen ist.
+                </p>
+            </div>
+
+            <div class="security-notice">
+                <strong>🔒 Sicherheitshinweis:</strong> Diese Funktionen werden nach der Unternehmens-Konfiguration verfügbar sein. 
+                Das System wird dann automatische Skonto-Entscheidungen und Benachrichtigungen unterstützen.
+            </div>
         </div>
-    </div>
-    
-    <div class="footer">
-        <p><strong>🤖 Automatisch generiert vom Rechnungsverarbeitungssystem</strong></p>
-        <p><strong>Zeitstempel:</strong> {{ timestamp }}</p>
-        <p><strong>Token gültig bis:</strong> {{ token_expires }}</p>
-        <p><strong>E-Mail ID:</strong> {{ email_id or 'N/A' }}</p>
-        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 15px 0;">
-        <p>Diese E-Mail wurde automatisch versendet. Bei Fragen oder Problemen wenden Sie sich an den System-Administrator.</p>
-        <p><strong>Skonto-Verwaltung:</strong> Für Unterstützung bei Skonto-Entscheidungen kontaktieren Sie die Buchhaltung.</p>
+        
+        <div class="footer">
+            <p><strong>🤖 Automatisch generiert vom Rechnungsverarbeitungssystem</strong></p>
+            <p><strong>Zeitstempel:</strong> {{ timestamp }}</p>
+            <p><strong>E-Mail ID:</strong> {{ email_id or 'N/A' }}</p>
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 15px 0;">
+            <p>Diese E-Mail wurde automatisch versendet. Bei Fragen oder Problemen wenden Sie sich an den System-Administrator.</p>
+            <p><strong>Skonto-Verwaltung:</strong> Für Unterstützung bei Skonto-Entscheidungen kontaktieren Sie die Buchhaltung.</p>
+        </div>
     </div>
 </body>
 </html>
@@ -856,6 +867,19 @@ class EmailService:
                     return 'Nicht eingegeben'
                 return value
 
+            # Helper function to get display name (filename fallback)
+            def get_display_name(invoice_data):
+                """Get display name for invoice - use filename if invoice number is missing"""
+                invoice_number = clean_field_value(invoice_data.get("rechnungsnummer"))
+                if invoice_number == 'Nicht eingegeben' and invoice_data.get("file_path"):
+                    # Extract filename from file_path
+                    filename = invoice_data["file_path"].split("/")[-1]
+                    # Remove file extension for cleaner display
+                    if filename.endswith('.pdf'):
+                        filename = filename[:-4]
+                    return filename
+                return invoice_number if invoice_number != 'Nicht eingegeben' else 'Rechnung ohne Nummer'
+
             # Prepare comprehensive template context with ALL invoice fields
             context = {
                 # Editor and timing information
@@ -865,8 +889,9 @@ class EmailService:
                 "timestamp": datetime.now().isoformat(),
                 "request_id": request_id or "N/A",
                 
-                # Basic invoice information
+                # Basic invoice information with filename fallback
                 "invoice_number": clean_field_value(invoice_data.get("rechnungsnummer")),
+                "invoice_display_name": get_display_name(invoice_data),
                 "supplier_name": clean_field_value(invoice_data.get("lieferant")),
                 "invoice_date": clean_field_value(invoice_data.get("rechnungsdatum")),
                 "total_amount": invoice_data.get("rechnungsbetrag"),
@@ -901,8 +926,9 @@ class EmailService:
                 "bauleiter_email": clean_field_value(invoice_data.get("bauleiter_email")),
                 "rechnungspruefung_email": clean_field_value(invoice_data.get("rechnungspruefung_email")),
                 
-                # PDF link
+                # PDF link - keep visual but make non-functional
                 "pdf_url": None,
+                "has_pdf": bool(invoice_data.get("file_path")),
                 
                 # Changes summary
                 "changes_summary": changes_summary or []
@@ -916,12 +942,12 @@ class EmailService:
             if is_completion:
                 # Formal completion email
                 template = self.jinja_env.get_template("editor_notification")
-                subject = f"✅ Prüfbericht - Rechnung abgeschlossen ({context['invoice_number'] or 'N/A'})"
+                subject = f"{context['invoice_display_name']}"
                 context["status"] = "Bearbeitung abgeschlossen"
             else:
                 # Summary so far email
                 template = self.jinja_env.get_template("editor_summary")
-                subject = f"📝 Prüfbericht - Rechnung bearbeitet ({context['invoice_number'] or 'N/A'})"
+                subject = f"{context['invoice_display_name']}"
                 context["status"] = "In Bearbeitung"
             
             html_content = template.render(**context)
@@ -1001,6 +1027,19 @@ class EmailService:
                     return 'Nicht eingegeben'
                 return value
 
+            # Helper function to get display name (filename fallback)
+            def get_display_name(invoice_data):
+                """Get display name for invoice - use filename if invoice number is missing"""
+                invoice_number = clean_field_value(invoice_data.get("rechnungsnummer"))
+                if invoice_number == 'Nicht eingegeben' and invoice_data.get("file_path"):
+                    # Extract filename from file_path
+                    filename = invoice_data["file_path"].split("/")[-1]
+                    # Remove file extension for cleaner display
+                    if filename.endswith('.pdf'):
+                        filename = filename[:-4]
+                    return filename
+                return invoice_number if invoice_number != 'Nicht eingegeben' else 'Rechnung ohne Nummer'
+
             # Prepare comprehensive template context with ALL invoice fields
             context = {
                 # Email metadata
@@ -1014,9 +1053,11 @@ class EmailService:
                 "reject_url": reject_url,
                 "token_expires": (datetime.now() + timedelta(days=7)).strftime("%d.%m.%Y um %H:%M"),
                 "pdf_url": pdf_url,
+                "has_pdf": bool(invoice_data.get("file_path")),
                 
-                # Basic invoice information
+                # Basic invoice information with filename fallback
                 "invoice_number": clean_field_value(invoice_data.get("rechnungsnummer")),
+                "invoice_display_name": get_display_name(invoice_data),
                 "supplier_name": clean_field_value(invoice_data.get("lieferant")),
                 "invoice_date": clean_field_value(invoice_data.get("rechnungsdatum")),
                 "total_amount": invoice_data.get("rechnungsbetrag"),
@@ -1054,7 +1095,7 @@ class EmailService:
             html_content = template.render(**context)
             
             # Email details
-            subject = f"Rechnung zur Genehmigung - {context['invoice_number'] or 'N/A'} ({context['supplier_name'] or 'N/A'})"
+            subject = f"{context['invoice_display_name']}"
             
             # Send email
             result = await self._send_email(
@@ -1229,15 +1270,39 @@ class EmailService:
             take_skonto_url = f"{self.base_url}/api/email/skonto-decision?token={take_token}&decision=taken"
             skip_skonto_url = f"{self.base_url}/api/email/skonto-decision?token={skip_token}&decision=missed"
             
+            # Helper function to clean placeholder values
+            def clean_field_value(value):
+                """Replace placeholder/default values with 'Nicht eingegeben'"""
+                if not value or value in [
+                    'Projekt auswählen...', 'Gewerk auswählen...', 'Abteilung oder Kontakt auswählen...',
+                    'Typ auswählen...', 'dd.mm.yyyy', 'mm.yyyy', 'yyyy', '0.00', '0,00'
+                ]:
+                    return 'Nicht eingegeben'
+                return value
+
+            # Helper function to get display name (filename fallback)
+            def get_display_name(invoice_data):
+                """Get display name for invoice - use filename if invoice number is missing"""
+                invoice_number = clean_field_value(invoice_data.get("rechnungsnummer"))
+                if invoice_number == 'Nicht eingegeben' and invoice_data.get("file_path"):
+                    # Extract filename from file_path
+                    filename = invoice_data["file_path"].split("/")[-1]
+                    # Remove file extension for cleaner display
+                    if filename.endswith('.pdf'):
+                        filename = filename[:-4]
+                    return filename
+                return invoice_number if invoice_number != 'Nicht eingegeben' else 'Rechnung ohne Nummer'
+
             # Prepare template context
             context = {
                 "recipient_name": recipient_name or recipient_email.split("@")[0],
                 "recipient_email": recipient_email,
                 "timestamp": datetime.now().isoformat(),
                 "request_id": request_id or "N/A",
-                "invoice_number": invoice_data.get("rechnungsnummer"),
-                "supplier_name": invoice_data.get("lieferant"),
-                "invoice_date": invoice_data.get("rechnungsdatum"),
+                "invoice_number": clean_field_value(invoice_data.get("rechnungsnummer")),
+                "invoice_display_name": get_display_name(invoice_data),
+                "supplier_name": clean_field_value(invoice_data.get("lieferant")),
+                "invoice_date": clean_field_value(invoice_data.get("rechnungsdatum")),
                 "total_amount": total_amount,
                 "currency": invoice_data.get("currency", "EUR"),
                 "skonto_datum": skonto_datum,
@@ -1262,7 +1327,7 @@ class EmailService:
             else:
                 urgency = "📋"
                 
-            subject = f"{urgency} Skonto-Erinnerung: {invoice_data.get('rechnungsnummer', 'Rechnung')} - {potential_savings} EUR sparen"
+            subject = f"{context['invoice_display_name']}"
             
             # Send email
             result = await self._send_email(
