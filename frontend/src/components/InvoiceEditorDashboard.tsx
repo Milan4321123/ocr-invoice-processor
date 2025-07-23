@@ -77,7 +77,7 @@ export default function InvoiceEditorDashboard({
       
       // Prepare editor information for email notification
       const editorInfo = {
-        editor_email: updatedFields.rechnungspruefung_email || "editor@company.de",
+        editor_email: updatedFields.rechnungspruefung_email ,
         editor_name: "Rechnung Bearbeiter",
         changes_summary: [
           {
