@@ -14,9 +14,9 @@ services:
       - ./logs:/app/logs
     environment:
       # Database Configuration (Supabase)
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_KEY=${SUPABASE_KEY}
-      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - SUPABASE_URL=${SUPA_URL}
+      - SUPABASE_KEY=${SUPA_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
       
       # Email Configuration
       - SENDGRID_API_KEY=${SENDGRID_API_KEY}

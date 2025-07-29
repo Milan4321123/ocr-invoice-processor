@@ -475,8 +475,13 @@ class FolderWatcherService:
         Returns (success, config_id, error_message)
         """
         try:
-            # Validate folder path
-            path = Path(folder_path)
+            # Validate folder path with better normalization
+            import os
+            
+            # Normalize the path to handle any path resolution issues
+            normalized_path = os.path.abspath(os.path.expanduser(folder_path))
+            path = Path(normalized_path)
+            
             if not path.exists():
                 return False, "", f"Folder does not exist: {folder_path}"
             
@@ -484,15 +489,17 @@ class FolderWatcherService:
                 return False, "", f"Path is not a directory: {folder_path}"
             
             # Check if folder is already being watched
+            resolved_path = str(path.resolve())
+            
             for config in self.watch_configs.values():
-                if config.folder_path == str(path.resolve()):
+                if config.folder_path == resolved_path:
                     return False, "", f"Folder is already being watched: {folder_path}"
             
             # Create watch configuration
             config_id = str(uuid.uuid4())
             watch_config = WatchConfig(
                 id=config_id,
-                folder_path=str(path.resolve()),
+                folder_path=resolved_path,
                 pattern=pattern,
                 enabled=enabled,
                 recursive=recursive
