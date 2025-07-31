@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getApiUrl } from '@/config/api';
 
 export async function GET(request: NextRequest) {
   try {
-    const apiUrl = getApiUrl();
-    const response = await fetch(`${apiUrl}/api/system-health`);
+    // Get backend URL with fallback
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || process.env.INTERNAL_API_URL || 'http://localhost:8000';
+    const apiUrl = `${backendUrl}/api/system-health`;
+    
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
     
     if (!response.ok) {
       throw new Error(`Backend responded with ${response.status}: ${response.statusText}`);
