@@ -81,12 +81,21 @@ USE_MOCK_STORAGE=true
 # =====================================================================
 # BUSINESS CONFIGURATION
 # =====================================================================
-# Skonto (Early Payment Discount) Configuration
-SKONTO_DEFAULT_RECIPIENT=finance@yourcompany.com
-
 # Company Information
 COMPANY_NAME=Your Company Name
 COMPANY_EMAIL=info@yourcompany.com
+
+# Default Email Addresses (used as fallbacks)
+ADMIN_EMAIL=admin@yourcompany.com
+DEFAULT_ADMIN_EMAIL=admin@yourcompany.com
+DEFAULT_EDITOR_EMAIL=editor@yourcompany.com
+SKONTO_DEFAULT_RECIPIENT=finance@yourcompany.com
+
+# Demo/Test Email Addresses (for demo scripts)
+DEMO_FINANCE_EMAIL=finance@yourcompany.com
+DEMO_MANAGER_EMAIL=manager@yourcompany.com
+DEMO_EDITOR_EMAIL=editor@yourcompany.com
+DEMO_ADMIN_EMAIL=admin@yourcompany.com
 
 # =====================================================================
 # ENVIRONMENT SETTINGS

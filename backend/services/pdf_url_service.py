@@ -11,7 +11,7 @@ class PDFUrlService:
     
     def __init__(self):
         self.use_mock_storage = os.getenv("USE_MOCK_STORAGE", "false").lower() == "true"
-        self.supabase_url = os.getenv("SUPA_URL", "https://your-project.supabase.co")
+        self.supabase_url = os.getenv("SUPA_URL")
         self.api_base_url = os.getenv("API_BASE_URL", "")
     
     def get_pdf_url(self, file_path: str) -> str:

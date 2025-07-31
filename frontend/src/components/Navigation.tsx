@@ -115,7 +115,7 @@ const Navigation = () => {
                 </div>
                 <div className="hidden lg:block text-left">
                   <p className="text-sm font-medium">{user?.full_name || user?.username || 'Admin User'}</p>
-                  <p className="text-xs text-gray-500">{user?.email || 'user@company.com'}</p>
+                  <p className="text-xs text-gray-500">{user?.email || 'user@yourcompany.com'}</p>
                 </div>
                 <ChevronDown className="h-4 w-4 text-gray-500 hidden lg:block" />
               </button>
@@ -190,7 +190,7 @@ const Navigation = () => {
               
               <div className="px-4 py-2">
                 <p className="text-sm font-medium text-gray-700">{user?.full_name || user?.username || 'Admin User'}</p>
-                <p className="text-xs text-gray-500">{user?.email || 'user@company.com'}</p>
+                <p className="text-xs text-gray-500">{user?.email || 'user@yourcompany.com'}</p>
               </div>
               
               <Link

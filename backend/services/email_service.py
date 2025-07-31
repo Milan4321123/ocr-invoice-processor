@@ -47,7 +47,7 @@ class EmailService:
         self.smtp_port = int(os.getenv("SMTP_PORT", 587))
         self.smtp_username = os.getenv("SMTP_USERNAME")
         self.smtp_password = os.getenv("SMTP_PASSWORD")
-        self.from_email = os.getenv("FROM_EMAIL", "noreply@company.com")
+        self.from_email = os.getenv("FROM_EMAIL")
         self.from_name = os.getenv("FROM_NAME", "Invoice System")
         self.jwt_secret = os.getenv("JWT_SECRET", "your-secure-jwt-secret")
         self.base_url = os.getenv("BASE_URL", "http://localhost:8001")

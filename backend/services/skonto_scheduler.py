@@ -24,7 +24,7 @@ class SkontoReminderConfig:
     days_ahead_normal: int = 3     # Send normal reminders 3 days before
     days_ahead_early: int = 7      # Send early reminders 7 days before
     max_reminders_per_run: int = 50  # Limit batch size
-    default_recipient_email: str = "finance@company.com"
+    default_recipient_email: str = None
     dry_run: bool = False  # For testing without actually sending emails
 
 class SkontoSchedulerService:
@@ -55,7 +55,7 @@ class SkontoSchedulerService:
         self.config.days_ahead_normal = int(os.getenv("SKONTO_DAYS_AHEAD_NORMAL", "3"))
         self.config.days_ahead_early = int(os.getenv("SKONTO_DAYS_AHEAD_EARLY", "7"))
         self.config.max_reminders_per_run = int(os.getenv("SKONTO_MAX_REMINDERS_PER_RUN", "50"))
-        self.config.default_recipient_email = os.getenv("SKONTO_DEFAULT_RECIPIENT", "finance@company.com")
+        self.config.default_recipient_email = os.getenv("SKONTO_DEFAULT_RECIPIENT")
         self.config.dry_run = os.getenv("SKONTO_DRY_RUN", "false").lower() == "true"
         
         logger.info(f"📋 Skonto Scheduler Config: {self.config}")

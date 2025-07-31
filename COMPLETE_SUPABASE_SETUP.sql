@@ -242,7 +242,7 @@ INSERT INTO users (username, hashed_password, email, full_name, is_active)
 VALUES (
   'admin',
   '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/lewYGANtV.0B3GbVC', -- admin123
-  'admin@company.com',
+      'admin@yourcompany.com',
   'System Administrator',
   true
 ) ON CONFLICT (username) DO NOTHING;

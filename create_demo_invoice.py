@@ -5,6 +5,7 @@ Create Demo Invoice with Skonto for Testing Re-send and Re-update Features
 
 import requests
 import json
+import os
 from datetime import datetime, timedelta
 
 def main():
@@ -46,14 +47,14 @@ def main():
                 "skonto_prozent": 3.0,
                 "skonto_datum": skonto_date.strftime('%Y-%m-%d'),
                 "zahlungsziel": 30,
-                "rechnungspruefung_email": "finance@company.com",
-                "bauleiter_email": "manager@company.com",
+                        "rechnungspruefung_email": os.getenv("DEMO_FINANCE_EMAIL", "finance@yourcompany.com"),
+        "bauleiter_email": os.getenv("DEMO_MANAGER_EMAIL", "manager@yourcompany.com"),
                 "projekt": "DEMO_PROJECT",
                 "gewerk": "ELEKTRO",
                 "status": "uploaded"
             },
             "editor_info": {
-                "editor_email": "editor@company.com",
+                "editor_email": os.getenv("DEMO_EDITOR_EMAIL", "editor@yourcompany.com"),
                 "editor_name": "Demo User",
                 "changes_summary": [{
                     "field": "all_fields",
@@ -86,7 +87,7 @@ def main():
         # 4. Test sending a reminder (this should work now even with decision made)
         print("📧 Testing reminder sending...")
         reminder_data = {
-            "recipient_email": "admin@company.com",
+            "recipient_email": os.getenv("DEMO_ADMIN_EMAIL", "admin@yourcompany.com"),
             "reminder_type": "skonto_reminder"
         }
         response = requests.post(f"{base_url}/api/invoices/{invoice_id}/send-skonto-reminder", json=reminder_data)

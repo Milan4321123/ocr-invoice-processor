@@ -2,14 +2,14 @@
 """
 Create admin user in production Supabase database
 """
-import os
 import asyncio
+import os
 from datetime import datetime
 from supabase import create_client
 
 # Supabase configuration (use your production values)
-SUPABASE_URL = "https://your-project.supabase.co"
-SUPABASE_SERVICE_ROLE_KEY = "your-service-role-key-here"
+SUPABASE_URL = os.getenv("SUPA_URL")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPA_SERVICE_ROLE_KEY")
 
 async def create_admin_user():
     try:
@@ -20,7 +20,7 @@ async def create_admin_user():
         admin_data = {
             "username": "admin",
             "hashed_password": "$2b$12$H15JMkrTvK9XJpGPahX9fu7BZ/wS6Au69fPRLLBpYksvTAurKspWO",
-            "email": "admin@company.com",
+            "email": os.getenv("ADMIN_EMAIL", "admin@yourcompany.com"),
             "full_name": "Administrator",
             "is_active": True,
             "created_at": datetime.now().isoformat(),
