@@ -1,18 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { buildApiUrl, API_CONFIG } from '@/config/api';
 
 export async function GET(request: NextRequest) {
   try {
+    // Extract query parameters
     const { searchParams } = new URL(request.url);
-    const urgency = searchParams.get('urgency') || 'all';
-    const limit = searchParams.get('limit') || '100';
+    const queryParams = new URLSearchParams(searchParams);
     
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    
-    const queryParams = new URLSearchParams();
-    if (urgency) queryParams.append('urgency', urgency);
-    if (limit) queryParams.append('limit', limit);
-    
-    const response = await fetch(`${apiUrl}/api/skonto/dashboard/opportunities?${queryParams.toString()}`, {
+    const response = await fetch(`${buildApiUrl(API_CONFIG.ENDPOINTS.SKONTO.OPPORTUNITIES)}?${queryParams.toString()}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

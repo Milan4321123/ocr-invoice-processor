@@ -84,7 +84,7 @@ def main():
                 "status": "edited"
             },
             "editor_info": {
-                "editor_email": "enhanced.test@company.com",
+                "editor_email": "incognizant321@gmail.com",
                 "editor_name": "Enhanced Test User",
                 "changes_summary": [
                     {
@@ -145,7 +145,7 @@ def main():
             print("\n📧 Testing direct email notification endpoint...")
             email_data = {
                 "invoice_id": invoice_id,
-                "editor_email": "enhanced.test@company.com",
+                "editor_email": "incognizant321@gmail.com",
                 "editor_name": "Enhanced Test User",
                 "changes_summary": edit_data["editor_info"]["changes_summary"]
             }

@@ -43,33 +43,53 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const isAuthenticated = !!token && !!user;
 
-  // Load token from localStorage on mount - optimized
+  // Load token from localStorage on mount - optimized with better error handling
   useEffect(() => {
     try {
       const savedToken = localStorage.getItem('authToken');
       const savedUser = localStorage.getItem('authUser');
       
       if (savedToken && savedUser) {
-        setToken(savedToken);
-        setUser(JSON.parse(savedUser));
+        try {
+          const parsedUser = JSON.parse(savedUser);
+          // Validate that the parsed user has required fields
+          if (parsedUser.id && parsedUser.username) {
+            setToken(savedToken);
+            setUser(parsedUser);
+            console.log('✅ Restored auth from localStorage:', parsedUser.username);
+          } else {
+            console.warn('⚠️ Invalid user data in localStorage, clearing');
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('authUser');
+          }
+        } catch (parseError) {
+          console.error('❌ Error parsing saved user data:', parseError);
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('authUser');
+        }
       }
     } catch (error) {
-      console.error('Error loading saved auth data:', error);
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('authUser');
+      console.error('❌ Error accessing localStorage:', error);
+      // localStorage might not be available (SSR, private browsing, etc.)
     }
-    // No loading state needed - this is instant
   }, []);
 
   // Simplified redirect logic - only redirect if needed
   useEffect(() => {
     const isLoginPage = pathname === '/login';
     
-    if (!isAuthenticated && !isLoginPage) {
-      router.replace('/login');
-    } else if (isAuthenticated && isLoginPage) {
-      router.replace('/dashboard');
-    }
+    // Add a small delay to prevent race conditions during navigation
+    const timer = setTimeout(() => {
+      if (!isAuthenticated && !isLoginPage) {
+        console.log('🔄 Redirecting to login - not authenticated');
+        router.replace('/login');
+      } else if (isAuthenticated && isLoginPage) {
+        console.log('🔄 Redirecting to dashboard - already authenticated');
+        router.replace('/dashboard');
+      }
+    }, 100); // Small delay to allow authentication state to stabilize
+    
+    return () => clearTimeout(timer);
   }, [isAuthenticated, pathname, router]);
 
   const login = async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {

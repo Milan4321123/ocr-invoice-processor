@@ -209,7 +209,7 @@ class OCRInvoiceE2ETest:
                     "rechnungsnummer": "TEST-12345",
                     "lieferant": "Test Supplier GmbH",
                     "rechnungsbetrag": 1000.00,
-                    "rechnungspruefung_email": "test.reviewer@company.com",
+                    "rechnungspruefung_email": "incognizant321@gmail.com",
                     "projekt": "TEST_PROJECT",
                     "gewerk": "ELEKTRO"
                 }
@@ -217,7 +217,7 @@ class OCRInvoiceE2ETest:
                 save_data = {
                     "fields": updated_fields,
                     "editor_info": {
-                        "editor_email": "test.editor@company.com",
+                        "editor_email": "incognizant321@gmail.com",
                         "editor_name": "Test Editor",
                         "changes_summary": [
                             {
@@ -298,10 +298,10 @@ class OCRInvoiceE2ETest:
         try:
             completion_data = {
                 "fields": {
-                    "rechnungspruefung_email": "test.reviewer@company.com"
+                    "rechnungspruefung_email": "incognizant321@gmail.com"
                 },
                 "completion_info": {
-                    "completed_by": "test.editor@company.com",
+                    "completed_by": "incognizant321@gmail.com",
                     "completion_notes": "E2E test completion"
                 }
             }
@@ -313,10 +313,10 @@ class OCRInvoiceE2ETest:
                 
                 # Send to Bauleiter
                 bauleiter_data = {
-                    "bauleiter_email": "bauleiter@company.com",
-                    "sent_by": "test.user@company.com",
+                    "bauleiter_email": "incognizant321@gmail.com",
+                    "sent_by": "incognizant321@gmail.com",
                     "editor_name": "Test Editor",
-                    "editor_email": "test.editor@company.com"
+                    "editor_email": "incognizant321@gmail.com"
                 }
                 
                 response = self.make_request('POST', f'/api/invoices/{invoice_id}/send-to-bauleiter', json=bauleiter_data)
@@ -346,7 +346,7 @@ class OCRInvoiceE2ETest:
             "rechnungsbetrag": 2000.00,
             "skonto_prozent": 2.0,
             "skonto_datum": (datetime.now() + timedelta(days=14)).strftime('%Y-%m-%d'),
-            "rechnungspruefung_email": "test@company.com"
+            "rechnungspruefung_email": "incognizant321@gmail.com"
         }
         
         try:

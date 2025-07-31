@@ -3,7 +3,7 @@
  * Handles all API requests with automatic token management
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { API_CONFIG, buildApiUrl, getRequestConfig } from '@/config/api';
 
 export interface ApiResponse<T = any> {
   success?: boolean;
@@ -64,7 +64,7 @@ export class ApiClient {
       },
     };
 
-    const response = await fetch(`${API_BASE}${endpoint}`, config);
+    const response = await fetch(buildApiUrl(endpoint), config);
     return this.handleResponse<T>(response);
   }
 
@@ -94,7 +94,7 @@ export class ApiClient {
   public async postFormData<T = any>(endpoint: string, formData: FormData): Promise<T> {
     const token = this.getAuthToken();
     
-    const response = await fetch(`${API_BASE}${endpoint}`, {
+    const response = await fetch(buildApiUrl(endpoint), {
       method: 'POST',
       headers: {
         ...(token && { Authorization: `Bearer ${token}` }),
@@ -112,7 +112,7 @@ export class ApiClient {
     formData.append('username', username);
     formData.append('password', password);
 
-    const response = await fetch(`${API_BASE}/api/auth/login`, {
+    const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.AUTH.LOGIN), {
       method: 'POST',
       body: formData,
     });
@@ -122,7 +122,7 @@ export class ApiClient {
 
   // Health check (no auth required)
   public async healthCheck(): Promise<any> {
-    const response = await fetch(`${API_BASE}/api/health`, {
+    const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.HEALTH), {
       method: 'GET',
     });
     return this.handleResponse(response);
@@ -141,22 +141,22 @@ export const api = {
   health: () => apiClient.healthCheck(),
   
   // Invoices
-  getInvoices: () => apiClient.get('/api/invoices'),
-  getInvoice: (id: string) => apiClient.get(`/api/invoices/${id}`),
-  updateInvoice: (id: string, data: any) => apiClient.put(`/api/invoices/${id}`, data),
-  completeInvoice: (id: string) => apiClient.post(`/api/invoices/${id}/complete`),
+  getInvoices: () => apiClient.get(API_CONFIG.ENDPOINTS.INVOICES.BASE),
+  getInvoice: (id: string) => apiClient.get(API_CONFIG.ENDPOINTS.INVOICES.BY_ID(id)),
+  updateInvoice: (id: string, data: any) => apiClient.put(API_CONFIG.ENDPOINTS.INVOICES.BY_ID(id), data),
+  completeInvoice: (id: string) => apiClient.post(API_CONFIG.ENDPOINTS.INVOICES.COMPLETE(id)),
   
   // Upload
   uploadFile: (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    return apiClient.postFormData('/api/upload', formData);
+    return apiClient.postFormData(API_CONFIG.ENDPOINTS.UPLOAD, formData);
   },
   
   // Dropdowns
-  getDropdowns: () => apiClient.get('/api/dropdowns/all'),
-  addDropdownOption: (data: any) => apiClient.post('/api/dropdowns/add-option', data),
+  getDropdowns: () => apiClient.get(API_CONFIG.ENDPOINTS.DROPDOWNS.ALL),
+  addDropdownOption: (data: any) => apiClient.post(API_CONFIG.ENDPOINTS.DROPDOWNS.ADD_OPTION, data),
   
   // Folder watcher
-  getFolderWatcherStatus: () => apiClient.get('/api/folder-watcher/status'),
+  getFolderWatcherStatus: () => apiClient.get(API_CONFIG.ENDPOINTS.FOLDER_WATCHER.STATUS),
 };

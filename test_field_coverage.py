@@ -39,14 +39,14 @@ def test_field_coverage():
         'mwst_satz': '19',
         'kontierung': 'K-4711',
         'bemerkungen': 'Test invoice with all fields',
-        'bauleiter_email': 'bauleiter@test.com',
-        'rechnungspruefung_email': 'pruefung@test.com',
+        'bauleiter_email': 'incognizant321@gmail.com',
+        'rechnungspruefung_email': 'incognizant321@gmail.com',
         'currency': 'EUR'
     }
     
     context = {
         'editor_name': 'Test Editor',
-        'editor_email': 'editor@test.com',
+        'editor_email': 'incognizant321@gmail.com',
         'completion_date': '15.01.2025 um 10:30',
         'timestamp': '2025-01-15T10:30:00',
         'request_id': 'test-req-123',

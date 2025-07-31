@@ -381,125 +381,29 @@ const CleanInvoiceForm: React.FC<CleanInvoiceFormProps> = ({
 
   return (
     <div className={`h-full flex flex-col ${className}`}>
-      {/* Header with Save Buttons */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex justify-between items-center">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">Rechnungsdetails</h3>
-            <p className="text-sm text-gray-500 mt-1">Füllen Sie die Rechnungsinformationen unten aus</p>
-          </div>
-          
-          {/* Top-right Action Buttons */}
-          <div className="flex items-center gap-3">
-            {/* Pending Changes Indicator */}
-            {pendingChanges.length > 0 && (
-              <button
-                onClick={() => setShowPendingChangesDetails(!showPendingChangesDetails)}
-                className="flex items-center gap-2 px-3 py-2 bg-yellow-50 border border-yellow-200 rounded-lg hover:bg-yellow-100 transition-colors cursor-pointer"
-                title="Klicken um Details zu sehen"
-              >
-                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
-                <span className="text-sm font-medium text-yellow-700">
-                  {pendingChanges.length} ausstehende Änderung{pendingChanges.length !== 1 ? 'en' : ''}
-                </span>
-                <svg 
-                  className={`w-4 h-4 text-yellow-600 transition-transform ${showPendingChangesDetails ? 'rotate-180' : ''}`} 
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-            )}
-            
-            {/* Dropdown Changes Save Button */}
-            <button
-              onClick={showSaveConfirmationDialog}
-              disabled={isCommittingChanges || pendingChanges.length === 0}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                pendingChanges.length > 0 
-                  ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg' 
-                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-              }`}
+      {/* Only Pending Changes Indicator - Floating */}
+      {pendingChanges.length > 0 && (
+        <div className="absolute top-4 right-4 z-10">
+          <button
+            onClick={() => setShowPendingChangesDetails(!showPendingChangesDetails)}
+            className="flex items-center gap-2 px-3 py-1 bg-yellow-50 border border-yellow-200 rounded-lg hover:bg-yellow-100 transition-colors cursor-pointer shadow-lg"
+            title="Klicken um Details zu sehen"
+          >
+            <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+            <span className="text-sm font-medium text-yellow-700">
+              {pendingChanges.length}
+            </span>
+            <svg 
+              className={`w-4 h-4 text-yellow-600 transition-transform ${showPendingChangesDetails ? 'rotate-180' : ''}`} 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
             >
-              {isCommittingChanges ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span>Wird gespeichert...</span>
-                </>
-              ) : (
-                <>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                  </svg>
-                  <span>Dropdown-Änderungen speichern</span>
-                </>
-              )}
-            </button>
-
-            {/* Main Invoice Save Button */}
-            <button
-              onClick={handleSave}
-              disabled={isSaving || isCompleting || !fields.rechnungspruefung_email?.trim()}
-              className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium shadow-md hover:shadow-lg transition-all duration-200 ${
-                !fields.rechnungspruefung_email?.trim()
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-green-600 hover:bg-green-700 text-white'
-              } disabled:bg-gray-400`}
-              title={!fields.rechnungspruefung_email?.trim() ? 'E-Mail-Adresse erforderlich' : ''}
-            >
-              {isSaving ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span>Rechnung wird gespeichert...</span>
-                </>
-              ) : (
-                <>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span>Rechnung speichern</span>
-                  {!fields.rechnungspruefung_email?.trim() && (
-                    <span className="text-xs opacity-75">(E-Mail erforderlich)</span>
-                  )}
-                </>
-              )}
-            </button>
-
-            {/* Complete Invoice Button */}
-            {onComplete && (
-              <button
-                onClick={handleComplete}
-                disabled={isSaving || isCompleting || !fields.rechnungspruefung_email?.trim()}
-                className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium shadow-md hover:shadow-lg transition-all duration-200 ${
-                  !fields.rechnungspruefung_email?.trim()
-                    ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white'
-                } disabled:bg-gray-400`}
-                title={!fields.rechnungspruefung_email?.trim() ? 'E-Mail-Adresse erforderlich' : ''}
-              >
-                {isCompleting ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Wird abgeschlossen...</span>
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>Bearbeitung abschließen</span>
-                    {!fields.rechnungspruefung_email?.trim() && (
-                      <span className="text-xs opacity-75">(E-Mail erforderlich)</span>
-                    )}
-                  </>
-                )}
-              </button>
-            )}
-          </div>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
         </div>
-      </div>
+      )}
 
       {/* Pending Changes Details Panel */}
       {pendingChanges.length > 0 && showPendingChangesDetails && (
@@ -628,8 +532,10 @@ const CleanInvoiceForm: React.FC<CleanInvoiceFormProps> = ({
         </div>
       )}
 
-      {/* Form Content - Scrollable */}
-      <div className="flex-1 overflow-y-auto bg-gray-50">
+      {/* Form Content - Full Height Scrollable */}
+      <div 
+        className="flex-1 overflow-y-auto bg-gray-50 relative pb-24"
+      >
         <div className="p-6">
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             
@@ -848,6 +754,18 @@ const CleanInvoiceForm: React.FC<CleanInvoiceFormProps> = ({
                   Bitte geben Sie eine gültige E-Mail-Adresse ein
                 </p>
               )}
+              
+              {/* Highlighted warning to prevent email mistakes and SendGrid bounce issues */}
+              <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm font-semibold text-yellow-800 flex items-center gap-2">
+                  <span className="text-lg">⚠️</span>
+                  Wichtiger Hinweis zur E-Mail-Adresse
+                </p>
+                <p className="text-xs text-yellow-700 mt-1">
+                  Bitte geben Sie eine <strong>korrekte E-Mail-Adresse</strong> ein. Diese wird für alle Erinnerungen und Benachrichtigungen verwendet. 
+                  Falsche E-Mail-Adressen führen zu fehlgeschlagenen Zustellungen.
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -871,6 +789,101 @@ const CleanInvoiceForm: React.FC<CleanInvoiceFormProps> = ({
             </button>
           </div>
         )}
+
+        {/* Static Action Bar at Bottom */}
+        <div className="mt-8 pt-6 border-t border-gray-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {/* Status Indicators */}
+              {!fields.rechnungspruefung_email?.trim() && (
+                <div className="flex items-center gap-2 px-2 py-1 bg-red-50 border border-red-200 rounded text-red-700 text-xs">
+                  <svg className="w-3 h-3 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  <span className="font-medium">E-Mail erforderlich</span>
+                </div>
+              )}
+            </div>
+            
+            {/* Compact Action Buttons */}
+            <div className="flex items-center gap-2">
+              {/* Dropdown Changes Save Button */}
+              {pendingChanges.length > 0 && (
+                <button
+                  onClick={showSaveConfirmationDialog}
+                  disabled={isCommittingChanges}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium transition-all duration-300 bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {isCommittingChanges ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Speichern...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      </svg>
+                      <span>Dropdown-Änderungen ({pendingChanges.length})</span>
+                    </>
+                  )}
+                </button>
+              )}
+
+              {/* Main Invoice Save Button */}
+              <button
+                onClick={handleSave}
+                disabled={isSaving || isCompleting || !fields.rechnungspruefung_email?.trim()}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium transition-all duration-300 ${
+                  !fields.rechnungspruefung_email?.trim()
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-green-600 hover:bg-green-700 text-white'
+                } disabled:bg-gray-400`}
+              >
+                {isSaving ? (
+                  <>
+                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Speichern...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Rechnung speichern</span>
+                  </>
+                )}
+              </button>
+
+              {/* Complete Invoice Button */}
+              {onComplete && (
+                <button
+                  onClick={handleComplete}
+                  disabled={isSaving || isCompleting || !fields.rechnungspruefung_email?.trim()}
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium transition-all duration-300 ${
+                    !fields.rechnungspruefung_email?.trim()
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  } disabled:bg-gray-400`}
+                >
+                  {isCompleting ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Abschließen...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>Bearbeitung abschließen</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
           </div>
         </div>
       </div>

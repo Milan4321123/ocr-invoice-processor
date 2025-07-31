@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
   Home,
   LayoutDashboard, 
@@ -36,16 +36,16 @@ const Navigation = () => {
   };
 
   const navItems = [
-    { href: '/', label: 'Home', icon: Home },
+    { href: '/', label: 'Startseite', icon: Home },
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/upload', label: 'Upload', icon: Upload },
-    { href: '/dashboard/folder-watcher', label: 'Folder Watcher', icon: FolderOpen },
+    { href: '/upload', label: 'Hochladen', icon: Upload },
+    { href: '/dashboard/folder-watcher', label: 'Ordnerüberwachung', icon: FolderOpen },
     { href: '/prufbericht', label: 'Prüfbericht', icon: BarChart3 },
-    { href: '/health', label: 'Health', icon: Activity },
+    { href: '/health', label: 'Systemstatus', icon: Activity },
   ];
 
   const isActiveRoute = (href: string) => {
-    return pathname === href || pathname.startsWith(href + '/');
+    return pathname === href || pathname?.startsWith(href + '/');
   };
 
   return (
@@ -115,7 +115,7 @@ const Navigation = () => {
                 </div>
                 <div className="hidden lg:block text-left">
                   <p className="text-sm font-medium">{user?.full_name || user?.username || 'Admin User'}</p>
-                  <p className="text-xs text-gray-500">{user?.email || 'admin@company.com'}</p>
+                  <p className="text-xs text-gray-500">{user?.email || 'incognizant321@gmail.com'}</p>
                 </div>
                 <ChevronDown className="h-4 w-4 text-gray-500 hidden lg:block" />
               </button>
@@ -128,14 +128,14 @@ const Navigation = () => {
                     className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-white/50 transition-colors"
                   >
                     <User className="h-4 w-4 mr-3" />
-                    Profile Settings
+                    Profil Einstellungen
                   </Link>
                   <Link
                     href="/settings"
                     className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-white/50 transition-colors"
                   >
                     <Settings className="h-4 w-4 mr-3" />
-                    System Settings
+                    System Einstellungen
                   </Link>
                   <hr className="my-2 border-gray-200" />
                   <button 
@@ -143,7 +143,7 @@ const Navigation = () => {
                     className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
                   >
                     <LogOut className="h-4 w-4 mr-3" />
-                    Sign Out
+                    Abmelden
                   </button>
                 </div>
               )}
@@ -190,7 +190,7 @@ const Navigation = () => {
               
               <div className="px-4 py-2">
                 <p className="text-sm font-medium text-gray-700">{user?.full_name || user?.username || 'Admin User'}</p>
-                <p className="text-xs text-gray-500">{user?.email || 'admin@company.com'}</p>
+                <p className="text-xs text-gray-500">{user?.email || 'incognizant321@gmail.com'}</p>
               </div>
               
               <Link
@@ -199,7 +199,7 @@ const Navigation = () => {
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 <User className="h-4 w-4" />
-                <span>Profile Settings</span>
+                <span>Profil Einstellungen</span>
               </Link>
               
               <Link
@@ -208,7 +208,7 @@ const Navigation = () => {
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 <Settings className="h-4 w-4" />
-                <span>System Settings</span>
+                <span>System Einstellungen</span>
               </Link>
               
               <button 
@@ -216,7 +216,7 @@ const Navigation = () => {
                 className="flex items-center space-x-3 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
               >
                 <LogOut className="h-4 w-4" />
-                <span>Sign Out</span>
+                <span>Abmelden</span>
               </button>
             </div>
           </div>

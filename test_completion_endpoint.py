@@ -28,11 +28,11 @@ def test_completion_endpoint():
                 # Test completion with editor info
                 completion_data = {
                     "completion_info": {
-                        "completed_by": "test_editor@example.com",
+                        "completed_by": "incognizant321@gmail.com",
                         "completion_notes": "Test completion for context-aware emails"
                     },
                     "editor_info": {
-                        "editor_email": "test_editor@example.com",
+                        "editor_email": "incognizant321@gmail.com",
                         "editor_name": "Test Editor",
                         "changes_summary": [
                             {

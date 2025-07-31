@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { AlertCircle, TrendingUp, Clock, CheckCircle, XCircle, Filter, Download, RefreshCw, Mail, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { AlertCircle, TrendingUp, Clock, CheckCircle, XCircle, Filter, Download, RefreshCw, Mail, ThumbsUp, ThumbsDown, Settings, Play, Pause, Zap, Timer } from 'lucide-react';
 
 interface SkontoMetrics {
   totalInvoices: number;
@@ -26,9 +26,23 @@ interface SkontoInvoice {
   reminderSent?: boolean;
 }
 
+interface SchedulerStatus {
+  enabled: boolean;
+  is_running: boolean;
+  stats: {
+    total_runs: number;
+    total_reminders_sent: number;
+    total_errors: number;
+    last_error: string | null;
+  };
+  last_run: string | null;
+  next_run: string | null;
+}
+
 export default function PrufberichtPage() {
   const [metrics, setMetrics] = useState<SkontoMetrics | null>(null);
   const [invoices, setInvoices] = useState<SkontoInvoice[]>([]);
+  const [schedulerStatus, setSchedulerStatus] = useState<SchedulerStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -40,9 +54,10 @@ export default function PrufberichtPage() {
       setLoading(true);
       
       // Fetch real data from Skonto API endpoints
-      const [metricsResponse, opportunitiesResponse] = await Promise.all([
+      const [metricsResponse, opportunitiesResponse, schedulerResponse] = await Promise.all([
         fetch('/api/skonto/dashboard/summary'),
-        fetch('/api/skonto/dashboard/opportunities?urgency=all&limit=200') // Max limit is 200
+        fetch('/api/skonto/dashboard/opportunities?urgency=all&limit=200'), // Max limit is 200
+        fetch('/api/skonto/scheduler/status')
       ]);
 
       if (!metricsResponse.ok || !opportunitiesResponse.ok) {
@@ -51,6 +66,13 @@ export default function PrufberichtPage() {
 
       const metricsData = await metricsResponse.json();
       const opportunitiesData = await opportunitiesResponse.json();
+      
+      // Fetch scheduler status (non-critical)
+      let schedulerData = null;
+      if (schedulerResponse.ok) {
+        const schedulerResult = await schedulerResponse.json();
+        schedulerData = schedulerResult.scheduler_status;
+      }
 
       console.log('📊 Metrics data:', metricsData);
       console.log('📋 Opportunities data:', opportunitiesData);
@@ -108,6 +130,7 @@ export default function PrufberichtPage() {
 
       setMetrics(transformedMetrics);
       setInvoices(transformedInvoices);
+      setSchedulerStatus(schedulerData);
       setError(null);
       
     } catch (error) {
@@ -241,7 +264,7 @@ export default function PrufberichtPage() {
           <div className="glass-card p-8 text-center animate-pulse rounded-xl border shadow">
             <div className="flex items-center justify-center space-x-2">
               <RefreshCw className="h-6 w-6 animate-spin text-purple-600" />
-              <span className="text-lg font-medium text-gray-700">Loading Skonto Report...</span>
+              <span className="text-lg font-medium text-gray-700">Lade Skonto-Bericht...</span>
             </div>
           </div>
         </div>
@@ -259,13 +282,13 @@ export default function PrufberichtPage() {
         <div className="flex items-center justify-center min-h-screen">
           <div className="glass-card p-8 text-center max-w-md rounded-xl border shadow">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-800 mb-2">Error Loading Report</h2>
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">Fehler beim Laden des Berichts</h2>
             <p className="text-gray-600 mb-4">{error}</p>
             <button 
               onClick={() => window.location.reload()} 
               className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
             >
-              Try Again
+              Erneut versuchen
             </button>
           </div>
         </div>
@@ -292,113 +315,39 @@ export default function PrufberichtPage() {
                     Skonto Prüfbericht
                   </h1>
                   <p className="text-gray-600">
-                    Comprehensive analysis of discount opportunities and performance
+                    Umfassende Analyse von Skonto-Möglichkeiten und Leistung
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2 mt-4 md:mt-0">
                   <span className="inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-semibold bg-gradient-to-r from-green-100 to-green-200 text-green-700 border border-green-300">
                     <TrendingUp className="h-3 w-3 mr-1" />
-                    Real-time Analytics
+                    Echtzeit-Analysen
                   </span>
                   <span className="inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-semibold bg-gradient-to-r from-blue-100 to-blue-200 text-blue-700 border border-blue-300">
                     <Clock className="h-3 w-3 mr-1" />
-                    Auto-updated
+                    Automatisch aktualisiert
                   </span>
+                  {/* Scheduler Status Indicator */}
+                  {schedulerStatus && (
+                    <span className={`inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-semibold border ${
+                      schedulerStatus.enabled && schedulerStatus.is_running
+                        ? 'bg-gradient-to-r from-green-100 to-green-200 text-green-700 border-green-300'
+                        : 'bg-gradient-to-r from-red-100 to-red-200 text-red-700 border-red-300'
+                    }`}>
+                      {schedulerStatus.enabled && schedulerStatus.is_running ? (
+                        <Play className="h-3 w-3 mr-1" />
+                      ) : (
+                        <Pause className="h-3 w-3 mr-1" />
+                      )}
+                      Reminder Scheduler {schedulerStatus.enabled && schedulerStatus.is_running ? 'Active' : 'Inactive'}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Metrics Section */}
-          {metrics && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
-              <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">
-                <div className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600 mb-1">Total Invoices</p>
-                      <p className="text-2xl font-bold text-gray-900">{metrics.totalInvoices.toLocaleString()}</p>
-                    </div>
-                    <div className="h-12 w-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-                      <AlertCircle className="h-6 w-6 text-white" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">
-                <div className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600 mb-1">Total Skonto</p>
-                      <p className="text-2xl font-bold text-gray-900">€{metrics.totalSkontoAmount.toLocaleString()}</p>
-                    </div>
-                    <div className="h-12 w-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
-                      <TrendingUp className="h-6 w-6 text-white" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">
-                <div className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600 mb-1">Captured</p>
-                      <p className="text-2xl font-bold text-green-600">€{metrics.capturedSkonto.toLocaleString()}</p>
-                    </div>
-                    <div className="h-12 w-12 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center">
-                      <CheckCircle className="h-6 w-6 text-white" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">
-                <div className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600 mb-1">Missed</p>
-                      <p className="text-2xl font-bold text-red-600">€{metrics.missedSkonto.toLocaleString()}</p>
-                    </div>
-                    <div className="h-12 w-12 bg-gradient-to-r from-red-500 to-red-600 rounded-lg flex items-center justify-center">
-                      <XCircle className="h-6 w-6 text-white" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">
-                <div className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600 mb-1">Pending</p>
-                      <p className="text-2xl font-bold text-yellow-600">{metrics.pendingReview}</p>
-                    </div>
-                    <div className="h-12 w-12 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-lg flex items-center justify-center">
-                      <Clock className="h-6 w-6 text-white" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">
-                <div className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600 mb-1">Avg. Processing</p>
-                      <p className="text-2xl font-bold text-gray-900">{metrics.averageProcessingTime.toFixed(1)}d</p>
-                    </div>
-                    <div className="h-12 w-12 bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center">
-                      <Clock className="h-6 w-6 text-white" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Filters and Controls */}
+          {/* Filters and Controls - MOVED TO TOP */}
           <div className="glass-card border-0 shadow-lg mb-6 rounded-xl">
             <div className="p-6">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -435,8 +384,49 @@ export default function PrufberichtPage() {
             </div>
           </div>
 
-          {/* Invoices Table */}
-          <div className="glass-card border-0 shadow-xl rounded-xl">
+          {/* Scheduler Statistics */}
+          {schedulerStatus && (
+            <div className="glass-card border-0 shadow-lg mb-6 rounded-xl">
+              <div className="p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Settings className="h-5 w-5 text-gray-600" />
+                  <h3 className="text-lg font-semibold text-gray-800">Automatic Reminder System</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="text-center p-3 bg-white/30 rounded-lg">
+                    <div className="text-lg font-bold text-gray-900">{schedulerStatus.stats.total_runs}</div>
+                    <div className="text-xs text-gray-600">Total Checks</div>
+                  </div>
+                  <div className="text-center p-3 bg-white/30 rounded-lg">
+                    <div className="text-lg font-bold text-green-600">{schedulerStatus.stats.total_reminders_sent}</div>
+                    <div className="text-xs text-gray-600">Reminders Sent</div>
+                  </div>
+                  <div className="text-center p-3 bg-white/30 rounded-lg">
+                    <div className="text-lg font-bold text-blue-600">
+                      {schedulerStatus.last_run ? new Date(schedulerStatus.last_run).toLocaleDateString() : 'Never'}
+                    </div>
+                    <div className="text-xs text-gray-600">Last Check</div>
+                  </div>
+                  <div className="text-center p-3 bg-white/30 rounded-lg">
+                    <div className="text-lg font-bold text-purple-600">
+                      {schedulerStatus.next_run ? new Date(schedulerStatus.next_run).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Not scheduled'}
+                    </div>
+                    <div className="text-xs text-gray-600">Next Check</div>
+                  </div>
+                </div>
+                {schedulerStatus.stats.total_errors > 0 && (
+                  <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="text-sm text-red-700">
+                      ⚠️ {schedulerStatus.stats.total_errors} error(s) detected. Check system logs.
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Invoices Table - MOVED TO TOP */}
+          <div className="glass-card border-0 shadow-xl rounded-xl mb-8">
             <div className="border-b border-white/20 p-6">
               <h3 className="text-xl font-semibold text-gray-800">
                 Skonto Invoice Details ({filteredInvoices.length} invoices)
@@ -501,57 +491,50 @@ export default function PrufberichtPage() {
                             {invoice.reminderSent ? 'Sent' : 'Not Sent'}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <div className="flex space-x-2">
-                            {/* Send Reminder Button */}
-                            <button 
-                              onClick={() => handleSendReminder(invoice.id)}
-                              disabled={actionLoading === invoice.id}
-                              className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-md transition-colors ${
-                                invoice.reminderSent 
-                                  ? 'text-green-600 bg-green-50 border border-green-200' 
-                                  : 'text-blue-600 bg-blue-50 hover:bg-blue-100 hover:text-blue-700'
-                              } disabled:opacity-50 disabled:cursor-not-allowed`}
-                              title={invoice.reminderSent ? "Reminder already sent" : "Send Skonto Reminder"}
-                            >
-                              <Mail className="h-3 w-3 mr-1" />
-                              {invoice.reminderSent ? 'Sent' : 'Reminder'}
-                            </button>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            {invoice.status === 'pending' && !invoice.reminderSent && (
+                              <button
+                                onClick={() => handleSendReminder(invoice.id)}
+                                disabled={actionLoading === invoice.id}
+                                className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg px-3 py-1 rounded-md text-xs font-medium transition-colors inline-flex items-center gap-1 disabled:opacity-50"
+                              >
+                                {actionLoading === invoice.id ? (
+                                  <RefreshCw className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Mail className="h-3 w-3" />
+                                )}
+                                Send Reminder
+                              </button>
+                            )}
                             
-                            {/* Mark as Taken Button */}
-                            <button 
-                              onClick={() => handleMarkAsTaken(invoice.id)}
-                              disabled={actionLoading === invoice.id}
-                              className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-md transition-colors ${
-                                invoice.status === 'captured'
-                                  ? 'text-green-800 bg-green-200 border border-green-300 cursor-default'
-                                  : 'text-green-600 bg-green-50 hover:bg-green-100 hover:text-green-700'
-                              } disabled:opacity-50 disabled:cursor-not-allowed`}
-                              title={invoice.status === 'captured' ? "Already marked as taken" : "Mark Skonto as Taken"}
-                            >
-                              <ThumbsUp className="h-3 w-3 mr-1" />
-                              {invoice.status === 'captured' ? 'Captured' : 'Take'}
-                            </button>
-                            
-                            {/* Mark as Missed Button */}
-                            <button 
-                              onClick={() => handleMarkAsMissed(invoice.id)}
-                              disabled={actionLoading === invoice.id}
-                              className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-md transition-colors ${
-                                invoice.status === 'missed'
-                                  ? 'text-red-800 bg-red-200 border border-red-300 cursor-default'
-                                  : 'text-red-600 bg-red-50 hover:bg-red-100 hover:text-red-700'
-                              } disabled:opacity-50 disabled:cursor-not-allowed`}
-                              title={invoice.status === 'missed' ? "Already marked as missed" : "Mark Skonto as Missed"}
-                            >
-                              <ThumbsDown className="h-3 w-3 mr-1" />
-                              {invoice.status === 'missed' ? 'Missed' : 'Miss'}
-                            </button>
-                            
-                            {actionLoading === invoice.id && (
-                              <div className="inline-flex items-center px-2 py-1">
-                                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-purple-600"></div>
-                              </div>
+                            {(invoice.status === 'pending' || invoice.status === 'expired') && (
+                              <>
+                                <button
+                                  onClick={() => handleMarkAsTaken(invoice.id)}
+                                  disabled={actionLoading === invoice.id}
+                                  className="bg-green-600 hover:bg-green-700 text-white shadow-lg px-3 py-1 rounded-md text-xs font-medium transition-colors inline-flex items-center gap-1 disabled:opacity-50"
+                                >
+                                  {actionLoading === invoice.id ? (
+                                    <RefreshCw className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <ThumbsUp className="h-3 w-3" />
+                                  )}
+                                  Taken
+                                </button>
+                                <button
+                                  onClick={() => handleMarkAsMissed(invoice.id)}
+                                  disabled={actionLoading === invoice.id}
+                                  className="bg-red-600 hover:bg-red-700 text-white shadow-lg px-3 py-1 rounded-md text-xs font-medium transition-colors inline-flex items-center gap-1 disabled:opacity-50"
+                                >
+                                  {actionLoading === invoice.id ? (
+                                    <RefreshCw className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <ThumbsDown className="h-3 w-3" />
+                                  )}
+                                  Missed
+                                </button>
+                              </>
                             )}
                           </div>
                         </td>
@@ -560,16 +543,96 @@ export default function PrufberichtPage() {
                   </tbody>
                 </table>
               </div>
-              
-              {filteredInvoices.length === 0 && (
-                <div className="text-center py-12">
-                  <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No invoices found</h3>
-                  <p className="text-gray-500">Try adjusting your search criteria or filters.</p>
-                </div>
-              )}
             </div>
           </div>
+
+          {/* Metrics Section - MOVED BELOW TABLE */}
+          {metrics && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
+              <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">                  <div className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600 mb-1">Rechnungen gesamt</p>
+                        <p className="text-2xl font-bold text-gray-900">{metrics.totalInvoices.toLocaleString()}</p>
+                      </div>
+                      <div className="h-12 w-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                        <AlertCircle className="h-6 w-6 text-white" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">
+                  <div className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600 mb-1">Skonto gesamt</p>
+                        <p className="text-2xl font-bold text-gray-900">€{metrics.totalSkontoAmount.toLocaleString()}</p>
+                      </div>
+                      <div className="h-12 w-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
+                        <TrendingUp className="h-6 w-6 text-white" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">
+                  <div className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600 mb-1">Erfasst</p>
+                        <p className="text-2xl font-bold text-green-600">€{metrics.capturedSkonto.toLocaleString()}</p>
+                      </div>
+                      <div className="h-12 w-12 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+                        <CheckCircle className="h-6 w-6 text-white" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">
+                  <div className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600 mb-1">Verpasst</p>
+                        <p className="text-2xl font-bold text-red-600">€{metrics.missedSkonto.toLocaleString()}</p>
+                      </div>
+                      <div className="h-12 w-12 bg-gradient-to-r from-red-500 to-red-600 rounded-lg flex items-center justify-center">
+                        <XCircle className="h-6 w-6 text-white" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">
+                  <div className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600 mb-1">Ausstehend</p>
+                        <p className="text-2xl font-bold text-yellow-600">{metrics.pendingReview}</p>
+                      </div>
+                      <div className="h-12 w-12 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-lg flex items-center justify-center">
+                        <Clock className="h-6 w-6 text-white" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 rounded-xl">
+                  <div className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600 mb-1">Ø Bearbeitung</p>
+                        <p className="text-2xl font-bold text-gray-900">{metrics.averageProcessingTime.toFixed(1)}T</p>
+                      </div>
+                      <div className="h-12 w-12 bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                        <Clock className="h-6 w-6 text-white" />
+                      </div>
+                    </div>
+                  </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -33,8 +33,9 @@ class DatabaseService:
     
     def _initialize_client(self):
         """Initialize the Supabase client using your .env credentials"""
-        url = os.getenv("SUPA_URL")
-        key = os.getenv("SUPA_KEY")
+        # Try multiple environment variable names for flexibility
+        url = os.getenv("SUPABASE_URL") or os.getenv("SUPA_URL")
+        key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPA_KEY")
         
         if url and key:
             try:
@@ -45,6 +46,7 @@ class DatabaseService:
                 self._client = None
         else:
             logger.warning("⚠️ Database credentials missing. Running in offline mode.")
+            logger.warning(f"Available env vars: SUPABASE_URL={bool(os.getenv('SUPABASE_URL'))}, SUPABASE_ANON_KEY={bool(os.getenv('SUPABASE_ANON_KEY'))}, SUPA_URL={bool(os.getenv('SUPA_URL'))}, SUPA_KEY={bool(os.getenv('SUPA_KEY'))}")
     
     @property
     def client(self) -> Optional[Client]:
@@ -599,9 +601,110 @@ class DatabaseService:
         except Exception as e:
             logger.error(f"❌ Database error deleting invoice {invoice_id}: {e}")
             return {"success": False, "error": str(e)}
+
+    def delete_all_invoices(self) -> Dict[str, Any]:
+        """
+        Delete all invoices from the system with comprehensive cleanup.
+        Performs bulk deletion including:
+        - All invoice records deletion
+        - All associated Skonto data cleanup (automatic)
+        - Storage cleanup for all files
+        - Comprehensive logging and summary
+        """
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable"}
+        
+        try:
+            # First get all invoices to check details before deletion
+            all_invoices_result = self.get_all_invoices(limit=10000)  # Get all invoices
+            
+            if not all_invoices_result.get("success"):
+                return {"success": False, "error": "Failed to retrieve invoices for deletion"}
+            
+            invoices = all_invoices_result["data"]
+            total_count = len(invoices)
+            
+            if total_count == 0:
+                return {
+                    "success": True, 
+                    "message": "No invoices to delete",
+                    "deletion_summary": {
+                        "total_deleted": 0,
+                        "skonto_data_cleaned": 0,
+                        "storage_files_cleaned": 0,
+                        "failed_deletions": 0
+                    }
+                }
+            
+            logger.info(f"🗑️ Starting bulk deletion of {total_count} invoices...")
+            
+            # Track deletion statistics
+            deleted_count = 0
+            skonto_data_count = 0
+            storage_cleaned_count = 0
+            failed_count = 0
+            file_paths_to_clean = []
+            
+            # Collect statistics before deletion
+            for invoice in invoices:
+                # Check if invoice has Skonto data
+                has_skonto_data = bool(
+                    invoice.get("skonto_datum") or 
+                    invoice.get("skonto_prozent") or 
+                    invoice.get("skonto_reminder_sent") or 
+                    invoice.get("skonto_decision")
+                )
+                if has_skonto_data:
+                    skonto_data_count += 1
+                
+                # Track files for storage cleanup
+                file_path = invoice.get("file_path")
+                if file_path:
+                    file_paths_to_clean.append(file_path)
+            
+            logger.info(f"💰 Found {skonto_data_count} invoices with Skonto data")
+            logger.info(f"📁 Found {len(file_paths_to_clean)} files to clean from storage")
+            
+            # Perform bulk deletion of all records
+            response = (self._client.table(self.table_name)
+                       .delete()
+                       .neq("id", "00000000-0000-0000-0000-000000000000")  # Delete all (using impossible ID condition)
+                       .execute())
+            
+            if response.data is not None:
+                deleted_count = len(response.data) if response.data else total_count
+                logger.info(f"✅ Successfully deleted {deleted_count} invoice records from database")
+                
+                # Clean up storage files
+                if file_paths_to_clean:
+                    logger.info(f"📁 Cleaning up {len(file_paths_to_clean)} files from storage...")
+                    try:
+                        # Bulk delete from storage
+                        self._client.storage.from_("invoices").remove(file_paths_to_clean)
+                        storage_cleaned_count = len(file_paths_to_clean)
+                        logger.info(f"✅ Successfully cleaned {storage_cleaned_count} files from storage")
+                    except Exception as storage_error:
+                        logger.warning(f"⚠️ Storage cleanup partially failed: {storage_error}")
+                        # Don't fail the whole operation if storage cleanup fails
+                
+                deletion_summary = {
+                    "total_deleted": deleted_count,
+                    "skonto_data_cleaned": skonto_data_count,
+                    "storage_files_cleaned": storage_cleaned_count,
+                    "failed_deletions": failed_count
+                }
+                
+                logger.info(f"🎯 Bulk deletion completed successfully: {deletion_summary}")
+                return {
+                    "success": True, 
+                    "message": f"Successfully deleted {deleted_count} invoices",
+                    "deletion_summary": deletion_summary
+                }
+            else:
+                return {"success": False, "error": "Bulk deletion failed - no records affected"}
                 
         except Exception as e:
-            logger.error(f"❌ Database error deleting invoice {invoice_id}: {e}")
+            logger.error(f"❌ Database error during bulk deletion: {e}")
             return {"success": False, "error": str(e)}
 
     
@@ -1010,7 +1113,7 @@ class DatabaseService:
             return {"success": False, "error": "Database unavailable"}
         
         try:
-            from datetime import datetime, timedelta
+            from datetime import timedelta
             
             # Calculate the date range for Skonto due
             today = datetime.now().date()
@@ -1357,6 +1460,109 @@ class DatabaseService:
         except Exception as e:
             logger.error(f"❌ Failed to get invoices with Skonto data: {e}")
             return {"success": False, "error": str(e)}
+
+    def check_duplicate_by_filename(self, filename: str) -> Dict[str, Any]:
+        """
+        Check if a file with the given filename already exists in the database
+        Returns detailed information about existing file if found
+        """
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable", "duplicate_found": False}
+        
+        try:
+            response = self._client.table(self.table_name).select(
+                "id,file_name,created_at,file_size"
+            ).eq("file_name", filename).execute()
+            
+            if response.data and len(response.data) > 0:
+                existing_file = response.data[0]
+                return {
+                    "success": True,
+                    "duplicate_found": True,
+                    "existing_file": {
+                        "id": existing_file.get("id"),
+                        "filename": existing_file.get("file_name"),
+                        "created_at": existing_file.get("created_at"),
+                        "file_size": existing_file.get("file_size")
+                    }
+                }
+            else:
+                return {"success": True, "duplicate_found": False}
+                
+        except Exception as e:
+            logger.error(f"Error checking for duplicate filename '{filename}': {e}")
+            return {"success": False, "error": str(e), "duplicate_found": False}
+    
+    def check_duplicate_by_file_hash(self, file_hash: str) -> Dict[str, Any]:
+        """
+        Check if a file with the given hash already exists in the database
+        Note: Requires file_hash column to be added to schema
+        """
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable", "duplicate_found": False}
+        
+        try:
+            # This would require adding a file_hash column to the schema
+            # For now, return not found since column doesn't exist yet
+            return {"success": True, "duplicate_found": False}
+                
+        except Exception as e:
+            logger.error(f"Error checking for duplicate file hash '{file_hash}': {e}")
+            return {"success": False, "error": str(e), "duplicate_found": False}
+    
+    def check_duplicate_by_content_similarity(self, filename: str, file_size: int, tolerance_bytes: int = 1024) -> Dict[str, Any]:
+        """
+        Check for files with similar content (same filename pattern and similar file size)
+        This can help detect re-uploads of the same invoice with minor modifications
+        """
+        if not self.is_available:
+            return {"success": False, "error": "Database unavailable", "duplicate_found": False}
+        
+        try:
+            # Extract pattern parts from filename
+            import re
+            pattern_match = re.match(r'^(\d{8})_([^_]+)_([^_]+)_(.+)\.pdf$', filename)
+            if not pattern_match:
+                return {"success": True, "duplicate_found": False}
+            
+            date_part, project_part, gewerk_part, lieferant_part = pattern_match.groups()
+            
+            # Query for files with similar file size and filename patterns
+            min_size = max(0, file_size - tolerance_bytes)
+            max_size = file_size + tolerance_bytes
+            
+            response = self._client.table(self.table_name).select(
+                "id,file_name,created_at,file_size"
+            ).gte("file_size", min_size).lte("file_size", max_size).execute()
+            
+            if response.data:
+                similar_files = []
+                for file_record in response.data:
+                    # Check if filename matches pattern and has similar components
+                    existing_filename = file_record.get("file_name", "")
+                    existing_match = re.match(r'^(\d{8})_([^_]+)_([^_]+)_(.+)\.pdf$', existing_filename)
+                    
+                    if existing_match:
+                        _, existing_project, existing_gewerk, existing_lieferant = existing_match.groups()
+                        
+                        # Check for similarity (case-insensitive)
+                        if (project_part.lower() == existing_project.lower() and
+                            gewerk_part.lower() == existing_gewerk.lower() and
+                            lieferant_part.lower() == existing_lieferant.lower()):
+                            similar_files.append(file_record)
+                
+                if similar_files:
+                    return {
+                        "success": True,
+                        "duplicate_found": True,
+                        "similar_files": similar_files
+                    }
+            
+            return {"success": True, "duplicate_found": False}
+                
+        except Exception as e:
+            logger.error(f"Error checking for content similarity for '{filename}': {e}")
+            return {"success": False, "error": str(e), "duplicate_found": False}
 
 # =============================================================================
 # GLOBAL INSTANCE - Single database service for entire application

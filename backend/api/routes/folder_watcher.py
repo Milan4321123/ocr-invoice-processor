@@ -126,12 +126,21 @@ async def get_watch_folders():
 async def add_watch_folder(request: AddWatchFolderRequest):
     """Add a new folder to watch for invoice files"""
     try:
+        # Normalize the path to handle any path resolution issues
+        from pathlib import Path
+        import os
+        
+        normalized_path = os.path.abspath(os.path.expanduser(request.folder_path))
+        folder_path_to_use = normalized_path
+        
         success, config_id, error = await folder_watcher_service.add_watch_folder(
-            folder_path=request.folder_path,
+            folder_path=folder_path_to_use,
             pattern=request.pattern,
             recursive=request.recursive,
             enabled=request.enabled
         )
+        
+
         
         if not success:
             raise HTTPException(status_code=400, detail=error or "Failed to add watch folder")

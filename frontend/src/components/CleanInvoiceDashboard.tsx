@@ -21,6 +21,7 @@ import {
 import FolderWatcherWidget from './FolderWatcherWidget'
 import DeleteConfirmationDialog from './DeleteConfirmationDialog'
 import InvoiceMobileCard from './InvoiceMobileCard'
+import { buildApiUrl, API_CONFIG } from '@/config/api'
 
 interface CleanInvoice {
   id: string
@@ -69,6 +70,11 @@ export default function CleanInvoiceDashboard() {
     fileName: '',
     uploadSource: 'unknown'
   })
+  const [deleteAllDialog, setDeleteAllDialog] = useState<{
+    isOpen: boolean
+  }>({
+    isOpen: false
+  })
 
   useEffect(() => {
     fetchInvoices()
@@ -78,8 +84,7 @@ export default function CleanInvoiceDashboard() {
     try {
       setLoading(true)
       setError(null)
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      const response = await fetch(`${apiUrl}/api/invoices`)
+      const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.INVOICES.BASE))
       
       if (!response.ok) {
         throw new Error(`Failed to fetch invoices: ${response.statusText}`)
@@ -98,8 +103,7 @@ export default function CleanInvoiceDashboard() {
 
   const deleteInvoice = async (id: string, filename: string) => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      const response = await fetch(`${apiUrl}/api/invoices/${id}`, {
+      const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.INVOICES.DELETE(id)), {
         method: 'DELETE'
       })
 
@@ -147,12 +151,72 @@ export default function CleanInvoiceDashboard() {
     }
   }
 
+  const deleteAllInvoices = async () => {
+    try {
+      toast.loading('Alle Rechnungen werden gelöscht...', { id: 'delete-all' })
+      
+      const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.INVOICES.DELETE_ALL), {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        throw new Error('Rechnungen konnten nicht gelöscht werden')
+      }
+
+      const result = await response.json()
+      
+      // Create comprehensive success message
+      const summary = result.summary || {}
+      let successMessage = `✅ Alle Rechnungen erfolgreich gelöscht!\n\n`
+      successMessage += `📊 Zusammenfassung:\n`
+      successMessage += `• ${summary.total_deleted || 0} Rechnungen gelöscht\n`
+      successMessage += `• ${summary.skonto_data_cleaned || 0} Skonto-Datensätze bereinigt\n`
+      successMessage += `• ${summary.storage_files_cleaned || 0} Dateien aus Speicher entfernt`
+      
+      if (summary.failed_deletions > 0) {
+        successMessage += `\n⚠️ ${summary.failed_deletions} Löschungen fehlgeschlagen`
+      }
+
+      toast.success(successMessage, { 
+        id: 'delete-all',
+        duration: 8000,
+        style: {
+          maxWidth: '500px',
+          whiteSpace: 'pre-line'
+        }
+      })
+      
+      // Log deletion details for debugging
+      console.log('Bulk deletion completed:', result)
+      
+      await fetchInvoices() // Refresh the list
+      
+      // Close delete all dialog
+      setDeleteAllDialog({ isOpen: false })
+      
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Rechnungen konnten nicht gelöscht werden'
+      toast.error(errorMessage, { id: 'delete-all' })
+    }
+  }
+
+  const openDeleteAllDialog = () => {
+    if (invoices.length === 0) {
+      toast.error('Keine Rechnungen zum Löschen vorhanden')
+      return
+    }
+    setDeleteAllDialog({ isOpen: true })
+  }
+
+  const closeDeleteAllDialog = () => {
+    setDeleteAllDialog({ isOpen: false })
+  }
+
   const sendToBauleiter = async (invoice: CleanInvoice) => {
     try {
       // Get Bauleiter email from user
       const bauleiterEmail = prompt(
-        `Rechnung "${invoice.file_name}" an Bauleiter senden.\n\nBitte geben Sie die E-Mail-Adresse des Bauleiters ein:`,
-        "bauleiter@company.com"
+        `Rechnung "${invoice.file_name}" an Bauleiter senden.\n\nBitte geben Sie die E-Mail-Adresse des Bauleiters ein:`
       );
       
       if (!bauleiterEmail) {
@@ -166,8 +230,6 @@ export default function CleanInvoiceDashboard() {
         toast.error("Ungültige E-Mail-Adresse");
         return;
       }
-      
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
       
       // Use the new send-to-bauleiter endpoint for better status tracking
       const requestData = {
@@ -185,7 +247,7 @@ export default function CleanInvoiceDashboard() {
         ]
       };
 
-      const response = await fetch(`${apiUrl}/api/invoices/${invoice.id}/send-to-bauleiter`, {
+      const response = await fetch(buildApiUrl(`/api/invoices/${invoice.id}/send-to-bauleiter`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -468,6 +530,14 @@ export default function CleanInvoiceDashboard() {
                 <span>Bauleiter Dashboard</span>
               </a>
               
+              <Link 
+                href="/control"
+                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all transform hover:scale-105 shadow-lg"
+              >
+                <span>⚙️</span>
+                <span>Control Panel</span>
+              </Link>
+              
               <button
                 onClick={fetchInvoices}
                 className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all transform hover:scale-105 shadow-lg"
@@ -492,112 +562,27 @@ export default function CleanInvoiceDashboard() {
           </div>
         )}
 
-        {/* Enhanced Stats with Bauleiter Workflow */}
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-8">
-          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                <FileText className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600">Rechnungen gesamt</p>
-                <p className="text-2xl font-bold gradient-text">{invoices.length}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center">
-                <CheckCircle className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600">Genehmigt</p>
-                <p className="text-2xl font-bold gradient-text">
-                  {invoices.filter(inv => inv.status === 'approved_by_bauleiter').length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
-                <Clock className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600">Bei Bauleiter</p>
-                <p className="text-2xl font-bold gradient-text">
-                  {invoices.filter(inv => inv.status === 'in_review_by_bauleiter').length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
-                <Clock className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600">In Bearbeitung</p>
-                <p className="text-2xl font-bold gradient-text">
-                  {invoices.filter(inv => 
-                    (inv.status === 'edited' && inv.review_status === 'under_review') ||
-                    (inv.status === 'completed' && inv.review_status === 'completed_review' && 
-                     !['in_review_by_bauleiter', 'approved_by_bauleiter', 'rejected_by_bauleiter'].includes(inv.status || ''))
-                  ).length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
-                <Clock className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600">Nicht begonnen</p>
-                <p className="text-2xl font-bold gradient-text">
-                  {invoices.filter(inv => 
-                    !['completed', 'edited', 'in_review_by_bauleiter', 'approved_by_bauleiter', 'rejected_by_bauleiter'].includes(inv.status || '')
-                  ).length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center">
-                <DollarSign className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600">Gesamtbetrag</p>
-                <p className="text-2xl font-bold gradient-text">
-                  {formatCurrency(
-                    invoices.reduce((sum, inv) => sum + (inv.rechnungsbetrag || 0), 0)
-                  )}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Folder Watcher Widget */}
-        <div className="mb-8">
-          <FolderWatcherWidget />
-        </div>
-
-        {/* Invoice List */}
+        {/* Invoice List - MOVED TO TOP */}
         <div className="glass-card border-0 shadow-xl rounded-xl overflow-hidden animate-fade-in">
           <div className="px-4 lg:px-6 py-4 border-b border-white/20 bg-gradient-to-r from-purple-50 to-blue-50">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between space-y-3 lg:space-y-0">
               <h2 className="text-lg font-semibold gradient-text">Rechnungen</h2>
               
-              {/* Search Input */}
-              <div className="flex items-center space-x-3">
+              {/* Actions and Search */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-3 sm:space-y-0 sm:space-x-3">
+                {/* Delete All Button */}
+                {invoices.length > 0 && (
+                  <button
+                    onClick={openDeleteAllDialog}
+                    className="flex items-center justify-center space-x-2 px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-all transform hover:scale-105 shadow-lg text-sm font-medium"
+                    title={`Alle ${invoices.length} Rechnungen löschen`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span>Alle löschen ({invoices.length})</span>
+                  </button>
+                )}
+                
+                {/* Search Input */}
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Search className="h-4 w-4 text-gray-400" />
@@ -888,6 +873,104 @@ export default function CleanInvoiceDashboard() {
           )}
         </div>
 
+        {/* Enhanced Stats with Bauleiter Workflow - MOVED BELOW INVOICE TABLE */}
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-8 mt-8">
+          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+                <FileText className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">Rechnungen gesamt</p>
+                <p className="text-2xl font-bold gradient-text">{invoices.length}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center">
+                <CheckCircle className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">Genehmigt</p>
+                <p className="text-2xl font-bold gradient-text">
+                  {invoices.filter(inv => inv.status === 'approved_by_bauleiter').length}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
+                <Clock className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">Bei Bauleiter</p>
+                <p className="text-2xl font-bold gradient-text">
+                  {invoices.filter(inv => inv.status === 'in_review_by_bauleiter').length}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                <Clock className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">In Bearbeitung</p>
+                <p className="text-2xl font-bold gradient-text">
+                  {invoices.filter(inv => 
+                    (inv.status === 'edited' && inv.review_status === 'under_review') ||
+                    (inv.status === 'completed' && inv.review_status === 'completed_review' && 
+                     !['in_review_by_bauleiter', 'approved_by_bauleiter', 'rejected_by_bauleiter'].includes(inv.status || ''))
+                  ).length}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
+                <Clock className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">Nicht begonnen</p>
+                <p className="text-2xl font-bold gradient-text">
+                  {invoices.filter(inv => 
+                    !['completed', 'edited', 'in_review_by_bauleiter', 'approved_by_bauleiter', 'rejected_by_bauleiter'].includes(inv.status || '')
+                  ).length}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="glass-card rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-fade-in">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center">
+                <DollarSign className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">Gesamtbetrag</p>
+                <p className="text-2xl font-bold gradient-text">
+                  {formatCurrency(
+                    invoices.reduce((sum, inv) => sum + (inv.rechnungsbetrag || 0), 0)
+                  )}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Folder Watcher Widget - MOVED BELOW STATS */}
+        <div className="mb-8">
+          <FolderWatcherWidget />
+        </div>
+
         {/* Delete Confirmation Dialog */}
         <DeleteConfirmationDialog
           isOpen={deleteDialog.isOpen}
@@ -896,6 +979,87 @@ export default function CleanInvoiceDashboard() {
           onConfirm={handleDeleteConfirm}
           onCancel={closeDeleteDialog}
         />
+
+        {/* Delete All Confirmation Dialog */}
+        {deleteAllDialog.isOpen && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+              <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+                <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+              </div>
+
+              <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+              <div className="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <div className="sm:flex sm:items-start">
+                    <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                      <AlertTriangle className="h-6 w-6 text-red-600" />
+                    </div>
+                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                      <h3 className="text-lg leading-6 font-medium text-gray-900">
+                        Alle Rechnungen löschen
+                      </h3>
+                      <div className="mt-2">
+                        <p className="text-sm text-gray-500">
+                          ⚠️ <strong>WARNUNG:</strong> Diese Aktion löscht <strong>ALLE {invoices.length} Rechnungen</strong> dauerhaft aus dem System!
+                        </p>
+                        <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200">
+                          <p className="text-sm text-red-700 font-medium">Diese Aktion wird:</p>
+                          <ul className="mt-2 text-sm text-red-600 list-disc list-inside space-y-1">
+                            <li>Alle Rechnungsdatensätze löschen</li>
+                            <li>Alle Skonto-Daten bereinigen</li>
+                            <li>Alle Dateien aus dem Speicher entfernen</li>
+                            <li><strong>Kann NICHT rückgängig gemacht werden!</strong></li>
+                          </ul>
+                        </div>
+                        <div className="mt-4">
+                          <p className="text-sm text-gray-600">
+                            Geben Sie <strong>"ALLE LÖSCHEN"</strong> ein, um zu bestätigen:
+                          </p>
+                          <input
+                            type="text"
+                            id="confirm-delete-all"
+                            className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                            placeholder="ALLE LÖSCHEN"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && (e.target as HTMLInputElement).value === 'ALLE LÖSCHEN') {
+                                deleteAllInvoices();
+                              }
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                  <button
+                    type="button"
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
+                    onClick={() => {
+                      const input = document.getElementById('confirm-delete-all') as HTMLInputElement;
+                      if (input?.value === 'ALLE LÖSCHEN') {
+                        deleteAllInvoices();
+                      } else {
+                        toast.error('Bitte geben Sie "ALLE LÖSCHEN" ein, um zu bestätigen');
+                      }
+                    }}
+                  >
+                    Alle Rechnungen löschen
+                  </button>
+                  <button
+                    type="button"
+                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
+                    onClick={closeDeleteAllDialog}
+                  >
+                    Abbrechen
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   )

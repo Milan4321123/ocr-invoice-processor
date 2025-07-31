@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import toast from "react-hot-toast";
+import { buildApiUrl, API_CONFIG } from '@/config/api';
 
 type UploadStatus = "idle" | "uploading" | "success" | "error";
 
@@ -88,7 +89,7 @@ export default function Dropzone({ onUploadComplete, onUploadStart, onUploadErro
         });
       }, 200);
       
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/upload`, {
+      const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.UPLOAD), {
         method: "POST",
         body: formData,
       });

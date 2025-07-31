@@ -7,6 +7,7 @@ import asyncio
 import logging
 import uuid
 import time
+import re
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Any, Tuple, TYPE_CHECKING
 from dataclasses import dataclass, field
@@ -19,6 +20,7 @@ if TYPE_CHECKING:
     from watchdog.observers import Observer as ObserverType
 
 from services.upload_service import upload_service, FileData, UploadSource
+from services.database import db_service
 
 logger = logging.getLogger(__name__)
 
@@ -96,17 +98,19 @@ class InvoiceFileHandler(FileSystemEventHandler):
             self._handle_file_event(event.src_path, "modified")
     
     def _handle_file_event(self, file_path: str, event_type: str):
-        """Process file system events"""
+        """Process file system events with enhanced validation"""
         try:
             # Convert to Path object for easier handling
             path = Path(file_path)
             
             # Check if it's a PDF file
             if not path.suffix.lower() == '.pdf':
+                logger.debug(f"Ignoring non-PDF file: {file_path}")
                 return
             
             # Check if file exists (might be deleted quickly)
             if not path.exists():
+                logger.warning(f"File no longer exists: {file_path}")
                 return
             
             # Prevent duplicate processing with cooldown
@@ -116,6 +120,30 @@ class InvoiceFileHandler(FileSystemEventHandler):
                 if current_time - last_processed < self.watch_config.cooldown_seconds:
                     logger.debug(f"Skipping {file_path} - still in cooldown period")
                     return
+            
+            # Enhanced filename validation before processing
+            filename = path.name
+            filename_pattern = r'^(\d{8})_([^_]+)_([^_]+)_(.+)\.pdf$'
+            
+            if not re.match(filename_pattern, filename):
+                logger.warning(f"❌ Invalid filename pattern: {filename}")
+                self.folder_watcher._add_notification(FileNotification(
+                    id=str(uuid.uuid4()),
+                    type=NotificationType.VALIDATION_FAILED,
+                    filename=filename,
+                    file_path=file_path,
+                    timestamp=datetime.now().isoformat(),
+                    message=f"❌ Ungültiger Dateiname: {filename}",
+                    error=f"Dateiname entspricht nicht dem Muster: EINGANGSDATUM_PROJEKT_GEWERK_LIEFERANT.pdf\n"
+                          f"Beispiel: 20250704_OMEGA_ELEKTRO_Mueller.pdf",
+                    watch_config_id=self.watch_config.id
+                ))
+                return
+            
+            # Check if file was already processed successfully
+            if file_path in self.processed_files:
+                logger.debug(f"File already processed successfully: {file_path}")
+                return
             
             # Add to processing queue
             self.processing_queue[file_path] = current_time
@@ -127,7 +155,8 @@ class InvoiceFileHandler(FileSystemEventHandler):
                 if v > cutoff_time
             }
             
-            logger.info(f"Detected {event_type} event for PDF: {file_path}")
+            logger.info(f"📁 Detected {event_type} event for PDF: {file_path}")
+            logger.info(f"📋 Filename validation passed: {filename}")
             
             # Send file detected notification
             self.folder_watcher._add_notification(FileNotification(
@@ -136,7 +165,7 @@ class InvoiceFileHandler(FileSystemEventHandler):
                 filename=path.name,
                 file_path=file_path,
                 timestamp=datetime.now().isoformat(),
-                message=f"Neue PDF-Datei erkannt: {path.name}",
+                message=f"📁 Neue PDF-Datei erkannt: {path.name}",
                 watch_config_id=self.watch_config.id
             ))
             
@@ -149,21 +178,36 @@ class InvoiceFileHandler(FileSystemEventHandler):
                         self._process_file_async(file_path), 
                         self.folder_watcher._event_loop
                     )
-                    logger.info(f"Scheduled async processing for: {file_path}")
+                    logger.info(f"⚡ Scheduled async processing for: {file_path}")
                 else:
                     # No event loop available, add to pending queue
-                    logger.warning(f"No event loop available, queuing file: {file_path}")
+                    logger.warning(f"⚠️ No event loop available, queuing file: {file_path}")
                     self.folder_watcher._pending_files.add(file_path)
             except Exception as e:
-                logger.error(f"Error scheduling file processing: {e}")
+                logger.error(f"❌ Error scheduling file processing: {e}")
                 # Fallback: add to pending queue
                 self.folder_watcher._pending_files.add(file_path)
             
         except Exception as e:
-            logger.error(f"Error handling file event for {file_path}: {str(e)}")
+            logger.error(f"❌ Error handling file event for {file_path}: {str(e)}")
+            # Send error notification
+            try:
+                filename = Path(file_path).name if file_path else "unknown"
+                self.folder_watcher._add_notification(FileNotification(
+                    id=str(uuid.uuid4()),
+                    type=NotificationType.UPLOAD_FAILED,
+                    filename=filename,
+                    file_path=file_path,
+                    timestamp=datetime.now().isoformat(),
+                    message=f"❌ Fehler beim Verarbeiten der Datei: {filename}",
+                    error=str(e),
+                    watch_config_id=self.watch_config.id
+                ))
+            except Exception as notify_error:
+                logger.error(f"Failed to send error notification: {notify_error}")
     
     async def _process_file_async(self, file_path: str):
-        """Asynchronously process detected file"""
+        """Asynchronously process detected file with enhanced error handling"""
         path = Path(file_path)
         notification_id = str(uuid.uuid4())
         
@@ -175,12 +219,12 @@ class InvoiceFileHandler(FileSystemEventHandler):
                 filename=path.name,
                 file_path=file_path,
                 timestamp=datetime.now().isoformat(),
-                message=f"Verarbeitung gestartet: {path.name}",
+                message=f"🔄 Verarbeitung gestartet: {path.name}",
                 watch_config_id=self.watch_config.id
             ))
             
             # Wait a bit to ensure file is fully written
-            await asyncio.sleep(2)
+            await asyncio.sleep(3)  # Increased wait time for better stability
             
             # Check if file still exists and is readable
             if not path.exists():
@@ -191,8 +235,41 @@ class InvoiceFileHandler(FileSystemEventHandler):
                     filename=path.name,
                     file_path=file_path,
                     timestamp=datetime.now().isoformat(),
-                    message=f"Datei nicht mehr vorhanden: {path.name}",
+                    message=f"❌ Datei nicht mehr vorhanden: {path.name}",
                     error="Die Datei wurde gelöscht oder ist nicht mehr verfügbar",
+                    watch_config_id=self.watch_config.id
+                ))
+                return
+            
+            # Check file size and readability
+            try:
+                file_size = path.stat().st_size
+                if file_size == 0:
+                    logger.warning(f"File is empty: {file_path}")
+                    self.folder_watcher._add_notification(FileNotification(
+                        id=str(uuid.uuid4()),
+                        type=NotificationType.VALIDATION_FAILED,
+                        filename=path.name,
+                        file_path=file_path,
+                        timestamp=datetime.now().isoformat(),
+                        message=f"❌ Validierungsfehler: {path.name}",
+                        error="Die Datei ist leer (0 Bytes)",
+                        watch_config_id=self.watch_config.id
+                    ))
+                    return
+                
+                logger.info(f"📊 File size check passed: {path.name} ({file_size} bytes)")
+                
+            except OSError as e:
+                logger.error(f"Cannot access file stats {file_path}: {str(e)}")
+                self.folder_watcher._add_notification(FileNotification(
+                    id=str(uuid.uuid4()),
+                    type=NotificationType.UPLOAD_FAILED,
+                    filename=path.name,
+                    file_path=file_path,
+                    timestamp=datetime.now().isoformat(),
+                    message=f"❌ Dateizugriffsfehler: {path.name}",
+                    error=f"Datei-Eigenschaften können nicht gelesen werden: {str(e)}",
                     watch_config_id=self.watch_config.id
                 ))
                 return
@@ -201,6 +278,9 @@ class InvoiceFileHandler(FileSystemEventHandler):
             try:
                 with open(file_path, 'rb') as f:
                     content = f.read()
+                    
+                logger.info(f"📖 File read successfully: {path.name} ({len(content)} bytes)")
+                
             except (IOError, PermissionError) as e:
                 error_msg = f"Datei konnte nicht gelesen werden: {str(e)}"
                 logger.error(f"Cannot read file {file_path}: {str(e)}")
@@ -210,22 +290,23 @@ class InvoiceFileHandler(FileSystemEventHandler):
                     filename=path.name,
                     file_path=file_path,
                     timestamp=datetime.now().isoformat(),
-                    message=f"Lesefehler: {path.name}",
+                    message=f"❌ Lesefehler: {path.name}",
                     error=error_msg,
                     watch_config_id=self.watch_config.id
                 ))
                 return
             
+            # Double-check content is not empty after reading
             if len(content) == 0:
-                error_msg = "Die Datei ist leer"
-                logger.warning(f"File is empty: {file_path}")
+                error_msg = "Die Datei ist leer nach dem Lesen"
+                logger.warning(f"File content is empty after reading: {file_path}")
                 self.folder_watcher._add_notification(FileNotification(
                     id=str(uuid.uuid4()),
                     type=NotificationType.VALIDATION_FAILED,
                     filename=path.name,
                     file_path=file_path,
                     timestamp=datetime.now().isoformat(),
-                    message=f"Validierungsfehler: {path.name}",
+                    message=f"❌ Validierungsfehler: {path.name}",
                     error=error_msg,
                     watch_config_id=self.watch_config.id
                 ))
@@ -242,17 +323,20 @@ class InvoiceFileHandler(FileSystemEventHandler):
                     "folder_path": str(path.parent),
                     "original_path": file_path,
                     "detected_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-                    "watch_config_id": self.watch_config.id
+                    "watch_config_id": self.watch_config.id,
+                    "event_type": "folder_watcher_auto"
                 }
             )
+            
+            logger.info(f"📤 Starting upload process for: {path.name}")
             
             # Upload using common upload service
             result = await upload_service.upload_file(file_data)
             
             if result.success:
-                logger.info(f"Successfully uploaded {path.name} from folder watcher")
-                logger.info(f"  Invoice ID: {result.invoice_id}")
-                logger.info(f"  Storage URL: {result.url}")
+                logger.info(f"✅ Successfully uploaded {path.name} from folder watcher")
+                logger.info(f"   📋 Invoice ID: {result.invoice_id}")
+                logger.info(f"   🔗 Storage URL: {result.url}")
                 
                 # Send success notification
                 self.folder_watcher._add_notification(FileNotification(
@@ -261,7 +345,7 @@ class InvoiceFileHandler(FileSystemEventHandler):
                     filename=path.name,
                     file_path=file_path,
                     timestamp=datetime.now().isoformat(),
-                    message=f"Upload erfolgreich: {path.name}",
+                    message=f"✅ Upload erfolgreich: {path.name}",
                     invoice_id=result.invoice_id,
                     file_size=result.file_size,
                     watch_config_id=self.watch_config.id
@@ -276,20 +360,29 @@ class InvoiceFileHandler(FileSystemEventHandler):
                 # Mark as processed
                 self.processed_files.add(file_path)
                 
+                logger.info(f"📈 Stats updated - Total: {self.folder_watcher.stats.total_files_processed}, "
+                           f"Success: {self.folder_watcher.stats.successful_uploads}")
+                
             else:
-                logger.error(f"Failed to upload {path.name}: {result.error}")
+                logger.error(f"❌ Failed to upload {path.name}: {result.error}")
                 
                 # Determine notification type based on error
                 notification_type = NotificationType.UPLOAD_FAILED
                 error_message = result.error or "Unbekannter Fehler"
                 
-                # Check if it's a validation error
-                if error_message and any(keyword in error_message.lower() for keyword in [
+                # Check if it's a validation error (enhanced detection)
+                validation_keywords = [
                     "dateiname", "muster", "pattern", "filename", "format", 
                     "pdf", "dateityp", "filetype", "zu groß", "too large",
-                    "leer", "empty", "existiert bereits", "already exists", "duplicate"
-                ]):
+                    "leer", "empty", "existiert bereits", "already exists", 
+                    "duplicate", "duplikat", "ähnliche", "similar", "ungültig"
+                ]
+                
+                if error_message and any(keyword in error_message.lower() for keyword in validation_keywords):
                     notification_type = NotificationType.VALIDATION_FAILED
+                    logger.warning(f"🔍 Validation error detected: {error_message}")
+                else:
+                    logger.error(f"💥 Upload error: {error_message}")
                 
                 # Send failure notification with specific error
                 self.folder_watcher._add_notification(FileNotification(
@@ -298,15 +391,16 @@ class InvoiceFileHandler(FileSystemEventHandler):
                     filename=path.name,
                     file_path=file_path,
                     timestamp=datetime.now().isoformat(),
-                    message=f"{'Validierungsfehler' if notification_type == NotificationType.VALIDATION_FAILED else 'Upload fehlgeschlagen'}: {path.name}",
+                    message=f"{'❌ Validierungsfehler' if notification_type == NotificationType.VALIDATION_FAILED else '💥 Upload fehlgeschlagen'}: {path.name}",
                     error=error_message,
                     watch_config_id=self.watch_config.id
                 ))
                 
                 self.folder_watcher.stats.failed_uploads += 1
+                logger.info(f"📉 Failed uploads count: {self.folder_watcher.stats.failed_uploads}")
                 
         except Exception as e:
-            logger.error(f"Error processing file {file_path}: {str(e)}")
+            logger.error(f"💥 Error processing file {file_path}: {str(e)}")
             
             # Send generic error notification
             self.folder_watcher._add_notification(FileNotification(
@@ -315,8 +409,8 @@ class InvoiceFileHandler(FileSystemEventHandler):
                 filename=path.name,
                 file_path=file_path,
                 timestamp=datetime.now().isoformat(),
-                message=f"Verarbeitungsfehler: {path.name}",
-                error=str(e),
+                message=f"💥 Verarbeitungsfehler: {path.name}",
+                error=f"Unerwarteter Fehler: {str(e)}",
                 watch_config_id=self.watch_config.id
             ))
             
@@ -381,8 +475,13 @@ class FolderWatcherService:
         Returns (success, config_id, error_message)
         """
         try:
-            # Validate folder path
-            path = Path(folder_path)
+            # Validate folder path with better normalization
+            import os
+            
+            # Normalize the path to handle any path resolution issues
+            normalized_path = os.path.abspath(os.path.expanduser(folder_path))
+            path = Path(normalized_path)
+            
             if not path.exists():
                 return False, "", f"Folder does not exist: {folder_path}"
             
@@ -390,15 +489,17 @@ class FolderWatcherService:
                 return False, "", f"Path is not a directory: {folder_path}"
             
             # Check if folder is already being watched
+            resolved_path = str(path.resolve())
+            
             for config in self.watch_configs.values():
-                if config.folder_path == str(path.resolve()):
+                if config.folder_path == resolved_path:
                     return False, "", f"Folder is already being watched: {folder_path}"
             
             # Create watch configuration
             config_id = str(uuid.uuid4())
             watch_config = WatchConfig(
                 id=config_id,
-                folder_path=str(path.resolve()),
+                folder_path=resolved_path,
                 pattern=pattern,
                 enabled=enabled,
                 recursive=recursive
@@ -679,5 +780,91 @@ class FolderWatcherService:
         
         return processed_count
 
-# Global instance
+    async def scan_existing_files(self, config_id: str) -> Dict[str, Any]:
+        """
+        Scan existing files in a watched folder for processing
+        This helps catch files that were added while the watcher was offline
+        """
+        if config_id not in self.watch_configs:
+            return {"success": False, "error": "Watch configuration not found"}
+        
+        config = self.watch_configs[config_id]
+        scan_results = {
+            "success": True,
+            "folder_path": config.folder_path,
+            "files_found": 0,
+            "files_processed": 0,
+            "files_skipped": 0,
+            "errors": []
+        }
+        
+        try:
+            folder_path = Path(config.folder_path)
+            if not folder_path.exists():
+                return {"success": False, "error": f"Folder does not exist: {config.folder_path}"}
+            
+            # Find all PDF files
+            pdf_files = list(folder_path.glob("*.pdf"))
+            scan_results["files_found"] = len(pdf_files)
+            
+            logger.info(f"🔍 Scanning existing files in {config.folder_path}: found {len(pdf_files)} PDF files")
+            
+            for pdf_file in pdf_files:
+                try:
+                    file_path = str(pdf_file)
+                    
+                    # Skip if already processed
+                    if config_id in self.handlers:
+                        handler = self.handlers[config_id]
+                        if file_path in handler.processed_files:
+                            scan_results["files_skipped"] += 1
+                            continue
+                    
+                    # Check filename pattern
+                    filename_pattern = r'^(\d{8})_([^_]+)_([^_]+)_(.+)\.pdf$'
+                    if not re.match(filename_pattern, pdf_file.name):
+                        logger.warning(f"⚠️ Skipping file with invalid pattern: {pdf_file.name}")
+                        scan_results["errors"].append(f"Invalid filename pattern: {pdf_file.name}")
+                        scan_results["files_skipped"] += 1
+                        continue
+                    
+                    # Check if database has this file already
+                    if db_service.is_available:
+                        duplicate_result = db_service.check_duplicate_by_filename(pdf_file.name)
+                        if duplicate_result.get("success") and duplicate_result.get("duplicate_found"):
+                            logger.info(f"🔍 File already exists in database: {pdf_file.name}")
+                            scan_results["files_skipped"] += 1
+                            continue
+                    
+                    # Process the file
+                    logger.info(f"🔄 Processing existing file: {pdf_file.name}")
+                    
+                    # Simulate file detection event
+                    if config_id in self.handlers:
+                        handler = self.handlers[config_id]
+                        await handler._process_file_async(file_path)
+                        scan_results["files_processed"] += 1
+                    else:
+                        scan_results["errors"].append(f"No handler available for config {config_id}")
+                    
+                except Exception as file_error:
+                    error_msg = f"Error processing {pdf_file.name}: {str(file_error)}"
+                    logger.error(error_msg)
+                    scan_results["errors"].append(error_msg)
+            
+            # Update scan timestamp
+            config.last_scan = time.strftime("%Y-%m-%d %H:%M:%S")
+            
+            logger.info(f"📊 Scan completed - Found: {scan_results['files_found']}, "
+                       f"Processed: {scan_results['files_processed']}, "
+                       f"Skipped: {scan_results['files_skipped']}, "
+                       f"Errors: {len(scan_results['errors'])}")
+            
+            return scan_results
+            
+        except Exception as e:
+            logger.error(f"❌ Error during folder scan: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+# Global service instance
 folder_watcher_service = FolderWatcherService()

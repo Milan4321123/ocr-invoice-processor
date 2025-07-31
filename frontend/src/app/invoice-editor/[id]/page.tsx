@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import InvoiceEditorDashboard from '../../../components/InvoiceEditorDashboard';
+import InvoiceEditorDashboard from '@/components/InvoiceEditorDashboard';
 import { AlertTriangle, ArrowLeft } from 'lucide-react';
 
 export default function InvoiceEditorPage() {

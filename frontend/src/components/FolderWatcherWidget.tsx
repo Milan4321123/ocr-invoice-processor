@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { 
   FolderIcon, 
@@ -41,12 +42,26 @@ interface FileNotification {
 }
 
 export default function FolderWatcherWidget() {
+  const router = useRouter();
   const [status, setStatus] = useState<WatcherStatus | null>(null);
   const [notifications, setNotifications] = useState<FileNotification[]>([]);
   const [showNotifications, setShowNotifications] = useState(true);
   const [loading, setLoading] = useState(true);
   const [lastNotificationCount, setLastNotificationCount] = useState(0);
   const [isPolling, setIsPolling] = useState(true);
+  const [navigating, setNavigating] = useState(false);
+
+  const handleNavigateToConfig = async () => {
+    if (navigating) return; // Prevent multiple clicks
+    
+    try {
+      setNavigating(true);
+      await router.push('/dashboard/folder-watcher');
+    } catch (error) {
+      console.error('Navigation error:', error);
+      setNavigating(false);
+    }
+  };
 
   useEffect(() => {
     // Initial fetch
@@ -424,11 +439,14 @@ export default function FolderWatcherWidget() {
 
       <div className="flex gap-2">
         <button 
-          onClick={() => window.location.href = '/dashboard/folder-watcher'}
-          className="flex-1 glass-card hover:bg-white/20 text-blue-700 px-4 py-2 rounded-xl transition-all transform hover:scale-105 text-sm font-medium flex items-center justify-center gap-2 border border-blue-200 shadow-lg"
+          onClick={handleNavigateToConfig}
+          disabled={navigating}
+          className={`flex-1 glass-card hover:bg-white/20 text-blue-700 px-4 py-2 rounded-xl transition-all transform hover:scale-105 text-sm font-medium flex items-center justify-center gap-2 border border-blue-200 shadow-lg ${
+            navigating ? 'opacity-50 cursor-not-allowed' : ''
+          }`}
         >
           <FolderIcon className="w-4 h-4" />
-          Konfigurieren
+          {navigating ? 'Laden...' : 'Konfigurieren'}
         </button>
         
         {status?.status === 'running' ? (
