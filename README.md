@@ -168,6 +168,28 @@ cd ocr-invoice-processor
 - **Setup**: Create project at supabase.com
 - **Required**: Project URL and API keys
 
+#### 🏗️ Database Schema Setup
+
+**Option A: Automatic Setup (Recommended)**
+The application will automatically set up the database schema when it starts:
+1. Configure your `.env` file with Supabase credentials
+2. Start the backend: `python backend/main.py`
+3. The system will detect missing tables and create them automatically
+
+**Option B: Manual Setup**
+If automatic setup fails, manually run the SQL:
+1. Go to your Supabase SQL Editor
+2. Copy and paste the contents of `COMPLETE_SUPABASE_SETUP.sql`
+3. Execute the SQL to create all tables, indexes, and policies
+
+**What Gets Created:**
+- `users` table - Authentication and user management
+- `invoices_clean` table - Main invoice data storage
+- `email_audit_log` table - Email tracking and audit trail
+- `approval_tokens` table - Secure approval workflow tokens
+- `skonto_tracking` table - Early payment discount tracking
+- All necessary indexes, triggers, and security policies
+
 ### 2. SendGrid Email
 - **Purpose**: Sends workflow notifications
 - **Setup**: Create account at sendgrid.com

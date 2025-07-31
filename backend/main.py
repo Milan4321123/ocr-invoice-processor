@@ -118,6 +118,40 @@ async def startup_event():
     """Initialize application on startup"""
     logger.info("🚀 Starting Invoice Management API...")
     
+    # Check if database schema exists, if not, try to set it up
+    try:
+        from services.database import db_service
+        
+        # Quick check if main table exists
+        try:
+            db_service._client.table("invoices_clean").select("*").limit(1).execute()
+            logger.info("✅ Database schema exists")
+        except Exception:
+            logger.info("🏗️  Database schema not found, attempting automatic setup...")
+            
+            # Try to run automatic database setup
+            try:
+                import subprocess
+                import sys
+                from pathlib import Path
+                
+                setup_script = Path(__file__).parent / "setup_database.py"
+                if setup_script.exists():
+                    result = subprocess.run([sys.executable, str(setup_script)], 
+                                          capture_output=True, text=True, timeout=60)
+                    if result.returncode == 0:
+                        logger.info("✅ Automatic database setup completed")
+                    else:
+                        logger.warning("⚠️  Automatic setup failed, manual setup may be required")
+                        logger.warning(f"Setup output: {result.stdout}")
+                        logger.warning(f"Setup errors: {result.stderr}")
+            except Exception as setup_error:
+                logger.warning(f"⚠️  Could not run automatic database setup: {setup_error}")
+                logger.warning("📋 Manual database setup may be required - see COMPLETE_SUPABASE_SETUP.sql")
+    
+    except Exception as e:
+        logger.error(f"❌ Database check error: {e}")
+    
     # Initialize authentication system
     try:
         from services.auth_service import auth_service
