@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { buildApiUrl, API_CONFIG } from '@/config/api';
 
 export async function GET(request: NextRequest) {
   try {
@@ -7,7 +6,11 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const queryParams = new URLSearchParams(searchParams);
     
-    const response = await fetch(`${buildApiUrl(API_CONFIG.ENDPOINTS.SKONTO.OPPORTUNITIES)}?${queryParams.toString()}`, {
+    // Get backend URL with fallback
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || process.env.INTERNAL_API_URL || 'http://localhost:8000';
+    const apiUrl = `${backendUrl}/api/skonto/dashboard/opportunities?${queryParams.toString()}`;
+    
+    const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

@@ -51,14 +51,22 @@ export default function PrufberichtPage() {
 
   const fetchData = async () => {
     try {
+      console.log('🚀 Starting fetchData...');
       setLoading(true);
       
       // Fetch real data from Skonto API endpoints
+      console.log('📡 Making API calls...');
       const [metricsResponse, opportunitiesResponse, schedulerResponse] = await Promise.all([
         fetch('/api/skonto/dashboard/summary'),
         fetch('/api/skonto/dashboard/opportunities?urgency=all&limit=200'), // Max limit is 200
         fetch('/api/skonto/scheduler/status')
       ]);
+      
+      console.log('📊 API responses received:', {
+        metrics: metricsResponse.status,
+        opportunities: opportunitiesResponse.status,
+        scheduler: schedulerResponse.status
+      });
 
       if (!metricsResponse.ok || !opportunitiesResponse.ok) {
         throw new Error('Failed to fetch Skonto data');
@@ -134,9 +142,11 @@ export default function PrufberichtPage() {
       setError(null);
       
     } catch (error) {
-      console.error('Error fetching Skonto data:', error);
+      console.error('❌ Error fetching Skonto data:', error);
+      console.error('❌ Error details:', error);
       setError('Failed to load Skonto data');
     } finally {
+      console.log('✅ fetchData completed, setting loading to false');
       setLoading(false);
     }
   };
@@ -222,7 +232,13 @@ export default function PrufberichtPage() {
   };
 
   useEffect(() => {
-    fetchData();
+    console.log('🔄 useEffect triggered, calling fetchData...');
+    
+    // Add a simple timeout to test if useEffect is working
+    setTimeout(() => {
+      console.log('⏰ Timeout executed, now calling fetchData...');
+      fetchData();
+    }, 1000);
   }, []);
 
   const filteredInvoices = invoices.filter(invoice => {
@@ -255,11 +271,6 @@ export default function PrufberichtPage() {
   if (loading) {
     return (
       <div className="min-h-screen gradient-bg-light relative overflow-hidden">
-        {/* Floating Background Elements */}
-        <div className="absolute top-20 left-10 w-32 h-32 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-float"></div>
-        <div className="absolute top-40 right-20 w-40 h-40 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-float" style={{ animationDelay: '2s' }}></div>
-        <div className="absolute bottom-20 left-1/3 w-36 h-36 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-float" style={{ animationDelay: '4s' }}></div>
-        
         <div className="flex items-center justify-center min-h-screen">
           <div className="glass-card p-8 text-center animate-pulse rounded-xl border shadow">
             <div className="flex items-center justify-center space-x-2">
