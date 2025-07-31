@@ -1,11 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { buildApiUrl, API_CONFIG } from '@/config/api';
 
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData();
-    const username = formData.get('username') as string;
-    const password = formData.get('password') as string;
+    // Try both JSON and FormData parsing
+    let username: string;
+    let password: string;
+    
+    const contentType = request.headers.get('content-type') || '';
+    
+    if (contentType.includes('application/json')) {
+      const body = await request.json();
+      username = body.username;
+      password = body.password;
+    } else {
+      const formData = await request.formData();
+      username = formData.get('username') as string;
+      password = formData.get('password') as string;
+    }
     
     if (!username || !password) {
       return NextResponse.json(
@@ -14,19 +25,34 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Forward the login request to the backend
-    const backendFormData = new FormData();
-    backendFormData.append('username', username);
-    backendFormData.append('password', password);
+    // Get backend URL with fallback
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || process.env.INTERNAL_API_URL || 'http://localhost:8000';
+    const loginUrl = `${backendUrl}/api/auth/login`;
     
-    const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.AUTH.LOGIN), {
+    const formData = new URLSearchParams();
+    formData.append('username', username);
+    formData.append('password', password);
+    
+    const response = await fetch(loginUrl, {
       method: 'POST',
-      body: backendFormData,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formData,
     });
     
     if (!response.ok) {
-      const errorData = await response.json();
-      return NextResponse.json(errorData, { status: response.status });
+      const errorText = await response.text();
+      console.error('Backend login error:', response.status, errorText);
+      try {
+        const errorData = JSON.parse(errorText);
+        return NextResponse.json(errorData, { status: response.status });
+      } catch {
+        return NextResponse.json(
+          { detail: `Backend error: ${response.status}` },
+          { status: response.status }
+        );
+      }
     }
     
     const data = await response.json();
