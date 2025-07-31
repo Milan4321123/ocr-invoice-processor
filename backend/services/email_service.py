@@ -1461,15 +1461,32 @@ class EmailService:
     async def _send_via_sendgrid(self, to_email: str, to_name: str, subject: str, html_content: str) -> Dict[str, Any]:
         """Send email via SendGrid"""
         try:
-            sg = SendGridAPIClient(api_key=self.sendgrid_api_key)
-            message = Mail(
-                from_email=(self.from_email, self.from_name),
-                to_emails=[(to_email, to_name)],
-                subject=subject,
-                html_content=html_content
-            )
+            # Fix SSL certificate issue by setting the CA bundle
+            import certifi
+            import os
             
-            response = sg.send(message)
+            # Set the CA bundle path for SSL verification
+            original_ca_bundle = os.environ.get('REQUESTS_CA_BUNDLE')
+            os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
+            os.environ['SSL_CERT_FILE'] = certifi.where()
+            
+            try:
+                sg = SendGridAPIClient(api_key=self.sendgrid_api_key)
+                message = Mail(
+                    from_email=(self.from_email, self.from_name),
+                    to_emails=[(to_email, to_name)],
+                    subject=subject,
+                    html_content=html_content
+                )
+                
+                response = sg.send(message)
+                
+            finally:
+                # Restore original environment
+                if original_ca_bundle:
+                    os.environ['REQUESTS_CA_BUNDLE'] = original_ca_bundle
+                else:
+                    os.environ.pop('REQUESTS_CA_BUNDLE', None)
             
             return {
                 "success": True,
@@ -1598,6 +1615,11 @@ class EmailService:
     ):
         """Log email send attempt to audit table"""
         try:
+            # Skip audit logging for test emails without invoice_id
+            if not invoice_id and email_type == 'test':
+                logger.info(f"📧 Skipping audit log for test email to {recipient_email}")
+                return
+                
             # Use database service to create email audit log
             audit_result = db_service.create_email_audit_log(
                 invoice_id=str(invoice_id) if invoice_id else None,
