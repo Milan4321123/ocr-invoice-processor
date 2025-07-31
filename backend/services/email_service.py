@@ -936,7 +936,8 @@ class EmailService:
             
             # Generate PDF URL if file path exists
             if invoice_data.get("file_path"):
-                context["pdf_url"] = f"https://bdtcfypvadryfeabqnlc.supabase.co/storage/v1/object/public/invoices/{invoice_data['file_path']}"
+                from backend.services.pdf_url_service import pdf_url_service
+                context["pdf_url"] = pdf_url_service.get_pdf_url(invoice_data["file_path"])
             
             # Choose template and subject based on completion status
             if is_completion:
@@ -1015,7 +1016,8 @@ class EmailService:
             # Generate PDF URL if file path exists
             pdf_url = None
             if invoice_data.get("file_path"):
-                pdf_url = f"https://bdtcfypvadryfeabqnlc.supabase.co/storage/v1/object/public/invoices/{invoice_data['file_path']}"
+                from backend.services.pdf_url_service import pdf_url_service
+                pdf_url = pdf_url_service.get_pdf_url(invoice_data["file_path"])
             
             # Helper function to clean placeholder values
             def clean_field_value(value):

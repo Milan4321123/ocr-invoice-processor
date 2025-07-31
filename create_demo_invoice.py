@@ -46,14 +46,14 @@ def main():
                 "skonto_prozent": 3.0,
                 "skonto_datum": skonto_date.strftime('%Y-%m-%d'),
                 "zahlungsziel": 30,
-                "rechnungspruefung_email": "incognizant321@gmail.com",
-                "bauleiter_email": "incognizant321@gmail.com",
+                "rechnungspruefung_email": "finance@company.com",
+                "bauleiter_email": "manager@company.com",
                 "projekt": "DEMO_PROJECT",
                 "gewerk": "ELEKTRO",
                 "status": "uploaded"
             },
             "editor_info": {
-                "editor_email": "incognizant321@gmail.com",
+                "editor_email": "editor@company.com",
                 "editor_name": "Demo User",
                 "changes_summary": [{
                     "field": "all_fields",
@@ -86,7 +86,7 @@ def main():
         # 4. Test sending a reminder (this should work now even with decision made)
         print("📧 Testing reminder sending...")
         reminder_data = {
-            "recipient_email": "incognizant321@gmail.com",
+            "recipient_email": "admin@company.com",
             "reminder_type": "skonto_reminder"
         }
         response = requests.post(f"{base_url}/api/invoices/{invoice_id}/send-skonto-reminder", json=reminder_data)

@@ -324,27 +324,9 @@ async def get_invoice_editor_data(invoice_id: str = Path(..., description="The i
         
         invoice_data = result["data"]
         
-        # Construct proper PDF URL from file_path
-        file_path = invoice_data.get("file_path", "")
-        if file_path:
-            # Determine the correct bucket based on file_path prefix
-            if file_path.startswith('folder_watcher/'):
-                bucket_name = "folderwatcher"
-                # Remove the prefix since it's now part of the bucket structure
-                file_name = file_path.replace('folder_watcher/', '')
-            elif file_path.startswith('manual/'):
-                bucket_name = "manual"
-                file_name = file_path.replace('manual/', '')
-            else:
-                # Default for drag-drop uploads
-                bucket_name = "invoices"
-                file_name = file_path
-            
-            # Construct full Supabase storage URL with correct bucket using environment variable
-            supabase_url = os.getenv("SUPA_URL", "https://bdtcfypvadryfeabqnlc.supabase.co")
-            pdf_url = f"{supabase_url}/storage/v1/object/public/{bucket_name}/{file_name}"
-        else:
-            pdf_url = ""
+        # Construct proper PDF URL from file_path using centralized service
+        from backend.services.pdf_url_service import pdf_url_service
+        pdf_url = pdf_url_service.get_pdf_url(invoice_data.get("file_path", ""))
         
         # Format data for editor interface using correct field names
         editor_data = {
@@ -669,7 +651,7 @@ async def send_skonto_reminder(
         # Use provided email or fall back to default stakeholder
         if not recipient_email:
             # Default to bauleiter_email or a configured default
-            recipient_email = invoice_data.get("bauleiter_email") or "incognizant321@gmail.com"
+            recipient_email = invoice_data.get("bauleiter_email") or "admin@company.com"
             logger.info(f"📧 Using default recipient email: {recipient_email}")
         
         # Send Skonto reminder email

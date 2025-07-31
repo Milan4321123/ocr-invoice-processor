@@ -177,9 +177,10 @@ class DatabaseService:
             
             if response.data:
                 invoice = response.data[0]
-                # Add URL field for file access
+                # Add URL field for file access using centralized service
                 if invoice.get("file_path"):
-                    invoice["url"] = f"https://bdtcfypvadryfeabqnlc.supabase.co/storage/v1/object/public/invoices/{invoice['file_path']}"
+                    from backend.services.pdf_url_service import pdf_url_service
+                    invoice["url"] = pdf_url_service.get_pdf_url(invoice["file_path"])
                 return {"success": True, "data": invoice}
             else:
                 return {"success": False, "error": "Invoice not found"}
@@ -204,7 +205,8 @@ class DatabaseService:
                 # Add URL field for each invoice (for file access)
                 for invoice in response.data:
                     if invoice.get("file_path"):
-                        invoice["url"] = f"https://bdtcfypvadryfeabqnlc.supabase.co/storage/v1/object/public/invoices/{invoice['file_path']}"
+                        from backend.services.pdf_url_service import pdf_url_service
+                        invoice["url"] = pdf_url_service.get_pdf_url(invoice["file_path"])
                 
                 return {
                     "success": True, 
@@ -243,7 +245,8 @@ class DatabaseService:
                 # Add URL field for each invoice (for file access)
                 for invoice in response.data:
                     if invoice.get("file_path"):
-                        invoice["url"] = f"https://bdtcfypvadryfeabqnlc.supabase.co/storage/v1/object/public/invoices/{invoice['file_path']}"
+                        from backend.services.pdf_url_service import pdf_url_service
+                        invoice["url"] = pdf_url_service.get_pdf_url(invoice["file_path"])
                 
                 return {
                     "success": True, 
@@ -270,10 +273,11 @@ class DatabaseService:
                        .execute())
             
             if response.data and len(response.data) > 0:
-                # Add URL field for file access
+                # Add URL field for file access using centralized service
                 invoice = response.data[0]
                 if invoice.get("file_path"):
-                    invoice["url"] = f"https://bdtcfypvadryfeabqnlc.supabase.co/storage/v1/object/public/invoices/{invoice['file_path']}"
+                    from backend.services.pdf_url_service import pdf_url_service
+                    invoice["url"] = pdf_url_service.get_pdf_url(invoice["file_path"])
                 
                 logger.info(f"✅ Retrieved invoice: {invoice_id}")
                 return {"success": True, "data": invoice}
@@ -1449,7 +1453,8 @@ class DatabaseService:
                 # Add URL field for each invoice (for file access)
                 for invoice in response.data:
                     if invoice.get("file_path"):
-                        invoice["url"] = f"https://bdtcfypvadryfeabqnlc.supabase.co/storage/v1/object/public/invoices/{invoice['file_path']}"
+                        from backend.services.pdf_url_service import pdf_url_service
+                        invoice["url"] = pdf_url_service.get_pdf_url(invoice["file_path"])
                 
                 logger.info(f"✅ Found {len(response.data)} invoices with Skonto data")
                 return {"success": True, "data": response.data}

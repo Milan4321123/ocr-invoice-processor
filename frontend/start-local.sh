@@ -21,8 +21,8 @@ if [ ! -f ".env" ]; then
     cat > .env << EOF
 # Local Development Configuration
 NEXT_PUBLIC_API_URL=http://localhost:8000
-NEXT_PUBLIC_SUPABASE_URL=https://bdtcfypvadryfeabqnlc.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkdGNmeXB2YWRyeWZlYWJxbmxjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA1ODgyMjMsImV4cCI6MjA2NjE2NDIyM30.FANL4kJJJpCeBd3ghc5xLTyY5unMoyf32jRLYCBP5NY
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
 NODE_ENV=development
 EOF
     echo "✅ Created .env file with local configuration"

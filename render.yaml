@@ -11,7 +11,7 @@ services:
     plan: free
     envVars:
       - key: SUPABASE_URL
-        value: https://bdtcfypvadryfeabqnlc.supabase.co
+        value: https://your-project.supabase.co
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false # Set manually in Render dashboard
       - key: SUPABASE_ANON_KEY
@@ -57,7 +57,7 @@ services:
     plan: free
     envVars:
       - key: NEXT_PUBLIC_SUPABASE_URL
-        value: https://bdtcfypvadryfeabqnlc.supabase.co
+        value: https://your-project.supabase.co
       - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
         sync: false # Set manually in Render dashboard
       - key: NEXT_PUBLIC_API_URL
