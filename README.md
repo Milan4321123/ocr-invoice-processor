@@ -102,9 +102,8 @@ ocr-invoice-processor/
 │   └── Dockerfiles            # Container builds
 │
 ├── ⚙️ Configuration
-│   ├── .env                   # Your settings
-│   ├── .env.production        # Production template
-│   └── .env.example           # Basic template
+│   ├── .env                   # Your settings (create from template)
+│   └── environment.template   # Unified configuration template
 │
 ├── 📖 Documentation
 │   ├── README.md              # This file
@@ -149,10 +148,18 @@ cd ocr-invoice-processor
    cp .env.production .env
    ```
 
-2. **Edit `.env` with your credentials:**
-   - Supabase database URL and keys
-   - SendGrid API key for emails
-   - JWT secret for security
+2. **Set up environment configuration:**
+   ```bash
+   # Copy the unified environment template
+   cp environment.template .env
+   
+   # Edit .env with your credentials
+   nano .env
+   ```
+   - Replace all "your-*" placeholders with actual values
+   - Configure Supabase database URL and keys
+   - Add SendGrid API key for emails
+   - Generate secure JWT secret
 
 3. **Start services:**
    ```bash

@@ -1,0 +1,117 @@
+# =====================================================================
+# OCR INVOICE PROCESSOR - UNIFIED ENVIRONMENT CONFIGURATION
+# =====================================================================
+# This single .env file contains all configuration for both frontend and backend
+# Copy this file to .env and update with your actual values for deployment
+
+# =====================================================================
+# DATABASE CONFIGURATION (Supabase)
+# =====================================================================
+SUPA_URL=https://your-project.supabase.co
+SUPA_KEY=your-service-role-key-here
+SUPA_SERVICE_ROLE_KEY=your-service-role-key-here
+SUPA_ANON_KEY=your-anon-key-here
+
+# Frontend Supabase Configuration (same values as above)
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+
+# =====================================================================
+# API CONFIGURATION
+# =====================================================================
+# Backend API URLs
+API_BASE_URL=http://localhost:8000
+INTERNAL_API_URL=http://backend:8000
+BASE_URL=http://localhost:8000
+
+# Frontend API Configuration
+NEXT_PUBLIC_API_URL=http://localhost:8000
+
+# =====================================================================
+# EMAIL CONFIGURATION
+# =====================================================================
+# SendGrid Configuration (Primary)
+SENDGRID_API_KEY=your-sendgrid-api-key-here
+FROM_EMAIL=noreply@yourcompany.com
+FROM_NAME=Invoice Processor
+
+# SMTP Configuration (Fallback)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your-smtp-username
+SMTP_PASSWORD=your-smtp-password
+
+# Email Feature Flags
+ENABLE_EMAIL_NOTIFICATIONS=true
+EMAIL_PROVIDER=sendgrid
+EMAIL_RETRY_ATTEMPTS=3
+EMAIL_TIMEOUT_SECONDS=30
+
+# =====================================================================
+# SECURITY CONFIGURATION
+# =====================================================================
+JWT_SECRET=your-jwt-secret-key-here-make-it-long-and-secure
+
+# =====================================================================
+# OCR CONFIGURATION (Google Cloud Document AI)
+# =====================================================================
+# OCR Feature Flags
+ENABLE_OCR=false
+USE_MOCK_OCR=true
+
+# Google Cloud Configuration (if using real OCR)
+GCP_PROJECT_ID=your-gcp-project-id
+GCP_LOCATION=eu
+DOCUMENT_AI_PROCESSOR_ID=your-processor-id
+DOCUMENT_AI_PROCESSOR_VERSION=rc
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/service-account-key.json
+
+# OCR Processing Settings
+OCR_MAX_FILE_SIZE_MB=20
+OCR_REQUEST_TIMEOUT=300
+OCR_MAX_RETRIES=3
+OCR_RETRY_DELAY=2
+
+# =====================================================================
+# PDF STORAGE CONFIGURATION
+# =====================================================================
+# Set to "true" for development/demo, "false" for production Supabase storage
+USE_MOCK_STORAGE=true
+
+# =====================================================================
+# BUSINESS CONFIGURATION
+# =====================================================================
+# Skonto (Early Payment Discount) Configuration
+SKONTO_DEFAULT_RECIPIENT=finance@yourcompany.com
+
+# Company Information
+COMPANY_NAME=Your Company Name
+COMPANY_EMAIL=info@yourcompany.com
+
+# =====================================================================
+# ENVIRONMENT SETTINGS
+# =====================================================================
+NODE_ENV=development
+DEBUG=true
+
+# =====================================================================
+# DEPLOYMENT CONFIGURATION
+# =====================================================================
+# Docker/Production Settings (uncomment for production)
+# NODE_ENV=production
+# DEBUG=false
+# USE_MOCK_STORAGE=false
+# USE_MOCK_OCR=false
+# ENABLE_OCR=true
+
+# =====================================================================
+# INSTRUCTIONS FOR COMPANY DEPLOYMENT
+# =====================================================================
+# 1. Copy this file to .env: cp environment.template .env
+# 2. Replace all "your-*" placeholders with actual values
+# 3. Generate secure JWT_SECRET: openssl rand -base64 64
+# 4. Set up Supabase project and get URL/keys
+# 5. Configure SendGrid account and get API key
+# 6. For production: set NODE_ENV=production, DEBUG=false
+# 7. For real OCR: set ENABLE_OCR=true, USE_MOCK_OCR=false
+# 8. For Supabase storage: set USE_MOCK_STORAGE=false
