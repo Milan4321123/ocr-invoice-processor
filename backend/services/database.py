@@ -179,7 +179,7 @@ class DatabaseService:
                 invoice = response.data[0]
                 # Add URL field for file access using centralized service
                 if invoice.get("file_path"):
-                    from backend.services.pdf_url_service import pdf_url_service
+                    from services.pdf_url_service import pdf_url_service
                     invoice["url"] = pdf_url_service.get_pdf_url(invoice["file_path"])
                 return {"success": True, "data": invoice}
             else:
@@ -205,7 +205,7 @@ class DatabaseService:
                 # Add URL field for each invoice (for file access)
                 for invoice in response.data:
                     if invoice.get("file_path"):
-                        from backend.services.pdf_url_service import pdf_url_service
+                        from services.pdf_url_service import pdf_url_service
                         invoice["url"] = pdf_url_service.get_pdf_url(invoice["file_path"])
                 
                 return {
@@ -245,7 +245,7 @@ class DatabaseService:
                 # Add URL field for each invoice (for file access)
                 for invoice in response.data:
                     if invoice.get("file_path"):
-                        from backend.services.pdf_url_service import pdf_url_service
+                        from services.pdf_url_service import pdf_url_service
                         invoice["url"] = pdf_url_service.get_pdf_url(invoice["file_path"])
                 
                 return {
@@ -276,7 +276,7 @@ class DatabaseService:
                 # Add URL field for file access using centralized service
                 invoice = response.data[0]
                 if invoice.get("file_path"):
-                    from backend.services.pdf_url_service import pdf_url_service
+                    from services.pdf_url_service import pdf_url_service
                     invoice["url"] = pdf_url_service.get_pdf_url(invoice["file_path"])
                 
                 logger.info(f"✅ Retrieved invoice: {invoice_id}")
@@ -1453,7 +1453,7 @@ class DatabaseService:
                 # Add URL field for each invoice (for file access)
                 for invoice in response.data:
                     if invoice.get("file_path"):
-                        from backend.services.pdf_url_service import pdf_url_service
+                        from services.pdf_url_service import pdf_url_service
                         invoice["url"] = pdf_url_service.get_pdf_url(invoice["file_path"])
                 
                 logger.info(f"✅ Found {len(response.data)} invoices with Skonto data")

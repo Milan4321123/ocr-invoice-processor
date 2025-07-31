@@ -325,7 +325,7 @@ async def get_invoice_editor_data(invoice_id: str = Path(..., description="The i
         invoice_data = result["data"]
         
         # Construct proper PDF URL from file_path using centralized service
-        from backend.services.pdf_url_service import pdf_url_service
+        from services.pdf_url_service import pdf_url_service
         pdf_url = pdf_url_service.get_pdf_url(invoice_data.get("file_path", ""))
         
         # Format data for editor interface using correct field names

@@ -936,7 +936,7 @@ class EmailService:
             
             # Generate PDF URL if file path exists
             if invoice_data.get("file_path"):
-                from backend.services.pdf_url_service import pdf_url_service
+                from services.pdf_url_service import pdf_url_service
                 context["pdf_url"] = pdf_url_service.get_pdf_url(invoice_data["file_path"])
             
             # Choose template and subject based on completion status
@@ -1016,7 +1016,7 @@ class EmailService:
             # Generate PDF URL if file path exists
             pdf_url = None
             if invoice_data.get("file_path"):
-                from backend.services.pdf_url_service import pdf_url_service
+                from services.pdf_url_service import pdf_url_service
                 pdf_url = pdf_url_service.get_pdf_url(invoice_data["file_path"])
             
             # Helper function to clean placeholder values
