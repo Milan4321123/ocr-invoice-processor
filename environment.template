@@ -30,20 +30,13 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 # =====================================================================
 # EMAIL CONFIGURATION
 # =====================================================================
-# SendGrid Configuration (Primary)
+# SendGrid Configuration (Required for email functionality)
 SENDGRID_API_KEY=your-sendgrid-api-key-here
 FROM_EMAIL=noreply@yourcompany.com
 FROM_NAME=Invoice Processor
 
-# SMTP Configuration (Fallback)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USERNAME=your-smtp-username
-SMTP_PASSWORD=your-smtp-password
-
 # Email Feature Flags
 ENABLE_EMAIL_NOTIFICATIONS=true
-EMAIL_PROVIDER=sendgrid
 EMAIL_RETRY_ATTEMPTS=3
 EMAIL_TIMEOUT_SECONDS=30
 

@@ -10,11 +10,7 @@ import secrets
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 from uuid import UUID
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
-from email import encoders
+
 import jwt
 from jinja2 import Environment, FileSystemLoader, BaseLoader, Template
 from sendgrid import SendGridAPIClient
@@ -38,19 +34,21 @@ class StringTemplateLoader(BaseLoader):
 class EmailService:
     """
     Professional email service for invoice workflow with security and audit logging.
-    Supports both SendGrid and SMTP backends.
+    Uses SendGrid for reliable email delivery.
     """
     
     def __init__(self):
         self.sendgrid_api_key = os.getenv("SENDGRID_API_KEY")
-        self.smtp_host = os.getenv("SMTP_HOST")
-        self.smtp_port = int(os.getenv("SMTP_PORT", 587))
-        self.smtp_username = os.getenv("SMTP_USERNAME")
-        self.smtp_password = os.getenv("SMTP_PASSWORD")
         self.from_email = os.getenv("FROM_EMAIL")
         self.from_name = os.getenv("FROM_NAME", "Invoice System")
         self.jwt_secret = os.getenv("JWT_SECRET", "your-secure-jwt-secret")
         self.base_url = os.getenv("BASE_URL", "http://localhost:8001")
+        
+        # Validate SendGrid configuration
+        if not self.sendgrid_api_key:
+            logger.warning("⚠️  SENDGRID_API_KEY not configured - email functionality will be disabled")
+        if not self.from_email:
+            logger.warning("⚠️  FROM_EMAIL not configured - using default fallback")
         
         # Initialize template environment
         self.templates = self._load_templates()
@@ -1392,48 +1390,18 @@ class EmailService:
         email_size = len(html_content.encode('utf-8'))
         
         try:
-            # Try SendGrid first, fall back to SMTP on failure
-            result = None
-            last_error = None
+            # Check if SendGrid is configured
+            if not self.sendgrid_api_key:
+                raise ValueError("SendGrid API key not configured. Please set SENDGRID_API_KEY environment variable.")
             
-            # Primary: Try SendGrid
-            if self.sendgrid_api_key:
-                try:
-                    result = await self._send_via_sendgrid(to_email, to_name, subject, html_content)
-                    if result["success"]:
-                        result["provider"] = "sendgrid"
-                        logger.info(f"Email sent successfully via SendGrid")
-                    else:
-                        raise Exception(f"SendGrid failed: {result.get('error', 'Unknown error')}")
-                except Exception as sg_error:
-                    logger.warning(f"SendGrid failed: {sg_error}")
-                    last_error = sg_error
-                    result = None
+            # Send via SendGrid only
+            result = await self._send_via_sendgrid(to_email, to_name, subject, html_content)
             
-            # Fallback: Try SMTP if SendGrid failed or not configured
-            if not result or not result.get("success"):
-                if self.smtp_host:
-                    try:
-                        logger.info("Attempting SMTP fallback...")
-                        result = await self._send_via_smtp(to_email, to_name, subject, html_content)
-                        if result["success"]:
-                            result["provider"] = "smtp"
-                            logger.info(f"Email sent successfully via SMTP fallback")
-                        else:
-                            raise Exception(f"SMTP failed: {result.get('error', 'Unknown error')}")
-                    except Exception as smtp_error:
-                        logger.error(f"SMTP fallback also failed: {smtp_error}")
-                        last_error = smtp_error
-                        result = {"success": False, "error": str(smtp_error), "provider": "smtp"}
-                else:
-                    logger.error("No SMTP configuration available for fallback")
-            
-            # If both failed, return error
-            if not result or not result.get("success"):
-                if not self.sendgrid_api_key and not self.smtp_host:
-                    raise ValueError("No email provider configured")
-                else:
-                    raise Exception(f"All email providers failed. Last error: {last_error}")
+            if result["success"]:
+                result["provider"] = "sendgrid"
+                logger.info(f"✅ Email sent successfully via SendGrid to {to_email}")
+            else:
+                raise Exception(f"SendGrid failed: {result.get('error', 'Unknown error')}")
             
             # Log email send attempt
             await self._log_email_send(
@@ -1451,6 +1419,8 @@ class EmailService:
             return result
             
         except Exception as e:
+            logger.error(f"❌ Email send failed: {str(e)}")
+            
             # Log failed send attempt
             await self._log_email_send(
                 invoice_id=invoice_id,
@@ -1458,11 +1428,17 @@ class EmailService:
                 recipient_email=to_email,
                 subject=subject,
                 send_success=False,
+                provider_message_id=None,
                 provider_response={"error": str(e)},
                 template_used=template_used,
                 email_size_bytes=email_size
             )
-            raise e
+            
+            return {
+                "success": False,
+                "error": str(e),
+                "provider": "sendgrid"
+            }
     
     async def _send_via_sendgrid(self, to_email: str, to_name: str, subject: str, html_content: str) -> Dict[str, Any]:
         """Send email via SendGrid"""
@@ -1493,43 +1469,7 @@ class EmailService:
                 "error": str(e),
                 "response": None
             }
-    
-    async def _send_via_smtp(self, to_email: str, to_name: str, subject: str, html_content: str) -> Dict[str, Any]:
-        """Send email via SMTP"""
-        try:
-            # Create message
-            msg = MIMEMultipart("alternative")
-            msg["Subject"] = subject
-            msg["From"] = f"{self.from_name} <{self.from_email}>"
-            msg["To"] = f"{to_name} <{to_email}>"
-            
-            # Attach HTML content
-            html_part = MIMEText(html_content, "html", "utf-8")
-            msg.attach(html_part)
-            
-            # Send via SMTP
-            with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
-                server.starttls()
-                if self.smtp_username and self.smtp_password:
-                    server.login(self.smtp_username, self.smtp_password)
-                server.send_message(msg)
-            
-            return {
-                "success": True,
-                "message_id": f"smtp-{secrets.token_hex(8)}",
-                "response": {
-                    "provider": "SMTP",
-                    "sent_at": datetime.now().isoformat()
-                }
-            }
-            
-        except Exception as e:
-            logger.error(f"SMTP send failed: {str(e)}")
-            return {
-                "success": False,
-                "error": str(e),
-                "response": None
-            }
+
     
     async def _generate_approval_token(self, invoice_id: UUID, action: str, user_email: str) -> str:
         """Generate secure approval token with database storage"""
