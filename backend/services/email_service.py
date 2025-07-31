@@ -44,9 +44,15 @@ class EmailService:
         self.jwt_secret = os.getenv("JWT_SECRET", "your-secure-jwt-secret")
         self.base_url = os.getenv("BASE_URL", "http://localhost:8001")
         
+        # Demo mode configuration
+        self.demo_mode = os.getenv("EMAIL_DEMO_MODE", "false").lower() == "true"
+        
         # Validate SendGrid configuration
         if not self.sendgrid_api_key:
-            logger.warning("⚠️  SENDGRID_API_KEY not configured - email functionality will be disabled")
+            if not self.demo_mode:
+                logger.warning("⚠️  SENDGRID_API_KEY not configured - email functionality will be disabled")
+            else:
+                logger.info("📧 Demo mode enabled - emails will be logged instead of sent")
         if not self.from_email:
             logger.warning("⚠️  FROM_EMAIL not configured - using default fallback")
         
@@ -1390,6 +1396,18 @@ class EmailService:
         email_size = len(html_content.encode('utf-8'))
         
         try:
+            # Demo mode - just log the email
+            if self.demo_mode:
+                logger.info(f"📧 DEMO MODE: Email would be sent to {to_email}")
+                logger.info(f"   Subject: {subject}")
+                logger.info(f"   Type: {email_type}")
+                return {
+                    "success": True,
+                    "provider": "demo",
+                    "message_id": f"demo-{secrets.token_hex(8)}",
+                    "response": {"demo_mode": True, "logged_only": True}
+                }
+            
             # Check if SendGrid is configured
             if not self.sendgrid_api_key:
                 raise ValueError("SendGrid API key not configured. Please set SENDGRID_API_KEY environment variable.")
