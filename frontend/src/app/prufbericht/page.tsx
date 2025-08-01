@@ -144,7 +144,7 @@ export default function PrufberichtPage() {
     } catch (error) {
       console.error('❌ Error fetching Skonto data:', error);
       console.error('❌ Error details:', error);
-      setError('Failed to load Skonto data');
+      setError('Fehler beim Laden der Skonto-Daten');
     } finally {
       console.log('✅ fetchData completed, setting loading to false');
       setLoading(false);
@@ -165,11 +165,11 @@ export default function PrufberichtPage() {
         await fetchData();
       } else {
         const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to send reminder');
+        throw new Error(errorData.detail || 'Fehler beim Senden der Erinnerung');
       }
     } catch (error) {
       console.error('Error sending reminder:', error);
-      alert('Failed to send reminder: ' + (error as Error).message);
+      alert('Fehler beim Senden der Erinnerung: ' + (error as Error).message);
     } finally {
       setActionLoading(null);
     }
@@ -193,11 +193,11 @@ export default function PrufberichtPage() {
         await fetchData();
       } else {
         const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to mark as taken');
+        throw new Error(errorData.detail || 'Fehler beim Markieren als genutzt');
       }
     } catch (error) {
       console.error('Error marking as taken:', error);
-      alert('Failed to mark as taken: ' + (error as Error).message);
+      alert('Fehler beim Markieren als genutzt: ' + (error as Error).message);
     } finally {
       setActionLoading(null);
     }
@@ -221,11 +221,11 @@ export default function PrufberichtPage() {
         await fetchData();
       } else {
         const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to mark as missed');
+        throw new Error(errorData.detail || 'Fehler beim Markieren als verpasst');
       }
     } catch (error) {
       console.error('Error marking as missed:', error);
-      alert('Failed to mark as missed: ' + (error as Error).message);
+      alert('Fehler beim Markieren als verpasst: ' + (error as Error).message);
     } finally {
       setActionLoading(null);
     }
@@ -428,7 +428,7 @@ export default function PrufberichtPage() {
                 {schedulerStatus.stats.total_errors > 0 && (
                   <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
                     <div className="text-sm text-red-700">
-                      ⚠️ {schedulerStatus.stats.total_errors} error(s) detected. Check system logs.
+                      ⚠️ {schedulerStatus.stats.total_errors} Fehler erkannt. Überprüfen Sie die System-Logs.
                     </div>
                   </div>
                 )}

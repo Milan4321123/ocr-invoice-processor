@@ -110,14 +110,8 @@ export default function HomePage() {
                 </span>
               </h1>
               <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-                Optimieren Sie Ihre Rechnungsverarbeitung mit KI-gestützter OCR-Technologie und automatisierten Workflows
+                Optimieren Sie Ihre Rechnungsverarbeitung mit automatisierten Workflows und digitaler Dokumentenverwaltung
               </p>
-              <div className="flex items-center justify-center mt-4">
-                <span className="inline-flex items-center rounded-full px-3 py-1 text-sm font-medium glass-card text-purple-700 border border-purple-200">
-                  <Sparkles className="h-4 w-4 mr-1" />
-                  Modernes Glass UI Design
-                </span>
-              </div>
             </div>
           </div>
 

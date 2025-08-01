@@ -145,14 +145,14 @@ export function FolderWatcherDashboard() {
       })
       
       if (response.ok) {
-        toast.success('Folder watcher started successfully')
+        toast.success('Ordnerüberwachung erfolgreich gestartet')
         await loadData()
       } else {
         const error = await response.json()
-        toast.error(`Failed to start watcher: ${error.detail}`)
+        toast.error(`Fehler beim Starten der Überwachung: ${error.detail}`)
       }
     } catch (error) {
-      toast.error('Error starting folder watcher')
+      toast.error('Fehler beim Starten der Ordnerüberwachung')
       console.error('Start watcher error:', error)
     } finally {
       setActionLoading(null)
@@ -169,14 +169,14 @@ export function FolderWatcherDashboard() {
       })
       
       if (response.ok) {
-        toast.success('Folder watcher stopped successfully')
+        toast.success('Ordnerüberwachung erfolgreich gestoppt')
         await loadData()
       } else {
         const error = await response.json()
-        toast.error(`Failed to stop watcher: ${error.detail}`)
+        toast.error(`Fehler beim Stoppen der Überwachung: ${error.detail}`)
       }
     } catch (error) {
-      toast.error('Error stopping folder watcher')
+      toast.error('Fehler beim Stoppen der Ordnerüberwachung')
       console.error('Stop watcher error:', error)
     } finally {
       setActionLoading(null)
@@ -186,7 +186,7 @@ export function FolderWatcherDashboard() {
   // Add new watch folder
   const addWatchFolder = async () => {
     if (!newFolderPath.trim()) {
-      toast.error('Please enter a folder path')
+      toast.error('Bitte geben Sie einen Ordnerpfad ein')
       return
     }
 
@@ -216,10 +216,10 @@ export function FolderWatcherDashboard() {
         await loadData()
       } else {
         const error = await response.json()
-        toast.error(`Failed to add folder: ${error.detail}`)
+        toast.error(`Fehler beim Hinzufügen des Ordners: ${error.detail}`)
       }
     } catch (error) {
-      toast.error('Error adding watch folder')
+      toast.error('Fehler beim Hinzufügen des Überwachungsordners')
       console.error('Add folder error:', error)
     } finally {
       setActionLoading(null)
@@ -228,7 +228,7 @@ export function FolderWatcherDashboard() {
 
   // Remove watch folder
   const removeWatchFolder = async (folderId: string, folderPath: string) => {
-    if (!confirm(`Are you sure you want to remove the watch folder:\n${folderPath}`)) {
+    if (!confirm(`Sind Sie sicher, dass Sie den Überwachungsordner entfernen möchten:\n${folderPath}`)) {
       return
     }
 
@@ -240,14 +240,14 @@ export function FolderWatcherDashboard() {
       })
 
       if (response.ok) {
-        toast.success('Watch folder removed successfully')
+        toast.success('Überwachungsordner erfolgreich entfernt')
         await loadData()
       } else {
         const error = await response.json()
-        toast.error(`Failed to remove folder: ${error.detail}`)
+        toast.error(`Fehler beim Entfernen des Ordners: ${error.detail}`)
       }
     } catch (error) {
-      toast.error('Error removing watch folder')
+      toast.error('Fehler beim Entfernen des Überwachungsordners')
       console.error('Remove folder error:', error)
     } finally {
       setActionLoading(null)
@@ -380,7 +380,7 @@ export function FolderWatcherDashboard() {
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2"
           >
             <PlusIcon className="w-4 h-4" />
-            Add Folder
+            Ordner hinzufügen
           </button>
         </div>
       </div>
@@ -432,7 +432,7 @@ export function FolderWatcherDashboard() {
               className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white rounded-lg transition-colors flex items-center gap-2"
             >
               <StopIcon className="w-4 h-4" />
-              {actionLoading === 'stop' ? 'Stopping...' : 'Stop Watcher'}
+              {actionLoading === 'stop' ? 'Stoppe...' : 'Überwachung stoppen'}
             </button>
           ) : (
             <button
@@ -441,7 +441,7 @@ export function FolderWatcherDashboard() {
               className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg transition-colors flex items-center gap-2"
             >
               <PlayIcon className="w-4 h-4" />
-              {actionLoading === 'start' ? 'Starting...' : 'Start Watcher'}
+              {actionLoading === 'start' ? 'Starte...' : 'Überwachung starten'}
             </button>
           )}
         </div>
@@ -460,9 +460,9 @@ export function FolderWatcherDashboard() {
           {watchFolders.length === 0 ? (
             <div className="p-12 text-center">
               <FolderIcon className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No folders configured</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Keine Ordner konfiguriert</h3>
               <p className="text-gray-600 mb-4">
-                Add folders to monitor for automatic invoice processing
+                Fügen Sie Ordner hinzu, um die automatische Rechnungsverarbeitung zu überwachen
               </p>
               <button
                 onClick={() => setShowAddModal(true)}
@@ -509,7 +509,7 @@ export function FolderWatcherDashboard() {
                           ? 'text-green-600 hover:bg-green-50' 
                           : 'text-gray-400 hover:bg-gray-50'
                       }`}
-                      title={folder.enabled ? 'Disable watching' : 'Enable watching'}
+                      title={folder.enabled ? 'Überwachung deaktivieren' : 'Überwachung aktivieren'}
                     >
                       {folder.enabled ? (
                         <EyeIcon className="w-4 h-4" />
@@ -600,14 +600,14 @@ export function FolderWatcherDashboard() {
                 }}
                 className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
               >
-                Cancel
+                Abbrechen
               </button>
               <button
                 onClick={addWatchFolder}
                 disabled={actionLoading === 'add' || !newFolderPath.trim()}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg transition-colors"
               >
-                {actionLoading === 'add' ? 'Adding...' : 'Add Folder'}
+                {actionLoading === 'add' ? 'Hinzufügen...' : 'Ordner hinzufügen'}
               </button>
             </div>
           </div>
