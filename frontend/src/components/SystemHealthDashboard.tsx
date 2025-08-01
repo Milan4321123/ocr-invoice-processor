@@ -299,7 +299,7 @@ export default function SystemHealthDashboard() {
                     health.overall_status === 'healthy' ? 'GESUND' :
                     health.overall_status === 'degraded' ? 'BEEINTRÄCHTIGT' :
                     health.overall_status === 'error' ? 'FEHLER' :
-                    health.overall_status.toUpperCase()
+                    (health.overall_status as string).toUpperCase()
                   }
                 </span>
               </div>

@@ -20,10 +20,19 @@ class AuthService:
     def __init__(self):
         self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
         self.secret_key = os.getenv("JWT_SECRET")
+        
+        # Check if JWT_SECRET is properly configured
         if not self.secret_key or self.secret_key.startswith("your-"):
-            logger.error("❌ CRITICAL: JWT_SECRET not properly configured!")
-            logger.error("Generate a secure secret: openssl rand -base64 64")
-            raise ValueError("JWT_SECRET must be set to a secure random value")
+            if os.getenv("NODE_ENV") == "production":
+                logger.error("❌ CRITICAL: JWT_SECRET not properly configured for production!")
+                logger.error("Generate a secure secret: openssl rand -base64 64")
+                raise ValueError("JWT_SECRET must be set to a secure random value in production")
+            else:
+                # Development/demo mode - use default but warn
+                logger.warning("⚠️  WARNING: Using development JWT_SECRET - not secure for production!")
+                logger.warning("For production: Generate with 'openssl rand -base64 64'")
+                self.secret_key = "dev-jwt-secret-for-testing-only-not-secure"
+        
         self.algorithm = "HS256"
         self.access_token_expire_minutes = 30 * 24 * 60  # 30 days for simple auth
         

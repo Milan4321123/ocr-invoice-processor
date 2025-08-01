@@ -55,7 +55,7 @@ COMPANY_EMAIL=info@yourcompany.com
 USE_MOCK_STORAGE=true
 USE_MOCK_OCR=true
 ENABLE_EMAIL_NOTIFICATIONS=true
-NODE_ENV=production
+NODE_ENV=development
 
 # =====================================================================
 # SETUP INSTRUCTIONS
