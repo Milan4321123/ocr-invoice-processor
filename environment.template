@@ -1,145 +1,71 @@
 # =====================================================================
-# OCR INVOICE PROCESSOR - UNIFIED ENVIRONMENT CONFIGURATION
+# OCR INVOICE PROCESSOR - DOCKER DEPLOYMENT CONFIGURATION
 # =====================================================================
-# This single .env file contains all configuration for both frontend and backend
-# Copy this file to .env and update with your actual values for deployment
+# Copy this file to .env and update with your actual company values
 
 # =====================================================================
-# DATABASE CONFIGURATION (Supabase)
+# DATABASE (Supabase) - REQUIRED
 # =====================================================================
 SUPA_URL=https://your-project.supabase.co
 SUPA_KEY=your-service-role-key-here
 SUPA_SERVICE_ROLE_KEY=your-service-role-key-here
 SUPA_ANON_KEY=your-anon-key-here
 
-# Frontend Supabase Configuration (same values as above)
+# Frontend database access (same values as above)
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
 
 # =====================================================================
-# API CONFIGURATION
+# DOCKER NETWORKING - REQUIRED
 # =====================================================================
-# Backend API URLs
-API_BASE_URL=http://localhost:8000
-INTERNAL_API_URL=http://backend:8000
-BASE_URL=http://localhost:8000
-
-# Frontend API Configuration
+# Frontend talks to backend through Docker network
 NEXT_PUBLIC_API_URL=http://localhost:8000
 
 # =====================================================================
-# EMAIL CONFIGURATION
+# EMAIL SERVICE (SendGrid) - REQUIRED
 # =====================================================================
-# SendGrid Configuration (Required for email functionality)
-SENDGRID_API_KEY=your-sendgrid-api-key-here
+SENDGRID_API_KEY=SG.your-sendgrid-api-key-here
 FROM_EMAIL=noreply@yourcompany.com
-FROM_NAME=Invoice Processor
-
-# Email Feature Flags
-ENABLE_EMAIL_NOTIFICATIONS=true
-EMAIL_RETRY_ATTEMPTS=3
-EMAIL_TIMEOUT_SECONDS=30
+FROM_NAME=Invoice System
 
 # =====================================================================
-# SECURITY CONFIGURATION
+# SECURITY - REQUIRED
 # =====================================================================
-# CRITICAL: Generate a secure JWT secret for production
-# Run: openssl rand -base64 64
-JWT_SECRET=your-jwt-secret-key-here-make-it-long-and-secure
+# Generate with: openssl rand -base64 64
+JWT_SECRET=your-secure-jwt-secret-key-here
 
-# CRITICAL: Set a secure admin password for initial setup
-# This password will be used to create the default admin user
-# NEVER use weak passwords like "admin123" in production!
-ADMIN_PASSWORD=your-secure-admin-password-here
+# =====================================================================
+# ADMIN ACCOUNT - REQUIRED
+# =====================================================================
 ADMIN_USERNAME=admin
 ADMIN_EMAIL=admin@yourcompany.com
+ADMIN_PASSWORD=your-secure-admin-password-here
 ADMIN_FULL_NAME=System Administrator
 
-# Production environment flag
-NODE_ENV=development
-
-# Frontend URL for CORS (production)
-FRONTEND_URL=https://your-frontend-domain.com
-
-# Additional CORS origins (comma-separated)
-ADDITIONAL_CORS_ORIGINS=
-
 # =====================================================================
-# OCR CONFIGURATION (Google Cloud Document AI)
+# COMPANY INFORMATION - REQUIRED
 # =====================================================================
-# OCR Feature Flags
-ENABLE_OCR=false
-USE_MOCK_OCR=true
-
-# Google Cloud Configuration (if using real OCR)
-GCP_PROJECT_ID=your-gcp-project-id
-GCP_LOCATION=eu
-DOCUMENT_AI_PROCESSOR_ID=your-processor-id
-DOCUMENT_AI_PROCESSOR_VERSION=rc
-GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/service-account-key.json
-
-# OCR Processing Settings
-OCR_MAX_FILE_SIZE_MB=20
-OCR_REQUEST_TIMEOUT=300
-OCR_MAX_RETRIES=3
-OCR_RETRY_DELAY=2
-
-# =====================================================================
-# PDF STORAGE CONFIGURATION
-# =====================================================================
-# Set to "true" for development/demo, "false" for production Supabase storage
-USE_MOCK_STORAGE=true
-
-# =====================================================================
-# BUSINESS CONFIGURATION
-# =====================================================================
-# Company Information
 COMPANY_NAME=Your Company Name
 COMPANY_EMAIL=info@yourcompany.com
 
-# Default Email Addresses (used as fallbacks)
-ADMIN_EMAIL=admin@yourcompany.com
-DEFAULT_ADMIN_EMAIL=admin@yourcompany.com
-DEFAULT_EDITOR_EMAIL=editor@yourcompany.com
-SKONTO_DEFAULT_RECIPIENT=finance@yourcompany.com
-
-# Demo/Test Email Addresses (for demo scripts)
-DEMO_FINANCE_EMAIL=finance@yourcompany.com
-DEMO_MANAGER_EMAIL=manager@yourcompany.com
-DEMO_EDITOR_EMAIL=editor@yourcompany.com
-DEMO_ADMIN_EMAIL=admin@yourcompany.com
+# =====================================================================
+# FEATURE SETTINGS - DOCKER DEFAULTS
+# =====================================================================
+# Using mock services (no additional setup needed)
+USE_MOCK_STORAGE=true
+USE_MOCK_OCR=true
+ENABLE_EMAIL_NOTIFICATIONS=true
+NODE_ENV=production
 
 # =====================================================================
-# ENVIRONMENT SETTINGS
+# SETUP INSTRUCTIONS
 # =====================================================================
-NODE_ENV=development
-DEBUG=true
+# 1. Copy this file: cp environment.template .env
+# 2. Get Supabase project details from: https://supabase.com
+# 3. Get SendGrid API key from: https://sendgrid.com
+# 4. Generate JWT_SECRET: openssl rand -base64 64
+# 5. Set strong ADMIN_PASSWORD (12+ characters)
+# 6. Update company information
+# 7. Start with: ./start-company.sh or start-company.bat
 
-# =====================================================================
-# DEPLOYMENT CONFIGURATION
-# =====================================================================
-# Docker/Production Settings (uncomment for production)
-# NODE_ENV=production
-# DEBUG=false
-# USE_MOCK_STORAGE=false
-# USE_MOCK_OCR=false
-# ENABLE_OCR=true
-
-# =====================================================================
-# INSTRUCTIONS FOR COMPANY DEPLOYMENT
-# =====================================================================
-# 1. Copy this file to .env: cp environment.template .env
-# 2. Replace all "your-*" placeholders with actual values
-# 3. Generate secure JWT_SECRET: openssl rand -base64 64
-# 4. Set a STRONG ADMIN_PASSWORD (minimum 12 chars for production)
-# 5. Set up Supabase project and get URL/keys
-# 6. Configure SendGrid account and get API key
-# 7. Update all email addresses to your company domain
-# 8. For production: set NODE_ENV=production, DEBUG=false
-# 9. For real OCR: set ENABLE_OCR=true, USE_MOCK_OCR=false
-# 10. For Supabase storage: set USE_MOCK_STORAGE=false
-
-# SECURITY REMINDER:
-# - ADMIN_PASSWORD: Use a strong, unique password (12+ characters)
-# - JWT_SECRET: Generate with: openssl rand -base64 64
-# - Never commit your .env file to version control!
+# THAT'S IT! Docker handles everything else automatically.
