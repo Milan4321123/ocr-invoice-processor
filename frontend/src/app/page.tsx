@@ -151,8 +151,8 @@ export default function HomePage() {
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="text-center">
-                  <div className="text-3xl font-bold gradient-text mb-2">KI-gestützt</div>
-                  <div className="text-gray-600">OCR-Technologie</div>
+                  <div className="text-3xl font-bold gradient-text mb-2">Digital</div>
+                  <div className="text-gray-600">Dokumentenverwaltung</div>
                 </div>
                 <div className="text-center">
                   <div className="text-3xl font-bold gradient-text mb-2">Automatisiert</div>
