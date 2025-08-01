@@ -24,7 +24,12 @@ async def handle_approval_action(token: str, request: Request):
     try:
         # Get JWT secret from environment
         import os
-        jwt_secret = os.getenv("JWT_SECRET", "your-secure-jwt-secret")
+        jwt_secret = os.getenv("JWT_SECRET")
+        if not jwt_secret or jwt_secret.startswith("your-"):
+            return HTMLResponse(
+                content=get_error_page("Configuration Error", "Server configuration error. Please contact administrator."),
+                status_code=500
+            )
         
         # Decode and validate JWT token
         try:

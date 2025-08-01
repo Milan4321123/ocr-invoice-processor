@@ -43,7 +43,18 @@ EMAIL_TIMEOUT_SECONDS=30
 # =====================================================================
 # SECURITY CONFIGURATION
 # =====================================================================
+# CRITICAL: Generate a secure JWT secret for production
+# Run: openssl rand -base64 64
 JWT_SECRET=your-jwt-secret-key-here-make-it-long-and-secure
+
+# Production environment flag
+NODE_ENV=development
+
+# Frontend URL for CORS (production)
+FRONTEND_URL=https://your-frontend-domain.com
+
+# Additional CORS origins (comma-separated)
+ADDITIONAL_CORS_ORIGINS=
 
 # =====================================================================
 # OCR CONFIGURATION (Google Cloud Document AI)

@@ -41,7 +41,9 @@ class EmailService:
         self.sendgrid_api_key = os.getenv("SENDGRID_API_KEY")
         self.from_email = os.getenv("FROM_EMAIL")
         self.from_name = os.getenv("FROM_NAME", "Invoice System")
-        self.jwt_secret = os.getenv("JWT_SECRET", "your-secure-jwt-secret")
+        self.jwt_secret = os.getenv("JWT_SECRET")
+        if not self.jwt_secret or self.jwt_secret.startswith("your-"):
+            logger.warning("⚠️  JWT_SECRET not properly configured - email approval links may be insecure")
         self.base_url = os.getenv("BASE_URL", "http://localhost:8001")
         
         # Demo mode configuration

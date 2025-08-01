@@ -19,7 +19,11 @@ class AuthService:
     
     def __init__(self):
         self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-        self.secret_key = os.getenv("JWT_SECRET", "your-secure-jwt-secret-for-auth")
+        self.secret_key = os.getenv("JWT_SECRET")
+        if not self.secret_key or self.secret_key.startswith("your-"):
+            logger.error("❌ CRITICAL: JWT_SECRET not properly configured!")
+            logger.error("Generate a secure secret: openssl rand -base64 64")
+            raise ValueError("JWT_SECRET must be set to a secure random value")
         self.algorithm = "HS256"
         self.access_token_expire_minutes = 30 * 24 * 60  # 30 days for simple auth
         

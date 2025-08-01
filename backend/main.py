@@ -4,12 +4,56 @@ Handles upload, storage, editing, and workflow without OCR dependencies.
 """
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import uuid
 import logging
+import os
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+
+def validate_environment():
+    """Validate critical environment variables on startup"""
+    required_vars = {
+        "JWT_SECRET": "JWT secret for authentication",
+        "SUPA_URL": "Supabase database URL", 
+        "SUPA_KEY": "Supabase service key"
+    }
+    
+    missing_vars = []
+    insecure_vars = []
+    
+    for var, description in required_vars.items():
+        value = os.getenv(var)
+        if not value:
+            missing_vars.append(f"  - {var}: {description}")
+        elif value.startswith("your-") or value in ["your-jwt-secret-key-here-make-it-long-and-secure", "your-secure-jwt-secret"]:
+            insecure_vars.append(f"  - {var}: Still using default/placeholder value")
+    
+    if missing_vars:
+        logger.error("❌ CRITICAL: Missing required environment variables:")
+        for var in missing_vars:
+            logger.error(var)
+        logger.error("Please configure your .env file before deployment!")
+        return False
+    
+    if insecure_vars:
+        logger.warning("⚠️  WARNING: Insecure environment variables detected:")
+        for var in insecure_vars:
+            logger.warning(var)
+        logger.warning("Please update these values before production deployment!")
+        if os.getenv("NODE_ENV") == "production":
+            logger.error("❌ Cannot start in production with insecure values!")
+            return False
+    
+    logger.info("✅ Environment validation passed")
+    return True
+
+# Configure rate limiter
+limiter = Limiter(key_func=get_remote_address)
 
 # Configure logging with filter to reduce noise from frequent requests
 class QuietPathsFilter(logging.Filter):
@@ -47,21 +91,63 @@ app = FastAPI(
     version="2.0.0"
 )
 
+# Add rate limiter to app state
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # Configure CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
+allowed_origins = []
+
+# Development origins
+if os.getenv("NODE_ENV") != "production":
+    allowed_origins.extend([
         "http://localhost:3000", 
         "http://127.0.0.1:3000", 
         "http://localhost:3001", 
-        "http://127.0.0.1:3001",
-        "https://ocr-invoice-frontend.onrender.com",  # Production frontend
-        "https://ocr-invoice-backend.onrender.com"   # Production backend
-    ],
+        "http://127.0.0.1:3001"
+    ])
+
+# Production origins from environment
+production_frontend = os.getenv("FRONTEND_URL")
+if production_frontend:
+    allowed_origins.append(production_frontend)
+
+# Add any additional origins from environment
+additional_origins = os.getenv("ADDITIONAL_CORS_ORIGINS", "").split(",")
+for origin in additional_origins:
+    if origin.strip():
+        allowed_origins.append(origin.strip())
+
+# Fallback for development if no origins configured
+if not allowed_origins:
+    allowed_origins = ["http://localhost:3000"]
+
+logger.info(f"🔐 CORS allowed origins: {allowed_origins}")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
 )
+
+# Add security headers middleware
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    
+    # Security headers
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    
+    # Only add HSTS in production with HTTPS
+    if os.getenv("NODE_ENV") == "production" and request.url.scheme == "https":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    
+    return response
 
 # Add request ID middleware
 @app.middleware("http")
@@ -117,6 +203,12 @@ async def root():
 async def startup_event():
     """Initialize application on startup"""
     logger.info("🚀 Starting Invoice Management API...")
+    
+    # Validate environment variables
+    if not validate_environment():
+        logger.error("❌ Environment validation failed - stopping startup")
+        import sys
+        sys.exit(1)
     
     # Check if database schema exists, if not, try to set it up
     try:

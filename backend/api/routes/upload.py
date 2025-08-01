@@ -1,6 +1,8 @@
 """File upload route handlers"""
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Request
 from fastapi.responses import Response
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 import re
 import uuid
 import datetime
@@ -15,6 +17,7 @@ from api.dependencies.auth import require_auth
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+limiter = Limiter(key_func=get_remote_address)
 
 # Filename pattern validation
 FILENAME_PATTERN = r'^\d{8}_[A-Za-z0-9]+_[A-Za-z0-9]+_[A-Za-z0-9]+\.pdf$'
@@ -82,7 +85,9 @@ startxref
     )
 
 @router.post("/upload")
+@limiter.limit("10/minute")  # Limit uploads to 10 per minute per IP
 async def upload_file(
+    request: Request,
     file: UploadFile = File(...)
 ):  # Removed authentication for demo
     """Upload a PDF invoice file using the centralized upload service"""
