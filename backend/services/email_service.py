@@ -40,7 +40,7 @@ class EmailService:
     def __init__(self):
         self.sendgrid_api_key = os.getenv("SENDGRID_API_KEY")
         self.from_email = os.getenv("FROM_EMAIL")
-        self.from_name = os.getenv("FROM_NAME", "Invoice System")
+        self.from_name = os.getenv("FROM_NAME", "Rechnungssystem")
         self.jwt_secret = os.getenv("JWT_SECRET")
         if not self.jwt_secret or self.jwt_secret.startswith("your-"):
             logger.warning("⚠️  JWT_SECRET not properly configured - email approval links may be insecure")
@@ -473,7 +473,7 @@ class EmailService:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dropdown Changes Notification</title>
+    <title>Dropdown-Optionen Änderungsbenachrichtigung</title>
     <style>
         body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
         .header { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
@@ -489,34 +489,34 @@ class EmailService:
 </head>
 <body>
     <div class="header">
-        <h1>📋 Dropdown Options Updated</h1>
-        <p><strong>Date:</strong> {{ timestamp }}</p>
-        <p><strong>Updated by:</strong> {{ user_email }}</p>
-        <p><strong>Total changes:</strong> {{ changes|length }}</p>
+        <h1>📋 Dropdown-Optionen aktualisiert</h1>
+        <p><strong>Datum:</strong> {{ timestamp }}</p>
+        <p><strong>Aktualisiert von:</strong> {{ user_email }}</p>
+        <p><strong>Gesamte Änderungen:</strong> {{ changes|length }}</p>
     </div>
     
     <div class="content">
-        <h2>Changes Summary</h2>
+        <h2>Änderungsübersicht</h2>
         <div class="changes-section">
             {% for change in changes %}
             <div class="change-item change-{{ change.type }}">
                 <h4>
                     {% if change.type == 'add' %}
-                        ➕ Added new option
+                        ➕ Neue Option hinzugefügt
                     {% elif change.type == 'delete' %}
-                        ➖ Deleted option
+                        ➖ Option gelöscht
                     {% endif %}
                 </h4>
-                <p><strong>Field:</strong> <span class="field-name">{{ change.fieldName }}</span></p>
+                <p><strong>Feld:</strong> <span class="field-name">{{ change.fieldName }}</span></p>
                 <p><strong>Option:</strong> {{ change.optionLabel }}</p>
-                <p><strong>Value:</strong> <code>{{ change.optionValue }}</code></p>
-                <p class="timestamp"><strong>Time:</strong> {{ change.timestamp }}</p>
+                <p><strong>Wert:</strong> <code>{{ change.optionValue }}</code></p>
+                <p class="timestamp"><strong>Zeit:</strong> {{ change.timestamp }}</p>
                 {% if change.success is defined %}
                     <p><strong>Status:</strong> 
                         {% if change.success %}
-                            <span style="color: #28a745;">✅ Success</span>
+                            <span style="color: #28a745;">✅ Erfolgreich</span>
                         {% else %}
-                            <span style="color: #dc3545;">❌ Failed</span>
+                            <span style="color: #dc3545;">❌ Fehlgeschlagen</span>
                         {% endif %}
                     </p>
                 {% endif %}
@@ -525,10 +525,10 @@ class EmailService:
         </div>
         
         <div class="footer">
-            <p><strong>System Information:</strong></p>
-            <p>This notification confirms that dropdown options have been updated in the invoice management system.</p>
-            <p>All changes are tracked for audit purposes.</p>
-            <p><strong>Timestamp:</strong> {{ iso_timestamp }}</p>
+            <p><strong>Systeminformationen:</strong></p>
+            <p>Diese Benachrichtigung bestätigt, dass Dropdown-Optionen im Rechnungsverwaltungssystem aktualisiert wurden.</p>
+            <p>Alle Änderungen werden zu Prüfzwecken nachverfolgt.</p>
+            <p><strong>Zeitstempel:</strong> {{ iso_timestamp }}</p>
         </div>
     </div>
 </body>
