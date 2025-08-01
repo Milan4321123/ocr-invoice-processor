@@ -362,7 +362,7 @@ export function FolderWatcherDashboard() {
             Folder Watcher
           </h1>
           <p className="text-gray-600 mt-1">
-            Monitor folders for automatic invoice processing
+            Ordner für automatische Rechnungsverarbeitung überwachen
           </p>
         </div>
         
@@ -398,28 +398,28 @@ export function FolderWatcherDashboard() {
               <div className="text-2xl font-bold text-gray-900">
                 {watcherStatus.folders_watched}
               </div>
-              <div className="text-sm text-gray-600">Active Folders</div>
+              <div className="text-sm text-gray-600">Aktive Ordner</div>
             </div>
             
             <div className="text-center p-4 bg-gray-50 rounded-lg">
               <div className="text-2xl font-bold text-green-600">
                 {watcherStatus.statistics.successful_uploads}
               </div>
-              <div className="text-sm text-gray-600">Successful Uploads</div>
+              <div className="text-sm text-gray-600">Erfolgreiche Uploads</div>
             </div>
             
             <div className="text-center p-4 bg-gray-50 rounded-lg">
               <div className="text-2xl font-bold text-red-600">
                 {watcherStatus.statistics.failed_uploads}
               </div>
-              <div className="text-sm text-gray-600">Failed Uploads</div>
+              <div className="text-sm text-gray-600">Fehlgeschlagene Uploads</div>
             </div>
             
             <div className="text-center p-4 bg-gray-50 rounded-lg">
               <div className="text-2xl font-bold text-blue-600">
                 {formatUptime(watcherStatus.uptime_seconds)}
               </div>
-              <div className="text-sm text-gray-600">Uptime</div>
+              <div className="text-sm text-gray-600">Betriebszeit</div>
             </div>
           </div>
         )}
@@ -452,7 +452,7 @@ export function FolderWatcherDashboard() {
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">Watch Folders</h2>
           <p className="text-gray-600 text-sm mt-1">
-            Folders being monitored for new invoice files
+            Ordner, die auf neue Rechnungsdateien überwacht werden
           </p>
         </div>
 
@@ -469,7 +469,7 @@ export function FolderWatcherDashboard() {
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2 mx-auto"
               >
                 <PlusIcon className="w-4 h-4" />
-                Add Your First Folder
+                Ersten Ordner hinzufügen
               </button>
             </div>
           ) : (
