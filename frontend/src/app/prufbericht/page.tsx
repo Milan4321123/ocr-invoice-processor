@@ -160,7 +160,7 @@ export default function PrufberichtPage() {
       });
       
       if (response.ok) {
-        alert('✅ Reminder sent successfully!');
+        alert('✅ Erinnerung erfolgreich gesendet!');
         // Refresh data after action
         await fetchData();
       } else {
@@ -350,7 +350,7 @@ export default function PrufberichtPage() {
                       ) : (
                         <Pause className="h-3 w-3 mr-1" />
                       )}
-                      Reminder Scheduler {schedulerStatus.enabled && schedulerStatus.is_running ? 'Active' : 'Inactive'}
+                      Erinnerungs-Scheduler {schedulerStatus.enabled && schedulerStatus.is_running ? 'Aktiv' : 'Inaktiv'}
                     </span>
                   )}
                 </div>
@@ -380,7 +380,7 @@ export default function PrufberichtPage() {
                   </div>
                   
                   <input
-                    placeholder="Search invoices or vendors..."
+                    placeholder="Rechnungen oder Lieferanten suchen..."
                     value={searchTerm}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                     className="max-w-xs bg-white/50 border border-white/20 rounded-md px-3 py-1 text-sm placeholder:text-gray-500"
@@ -401,28 +401,28 @@ export default function PrufberichtPage() {
               <div className="p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <Settings className="h-5 w-5 text-gray-600" />
-                  <h3 className="text-lg font-semibold text-gray-800">Automatic Reminder System</h3>
+                  <h3 className="text-lg font-semibold text-gray-800">Automatisches Erinnerungssystem</h3>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="text-center p-3 bg-white/30 rounded-lg">
                     <div className="text-lg font-bold text-gray-900">{schedulerStatus.stats.total_runs}</div>
-                    <div className="text-xs text-gray-600">Total Checks</div>
+                    <div className="text-xs text-gray-600">Gesamte Prüfungen</div>
                   </div>
                   <div className="text-center p-3 bg-white/30 rounded-lg">
                     <div className="text-lg font-bold text-green-600">{schedulerStatus.stats.total_reminders_sent}</div>
-                    <div className="text-xs text-gray-600">Reminders Sent</div>
+                    <div className="text-xs text-gray-600">Erinnerungen gesendet</div>
                   </div>
                   <div className="text-center p-3 bg-white/30 rounded-lg">
                     <div className="text-lg font-bold text-blue-600">
-                      {schedulerStatus.last_run ? new Date(schedulerStatus.last_run).toLocaleDateString() : 'Never'}
+                      {schedulerStatus.last_run ? new Date(schedulerStatus.last_run).toLocaleDateString() : 'Nie'}
                     </div>
-                    <div className="text-xs text-gray-600">Last Check</div>
+                    <div className="text-xs text-gray-600">Letzte Prüfung</div>
                   </div>
                   <div className="text-center p-3 bg-white/30 rounded-lg">
                     <div className="text-lg font-bold text-purple-600">
-                      {schedulerStatus.next_run ? new Date(schedulerStatus.next_run).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Not scheduled'}
+                      {schedulerStatus.next_run ? new Date(schedulerStatus.next_run).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Nicht geplant'}
                     </div>
-                    <div className="text-xs text-gray-600">Next Check</div>
+                    <div className="text-xs text-gray-600">Nächste Prüfung</div>
                   </div>
                 </div>
                 {schedulerStatus.stats.total_errors > 0 && (
@@ -440,7 +440,7 @@ export default function PrufberichtPage() {
           <div className="glass-card border-0 shadow-xl rounded-xl mb-8">
             <div className="border-b border-white/20 p-6">
               <h3 className="text-xl font-semibold text-gray-800">
-                Skonto Invoice Details ({filteredInvoices.length} invoices)
+                Skonto-Rechnungsdetails ({filteredInvoices.length} Rechnungen)
               </h3>
             </div>
             <div className="p-0">
@@ -448,14 +448,14 @@ export default function PrufberichtPage() {
                 <table className="w-full">
                   <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
                     <tr>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vendor</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rechnung</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lieferant</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Betrag</th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Skonto</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deadline</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Frist</th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reminder</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Erinnerung</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aktionen</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
@@ -484,7 +484,7 @@ export default function PrufberichtPage() {
                             {new Date(invoice.skontoDeadline).toLocaleDateString()}
                             {invoice.daysRemaining !== undefined && (
                               <div className={`text-xs ${invoice.daysRemaining > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {invoice.daysRemaining > 0 ? `${invoice.daysRemaining} days left` : `${Math.abs(invoice.daysRemaining)} days overdue`}
+                                {invoice.daysRemaining > 0 ? `${invoice.daysRemaining} Tage verbleibend` : `${Math.abs(invoice.daysRemaining)} Tage überfällig`}
                               </div>
                             )}
                           </div>
@@ -499,7 +499,7 @@ export default function PrufberichtPage() {
                               : 'bg-gray-50 text-gray-500 border border-gray-200'
                           }`}>
                             <Mail className="h-3 w-3" />
-                            {invoice.reminderSent ? 'Sent' : 'Not Sent'}
+                            {invoice.reminderSent ? 'Gesendet' : 'Nicht gesendet'}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -515,7 +515,7 @@ export default function PrufberichtPage() {
                                 ) : (
                                   <Mail className="h-3 w-3" />
                                 )}
-                                Send Reminder
+                                Erinnerung senden
                               </button>
                             )}
                             
@@ -531,7 +531,7 @@ export default function PrufberichtPage() {
                                   ) : (
                                     <ThumbsUp className="h-3 w-3" />
                                   )}
-                                  Taken
+                                  Genutzt
                                 </button>
                                 <button
                                   onClick={() => handleMarkAsMissed(invoice.id)}
@@ -543,7 +543,7 @@ export default function PrufberichtPage() {
                                   ) : (
                                     <ThumbsDown className="h-3 w-3" />
                                   )}
-                                  Missed
+                                  Verpasst
                                 </button>
                               </>
                             )}
