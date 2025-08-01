@@ -66,7 +66,7 @@ fi
 
 # Start backend in background
 echo -e "${GREEN}🚀 Starting backend on http://localhost:8000${NC}"
-(cd backend && python main.py > ../backend.log 2>&1 &)
+python main.py > ../backend.log 2>&1 &
 BACKEND_PID=$!
 
 # Wait a moment for backend to start
