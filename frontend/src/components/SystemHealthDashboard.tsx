@@ -94,7 +94,7 @@ export default function SystemHealthDashboard() {
               component.status === 'healthy' ? 'GESUND' :
               component.status === 'degraded' ? 'BEEINTRÄCHTIGT' :
               component.status === 'error' ? 'FEHLER' :
-              component.status.toUpperCase()
+              (component.status as string).toUpperCase()
             }
           </span>
         </div>
