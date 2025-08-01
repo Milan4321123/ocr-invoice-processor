@@ -67,7 +67,7 @@ export default function SystemHealthDashboard() {
       setHealth(data);
       setLastUpdated(new Date());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch system health');
+      setError(err instanceof Error ? err.message : 'Fehler beim Laden des Systemstatus');
       setHealth(null);
     } finally {
       setLoading(false);
@@ -197,7 +197,7 @@ export default function SystemHealthDashboard() {
         
         {component.error && (
           <div className="mt-3 p-3 glass-card border border-red-200 rounded-xl shadow-lg">
-            <span className="text-red-600 text-sm font-medium">Error:</span>
+            <span className="text-red-600 text-sm font-medium">Fehler:</span>
             <p className="text-red-700 text-sm mt-1 font-mono">{component.error}</p>
           </div>
         )}
