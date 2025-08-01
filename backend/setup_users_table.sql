@@ -26,15 +26,9 @@ ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all operations for authenticated users" ON users
     FOR ALL USING (true);
 
--- Insert default admin user (password: admin123)
--- The password hash below is bcrypt hash of "admin123"
-INSERT INTO users (username, hashed_password, email, full_name)
-VALUES (
-    'admin',
-    '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewEVklk.QjuCQ5/6',
-    'admin@company.local',
-    'System Administrator'
-) ON CONFLICT (username) DO NOTHING;
+-- NOTE: Default admin user will be created automatically by the application
+-- based on environment variables (ADMIN_USERNAME, ADMIN_PASSWORD, ADMIN_EMAIL)
+-- This provides better security than hardcoded credentials
 
 -- Optional: Create a function to update the updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()

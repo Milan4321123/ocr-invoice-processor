@@ -47,6 +47,14 @@ EMAIL_TIMEOUT_SECONDS=30
 # Run: openssl rand -base64 64
 JWT_SECRET=your-jwt-secret-key-here-make-it-long-and-secure
 
+# CRITICAL: Set a secure admin password for initial setup
+# This password will be used to create the default admin user
+# NEVER use weak passwords like "admin123" in production!
+ADMIN_PASSWORD=your-secure-admin-password-here
+ADMIN_USERNAME=admin
+ADMIN_EMAIL=admin@yourcompany.com
+ADMIN_FULL_NAME=System Administrator
+
 # Production environment flag
 NODE_ENV=development
 
@@ -123,8 +131,15 @@ DEBUG=true
 # 1. Copy this file to .env: cp environment.template .env
 # 2. Replace all "your-*" placeholders with actual values
 # 3. Generate secure JWT_SECRET: openssl rand -base64 64
-# 4. Set up Supabase project and get URL/keys
-# 5. Configure SendGrid account and get API key
-# 6. For production: set NODE_ENV=production, DEBUG=false
-# 7. For real OCR: set ENABLE_OCR=true, USE_MOCK_OCR=false
-# 8. For Supabase storage: set USE_MOCK_STORAGE=false
+# 4. Set a STRONG ADMIN_PASSWORD (minimum 12 chars for production)
+# 5. Set up Supabase project and get URL/keys
+# 6. Configure SendGrid account and get API key
+# 7. Update all email addresses to your company domain
+# 8. For production: set NODE_ENV=production, DEBUG=false
+# 9. For real OCR: set ENABLE_OCR=true, USE_MOCK_OCR=false
+# 10. For Supabase storage: set USE_MOCK_STORAGE=false
+
+# SECURITY REMINDER:
+# - ADMIN_PASSWORD: Use a strong, unique password (12+ characters)
+# - JWT_SECRET: Generate with: openssl rand -base64 64
+# - Never commit your .env file to version control!

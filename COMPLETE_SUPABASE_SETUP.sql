@@ -237,15 +237,9 @@ CREATE TABLE IF NOT EXISTS public.gewerk_list (
 -- 8. INSERT DEFAULT DATA (Required for app to work)
 -- =====================================================================
 
--- Insert default admin user (password: admin123)
-INSERT INTO users (username, hashed_password, email, full_name, is_active) 
-VALUES (
-  'admin',
-  '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/lewYGANtV.0B3GbVC', -- admin123
-      'admin@yourcompany.com',
-  'System Administrator',
-  true
-) ON CONFLICT (username) DO NOTHING;
+-- NOTE: Default admin user will be created automatically by the application
+-- based on environment variables (ADMIN_USERNAME, ADMIN_PASSWORD, ADMIN_EMAIL)
+-- This provides better security than hardcoded credentials
 
 -- Insert sample dropdown options for project field
 INSERT INTO dropdown_options (field_name, value, label, is_default, sort_order, is_active) VALUES

@@ -127,8 +127,29 @@ class AuthService:
     
     async def initialize_default_user(self) -> Dict[str, Any]:
         """Initialize a default admin user for first setup"""
-        default_username = "admin"
-        default_password = "admin123"  # Change this in production!
+        # Get admin credentials from environment variables
+        default_username = os.getenv("ADMIN_USERNAME", "admin")
+        default_password = os.getenv("ADMIN_PASSWORD")
+        admin_email = os.getenv("ADMIN_EMAIL", "admin@yourcompany.com")
+        admin_name = os.getenv("ADMIN_FULL_NAME", "System Administrator")
+        
+        # Validate that admin password is provided
+        if not default_password:
+            logger.error("❌ CRITICAL: ADMIN_PASSWORD environment variable not set!")
+            logger.error("Please set ADMIN_PASSWORD in your .env file for secure admin account creation")
+            return {"success": False, "error": "ADMIN_PASSWORD environment variable required"}
+        
+        # Validate password strength in production
+        if os.getenv("NODE_ENV") == "production":
+            if len(default_password) < 12:
+                logger.error("❌ CRITICAL: Admin password too short for production (minimum 12 characters)")
+                return {"success": False, "error": "Admin password must be at least 12 characters in production"}
+            
+            # Check for common weak passwords
+            weak_passwords = ["admin123", "password", "123456", "admin", "password123"]
+            if default_password.lower() in weak_passwords:
+                logger.error("❌ CRITICAL: Weak admin password detected in production")
+                return {"success": False, "error": "Admin password is too weak for production use"}
         
         existing_user = await self.get_user_by_username(default_username)
         if existing_user:
@@ -138,13 +159,14 @@ class AuthService:
         result = await self.create_user(
             username=default_username,
             password=default_password,
-            email="admin@company.local",
-            full_name="System Administrator"
+            email=admin_email,
+            full_name=admin_name
         )
         
         if result["success"]:
-            logger.info(f"✅ Default admin user created: {default_username}/{default_password}")
-            return {"success": True, "message": f"Default user created: {default_username}/{default_password}"}
+            logger.info(f"✅ Default admin user created: {default_username}")
+            # Don't log the password for security
+            return {"success": True, "message": f"Default user created: {default_username}"}
         else:
             logger.error(f"❌ Failed to create default user: {result['error']}")
             return result

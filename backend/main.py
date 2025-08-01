@@ -20,7 +20,8 @@ def validate_environment():
     required_vars = {
         "JWT_SECRET": "JWT secret for authentication",
         "SUPA_URL": "Supabase database URL", 
-        "SUPA_KEY": "Supabase service key"
+        "SUPA_KEY": "Supabase service key",
+        "ADMIN_PASSWORD": "Admin user password for initial setup"
     }
     
     missing_vars = []
@@ -32,6 +33,15 @@ def validate_environment():
             missing_vars.append(f"  - {var}: {description}")
         elif value.startswith("your-") or value in ["your-jwt-secret-key-here-make-it-long-and-secure", "your-secure-jwt-secret"]:
             insecure_vars.append(f"  - {var}: Still using default/placeholder value")
+    
+    # Special validation for admin password
+    admin_password = os.getenv("ADMIN_PASSWORD")
+    if admin_password:
+        weak_passwords = ["admin123", "password", "123456", "admin", "password123"]
+        if admin_password.lower() in weak_passwords:
+            insecure_vars.append(f"  - ADMIN_PASSWORD: Using weak/common password")
+        elif len(admin_password) < 8:
+            insecure_vars.append(f"  - ADMIN_PASSWORD: Password too short (minimum 8 characters)")
     
     if missing_vars:
         logger.error("❌ CRITICAL: Missing required environment variables:")
