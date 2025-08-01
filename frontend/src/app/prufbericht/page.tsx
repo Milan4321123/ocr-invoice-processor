@@ -365,17 +365,17 @@ export default function PrufberichtPage() {
                 <div className="flex flex-col md:flex-row gap-4 flex-1">
                   <div className="flex items-center gap-2">
                     <Filter className="h-4 w-4 text-gray-500" />
-                    <span className="text-sm font-medium text-gray-700">Filter by Status:</span>
+                    <span className="text-sm font-medium text-gray-700">Nach Status filtern:</span>
                     <select 
                       value={filterStatus} 
                       onChange={(e) => setFilterStatus(e.target.value)}
                       className="w-40 bg-white/50 border border-white/20 rounded-md px-3 py-1 text-sm"
                     >
-                      <option value="all">All Status</option>
-                      <option value="captured">Captured</option>
-                      <option value="missed">Missed</option>
-                      <option value="pending">Pending</option>
-                      <option value="expired">Expired</option>
+                      <option value="all">Alle Status</option>
+                      <option value="captured">Genutzt</option>
+                      <option value="missed">Verpasst</option>
+                      <option value="pending">Ausstehend</option>
+                      <option value="expired">Abgelaufen</option>
                     </select>
                   </div>
                   

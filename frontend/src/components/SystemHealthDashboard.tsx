@@ -90,7 +90,12 @@ export default function SystemHealthDashboard() {
             {name.replace('_', ' ')}
           </h3>
           <span className={`px-3 py-1 rounded-full text-sm font-medium border shadow-lg ${statusColors[component.status]}`}>
-            {statusIcons[component.status]} {component.status.toUpperCase()}
+            {statusIcons[component.status]} {
+              component.status === 'healthy' ? 'GESUND' :
+              component.status === 'degraded' ? 'BEEINTRÄCHTIGT' :
+              component.status === 'error' ? 'FEHLER' :
+              component.status.toUpperCase()
+            }
           </span>
         </div>
       
@@ -113,7 +118,7 @@ export default function SystemHealthDashboard() {
         
         {component.connection && (
           <div className="flex justify-between">
-            <span className="text-gray-700">Connection:</span>
+            <span className="text-gray-700">Verbindung:</span>
             <span className="font-mono gradient-text">{component.connection}</span>
           </div>
         )}
@@ -127,9 +132,9 @@ export default function SystemHealthDashboard() {
         
         {component.write_access !== undefined && (
           <div className="flex justify-between">
-            <span className="text-gray-700">Write Access:</span>
+            <span className="text-gray-700">Schreibzugriff:</span>
             <span className={`font-mono ${component.write_access ? 'text-green-600' : 'text-red-600'}`}>
-              {component.write_access ? 'Yes' : 'No'}
+              {component.write_access ? 'Ja' : 'Nein'}
             </span>
           </div>
         )}
@@ -141,8 +146,8 @@ export default function SystemHealthDashboard() {
               {Object.entries(component.config).map(([key, value]) => (
                 <div key={key} className="flex justify-between text-sm">
                   <span className="text-gray-600">{key}:</span>
-                  <span className={`font-mono ${value === 'configured' ? 'text-green-600' : 'text-red-600'}`}>
-                    {value}
+                  <span className={`font-mono $                    {value === 'configured' ? 'text-green-600' : 'text-red-600'}`}>
+                    {value === 'configured' ? 'konfiguriert' : value}
                   </span>
                 </div>
               ))}
@@ -256,18 +261,18 @@ export default function SystemHealthDashboard() {
                 </div>
               </div>
               <div className="ml-4">
-                <h3 className="text-lg font-medium text-red-800 mb-2">Unable to fetch system health</h3>
+                <h3 className="text-lg font-medium text-red-800 mb-2">Systemstatus kann nicht abgerufen werden</h3>
                 <div className="text-sm text-red-700 space-y-2">
                   <p className="font-mono bg-red-50 p-2 rounded-lg border border-red-200">
                     {error}
                   </p>
                   <div className="space-y-1">
-                    <p><strong>Possible causes:</strong></p>
+                    <p><strong>Mögliche Ursachen:</strong></p>
                     <ul className="list-disc list-inside space-y-1 text-red-600">
-                      <li>Backend server is not running (expected at: <code className="bg-red-50 px-1 rounded">http://localhost:8000</code>)</li>
-                      <li>Network connectivity issues</li>
-                      <li>API endpoint configuration error</li>
-                      <li>Backend health endpoint not available</li>
+                      <li>Backend-Server läuft nicht (erwartet unter: <code className="bg-red-50 px-1 rounded">http://localhost:8000</code>)</li>
+                      <li>Netzwerkverbindungsprobleme</li>
+                      <li>API-Endpunkt-Konfigurationsfehler</li>
+                      <li>Backend-Health-Endpunkt nicht verfügbar</li>
                     </ul>
                   </div>
                   <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
@@ -288,13 +293,18 @@ export default function SystemHealthDashboard() {
           <>
             <div className="mb-8 glass-card rounded-xl shadow-xl p-6 animate-fade-in">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold gradient-text">Overall System Status</h2>
+                <h2 className="text-xl font-semibold gradient-text">Gesamtsystemstatus</h2>
                 <span className={`px-4 py-2 rounded-full text-lg font-medium border shadow-lg ${statusColors[health.overall_status]}`}>
-                  {statusIcons[health.overall_status]} {health.overall_status.toUpperCase()}
+                  {statusIcons[health.overall_status]} {
+                    health.overall_status === 'healthy' ? 'GESUND' :
+                    health.overall_status === 'degraded' ? 'BEEINTRÄCHTIGT' :
+                    health.overall_status === 'error' ? 'FEHLER' :
+                    health.overall_status.toUpperCase()
+                  }
                 </span>
               </div>
               <p className="text-gray-700 text-sm mt-2">
-                Checked at: {new Date(health.timestamp).toLocaleString()}
+                Geprüft am: {new Date(health.timestamp).toLocaleString()}
               </p>
             </div>
 
