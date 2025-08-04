@@ -88,8 +88,9 @@ startxref
 @limiter.limit("10/minute")  # Limit uploads to 10 per minute per IP
 async def upload_file(
     request: Request,
-    file: UploadFile = File(...)
-):  # Removed authentication for demo
+    file: UploadFile = File(...),
+    current_user: Dict[str, Any] = Depends(require_auth)
+):
     """Upload a PDF invoice file using the centralized upload service"""
     # Validate file type
     if file.content_type != "application/pdf":
@@ -112,6 +113,11 @@ async def upload_file(
         # Check if file is empty
         if len(content) == 0:
             raise HTTPException(status_code=400, detail="File is empty")
+        
+        # Check file size (max 50MB)
+        MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+        if len(content) > MAX_FILE_SIZE:
+            raise HTTPException(status_code=400, detail="File too large (max 50MB)")
         
         # Create FileData object
         file_data = FileData(
