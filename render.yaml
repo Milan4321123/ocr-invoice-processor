@@ -1,0 +1,56 @@
+services:
+  # Backend API Service
+  - type: web
+    name: ocr-invoice-backend
+    runtime: python3
+    buildCommand: pip install -r requirements_render.txt
+    startCommand: python render_start.py
+    plan: starter
+    rootDir: backend
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9.18
+      - key: NODE_ENV
+        value: production
+    healthCheckPath: /health
+    
+  # Frontend Web Service  
+  - type: web
+    name: ocr-invoice-frontend
+    runtime: node
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    plan: starter
+    rootDir: frontend
+    envVars:
+      - key: NODE_VERSION
+        value: 18.19.0
+      - key: NODE_ENV
+        value: production
+    healthCheckPath: /
+
+# Environment variables that need to be set in Render dashboard:
+# Backend service environment variables:
+# - SUPA_URL: Your Supabase project URL
+# - SUPA_KEY: Your Supabase service role key  
+# - SUPA_SERVICE_ROLE_KEY: Your Supabase service role key
+# - SUPA_ANON_KEY: Your Supabase anon key
+# - SENDGRID_API_KEY: Your SendGrid API key
+# - FROM_EMAIL: Your from email address
+# - FROM_NAME: Your company name
+# - JWT_SECRET: Generate with: openssl rand -base64 64
+# - ADMIN_USERNAME: admin
+# - ADMIN_EMAIL: Your admin email
+# - ADMIN_PASSWORD: Strong admin password
+# - ADMIN_FULL_NAME: Administrator name
+# - COMPANY_NAME: Your company name
+# - COMPANY_EMAIL: Your company email
+# - USE_MOCK_STORAGE: true
+# - USE_MOCK_OCR: true
+# - ENABLE_EMAIL_NOTIFICATIONS: true
+
+# Frontend service environment variables:
+# - NEXT_PUBLIC_SUPABASE_URL: Same as SUPA_URL above
+# - NEXT_PUBLIC_SUPABASE_ANON_KEY: Same as SUPA_ANON_KEY above
+# - NEXT_PUBLIC_API_URL: https://your-backend-service-name.onrender.com
+# - NODE_ENV: production

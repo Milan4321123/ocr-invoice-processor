@@ -18,7 +18,9 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
 # =====================================================================
 # DOCKER NETWORKING - REQUIRED
 # =====================================================================
-# Frontend talks to backend through Docker network
+# Frontend talks to backend through Docker network (local) or Render URLs (production)
+# For local Docker: http://localhost:8000
+# For Render: https://your-backend-service-name.onrender.com
 NEXT_PUBLIC_API_URL=http://localhost:8000
 
 # =====================================================================
