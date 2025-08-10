@@ -3,10 +3,10 @@
 --only-binary=all
 --prefer-binary
 
-# Core FastAPI stack - Python 3.13 compatible versions
-fastapi==0.104.1
-uvicorn==0.24.0
-pydantic==2.5.0
+# Core FastAPI stack - stable versions with guaranteed binary wheels
+fastapi==0.100.1
+uvicorn==0.23.2
+pydantic==2.3.0
 
 # Essential dependencies
 python-multipart==0.0.6
