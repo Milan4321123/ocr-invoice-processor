@@ -44,3 +44,6 @@ typing-extensions==4.8.0
 
 # Rate limiting
 slowapi==0.1.9
+
+# JWT handling
+python-jose[cryptography]==3.3.0
