@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import toast from "react-hot-toast";
 import { buildApiUrl, API_CONFIG } from '@/config/api';
+import { api } from '@/services/apiClient';
 
 type UploadStatus = "idle" | "uploading" | "success" | "error";
 
@@ -75,9 +76,6 @@ export default function Dropzone({ onUploadComplete, onUploadStart, onUploadErro
     onUploadStart?.(); // Call the callback when upload starts
     
     try {
-      const formData = new FormData();
-      formData.append("file", pdf);
-      
       // Simulate progress for better UX
       const progressInterval = setInterval(() => {
         setUploadProgress((prev) => {
@@ -89,20 +87,11 @@ export default function Dropzone({ onUploadComplete, onUploadStart, onUploadErro
         });
       }, 200);
       
-      const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.UPLOAD), {
-        method: "POST",
-        body: formData,
-      });
+      // Use authenticated API client instead of direct fetch
+      const data: UploadResponse = await api.uploadFile(pdf);
       
       clearInterval(progressInterval);
       setUploadProgress(100);
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "Upload fehlgeschlagen");
-      }
-      
-      const data: UploadResponse = await response.json();
       setStatus("success");
       setUploadedFile(data);
       toast.success("Datei erfolgreich hochgeladen!");
