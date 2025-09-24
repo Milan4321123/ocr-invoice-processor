@@ -31,22 +31,42 @@ class DatabaseService:
         }
         self._initialize_client()
     
+    def _sanitize_env(self, value: Optional[str]) -> Optional[str]:
+        """Strip whitespace and remove non-printable characters from env values."""
+        if value is None:
+            return None
+        original = value
+        # Trim whitespace and remove non-printable characters
+        value = ''.join(ch for ch in value.strip() if ch.isprintable())
+        if value != original:
+            logger.warning("⚠️  Sanitized environment value (removed hidden/whitespace characters)")
+        return value
+
     def _initialize_client(self):
         """Initialize the Supabase client using your .env credentials"""
         # Try multiple environment variable names for flexibility
-        url = os.getenv("SUPABASE_URL") or os.getenv("SUPA_URL")
-        key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPA_KEY")
+        url = self._sanitize_env(os.getenv("SUPABASE_URL") or os.getenv("SUPA_URL"))
+        
+        # PRIORITY: Use SERVICE_ROLE_KEY for backend operations to bypass RLS
+        service_key = self._sanitize_env(os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPA_SERVICE_ROLE_KEY"))
+        anon_key = self._sanitize_env(os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPA_KEY"))
+        
+        # Use service role key for backend, fallback to anon key
+        key = service_key or anon_key
+        key_type = "service_role" if service_key else "anon"
         
         if url and key:
             try:
                 self._client = create_client(url, key)
-                logger.info(f"✅ Database service connected to: {url[:50]}...")
+                logger.info(f"✅ Database service connected to: {url[:50]}... using {key_type} key")
+                if key_type == "anon":
+                    logger.warning("⚠️  WARNING: Using ANON key for backend - may cause RLS issues. Add SUPABASE_SERVICE_ROLE_KEY for full access.")
             except Exception as e:
                 logger.error(f"❌ Failed to connect to database: {e}")
                 self._client = None
         else:
             logger.warning("⚠️ Database credentials missing. Running in offline mode.")
-            logger.warning(f"Available env vars: SUPABASE_URL={bool(os.getenv('SUPABASE_URL'))}, SUPABASE_ANON_KEY={bool(os.getenv('SUPABASE_ANON_KEY'))}, SUPA_URL={bool(os.getenv('SUPA_URL'))}, SUPA_KEY={bool(os.getenv('SUPA_KEY'))}")
+            logger.warning(f"Available env vars: SUPABASE_URL={bool(os.getenv('SUPABASE_URL'))}, SERVICE_ROLE_KEY={bool(service_key)}, ANON_KEY={bool(anon_key)}, SUPA_URL={bool(os.getenv('SUPA_URL'))}")
     
     @property
     def client(self) -> Optional[Client]:
@@ -180,7 +200,7 @@ class DatabaseService:
                 # Add URL field for file access using centralized service
                 if invoice.get("file_path"):
                     from services.pdf_url_service import pdf_url_service
-                    invoice["url"] = pdf_url_service.get_pdf_url(invoice["file_path"])
+                    invoice["url"] = pdf_url_service.get_pdf_url(invoice["file_path"], invoice.get("id"))
                 return {"success": True, "data": invoice}
             else:
                 return {"success": False, "error": "Invoice not found"}
@@ -206,7 +226,7 @@ class DatabaseService:
                 for invoice in response.data:
                     if invoice.get("file_path"):
                         from services.pdf_url_service import pdf_url_service
-                        invoice["url"] = pdf_url_service.get_pdf_url(invoice["file_path"])
+                        invoice["url"] = pdf_url_service.get_pdf_url(invoice["file_path"], invoice.get("id"))
                 
                 return {
                     "success": True, 
@@ -246,7 +266,7 @@ class DatabaseService:
                 for invoice in response.data:
                     if invoice.get("file_path"):
                         from services.pdf_url_service import pdf_url_service
-                        invoice["url"] = pdf_url_service.get_pdf_url(invoice["file_path"])
+                        invoice["url"] = pdf_url_service.get_pdf_url(invoice["file_path"], invoice.get("id"))
                 
                 return {
                     "success": True, 
@@ -277,7 +297,7 @@ class DatabaseService:
                 invoice = response.data[0]
                 if invoice.get("file_path"):
                     from services.pdf_url_service import pdf_url_service
-                    invoice["url"] = pdf_url_service.get_pdf_url(invoice["file_path"])
+                    invoice["url"] = pdf_url_service.get_pdf_url(invoice["file_path"], invoice.get("id"))
                 
                 logger.info(f"✅ Retrieved invoice: {invoice_id}")
                 return {"success": True, "data": invoice}
@@ -1454,7 +1474,7 @@ class DatabaseService:
                 for invoice in response.data:
                     if invoice.get("file_path"):
                         from services.pdf_url_service import pdf_url_service
-                        invoice["url"] = pdf_url_service.get_pdf_url(invoice["file_path"])
+                        invoice["url"] = pdf_url_service.get_pdf_url(invoice["file_path"], invoice.get("id"))
                 
                 logger.info(f"✅ Found {len(response.data)} invoices with Skonto data")
                 return {"success": True, "data": response.data}

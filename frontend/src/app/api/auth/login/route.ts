@@ -54,7 +54,18 @@ export async function POST(request: NextRequest) {
         );
       }
     }
-    
+
+    // Success path: ensure response is JSON before parsing
+    const respType = response.headers.get('content-type') || '';
+    if (!respType.toLowerCase().includes('application/json')) {
+      const text = await response.text();
+      console.error('Unexpected non-JSON success from backend:', respType, text.slice(0, 200));
+      return NextResponse.json(
+        { detail: 'Unexpected response from backend', contentType: respType, bodyPreview: text.slice(0, 200) },
+        { status: 502 }
+      );
+    }
+
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {

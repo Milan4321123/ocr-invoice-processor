@@ -14,18 +14,24 @@ class PDFUrlService:
         self.supabase_url = os.getenv("SUPA_URL")
         self.api_base_url = os.getenv("API_BASE_URL", "")
     
-    def get_pdf_url(self, file_path: str) -> str:
+    def get_pdf_url(self, file_path: str, invoice_id: str = None) -> str:
         """
         Get PDF URL based on file path and environment configuration
         
         Args:
             file_path: The file path stored in database
+            invoice_id: Optional invoice ID for secure API access
             
         Returns:
             Complete URL to access the PDF
         """
         if not file_path:
             return ""
+        
+        # If we have invoice_id, use secure API endpoint
+        if invoice_id:
+            api_base = os.getenv("NEXT_PUBLIC_API_URL", "http://localhost:8000")
+            return f"{api_base}/api/pdf/view/{invoice_id}"
         
         if self.use_mock_storage:
             # Use mock storage for development/demo
@@ -49,6 +55,21 @@ class PDFUrlService:
             bucket_name = "invoices"
             file_name = file_path
         
+        # Try to generate signed URL for private buckets
+        try:
+            from supabase import create_client
+            supabase_service_key = os.getenv("SUPA_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+            
+            if supabase_service_key and self.supabase_url:
+                client = create_client(self.supabase_url, supabase_service_key)
+                # Generate signed URL valid for 1 hour
+                signed_url = client.storage.from_(bucket_name).create_signed_url(file_name, 3600)
+                if signed_url and 'signedURL' in signed_url:
+                    return signed_url['signedURL']
+        except Exception as e:
+            print(f"Warning: Could not generate signed URL for {file_path}: {e}")
+        
+        # Fallback to public URL (will work if bucket is public)
         return f"{self.supabase_url}/storage/v1/object/public/{bucket_name}/{file_name}"
 
 # Global instance
