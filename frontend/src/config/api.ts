@@ -11,8 +11,18 @@
  * 3. Fallback: localhost for development
  */
 export function getApiUrl(): string {
+  // Force production URL when deployed on Render
+  if (typeof window !== 'undefined' && window.location.hostname.includes('onrender.com')) {
+    return 'https://ocr-invoice-backend.onrender.com';
+  }
+  
   // Server-side (Next.js API routes, SSR)
   if (typeof window === 'undefined') {
+    // Force production URL on Render
+    if (process.env.NODE_ENV === 'production' && !process.env.NEXT_PUBLIC_API_URL?.includes('localhost')) {
+      return 'https://ocr-invoice-backend.onrender.com';
+    }
+    
     // In Docker containers, use internal service name
     if (process.env.INTERNAL_API_URL) {
       return process.env.INTERNAL_API_URL;
