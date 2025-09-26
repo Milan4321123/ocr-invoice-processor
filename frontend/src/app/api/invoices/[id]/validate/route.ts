@@ -18,7 +18,7 @@ export async function GET(
 
     // TODO: Replace with actual validation logic
     // For now, we'll do a simple check against the backend
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:8000';
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || process.env.INTERNAL_API_URL || 'http://localhost:8000';
     const response = await fetch(`${backendUrl}/api/invoices/${invoiceId}/validate`, {
       method: 'GET',
       headers: {

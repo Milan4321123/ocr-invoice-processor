@@ -37,7 +37,8 @@ export default function ApprovalPage() {
     try {
       setLoading(true);
       
-      const response = await fetch(`http://localhost:8000/api/approval/${token}`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${apiUrl}/api/approval/${token}`, {
         method: 'GET',
         headers: {
           'Accept': 'text/html,application/json',
