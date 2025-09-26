@@ -27,6 +27,12 @@ RUN apk add --no-cache curl
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
+# Copy package.json and package-lock.json for production dependencies
+COPY package*.json ./
+
+# Install only production dependencies
+RUN npm ci --only=production && npm cache clean --force
+
 # Copy built application files
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
@@ -38,10 +44,11 @@ USER nextjs
 # Expose port (will be overridden by Render's PORT env var)
 EXPOSE 3000
 ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 
 # Health check - use PORT env var
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:${PORT:-3000} || exit 1
 
-# Start command - Next.js will use PORT env var automatically
-CMD ["node", "server.js"]
+# Start command - Use npm start for better compatibility
+CMD ["npm", "run", "start"]
