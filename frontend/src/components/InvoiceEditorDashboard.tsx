@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { getApiUrl } from '@/config/api';
 import PDFViewer from './PDFViewerClean';
 import CleanInvoiceForm, { GermanInvoiceFields } from './CleanInvoiceForm';
 import { FileText, Eye, Edit3, AlertTriangle, CheckCircle, Monitor, FileInput } from 'lucide-react';
@@ -42,7 +43,7 @@ export default function InvoiceEditorDashboard({
       setError(null);
 
       // API call to load invoice data
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const apiUrl = getApiUrl();
       const response = await fetch(`${apiUrl}/api/invoices/${invoiceId}/editor`);
       if (!response.ok) {
         throw new Error(`Rechnung konnte nicht geladen werden: ${response.statusText}`);
@@ -73,7 +74,7 @@ export default function InvoiceEditorDashboard({
       setIsSaving(true);
       
       // API call to save invoice data with editor information for email notification
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const apiUrl = getApiUrl();
       
       // Prepare editor information for email notification
       const editorInfo = {
@@ -149,7 +150,7 @@ export default function InvoiceEditorDashboard({
       await handleSave(fields);
       
       // Mark as completed - no automatic email sending
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const apiUrl = getApiUrl();
       
       // Prepare completion data with editor info for completion email
       const completionData = {

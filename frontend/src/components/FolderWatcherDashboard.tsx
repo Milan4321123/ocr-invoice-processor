@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { toast } from 'react-hot-toast'
+import { getApiUrl } from '@/config/api'
 import { 
   FolderIcon, 
   PlayIcon, 
@@ -79,7 +80,7 @@ export function FolderWatcherDashboard() {
   // Fetch watcher status
   const fetchWatcherStatus = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const apiUrl = getApiUrl()
       const response = await fetch(`${apiUrl}/api/folder-watcher/status`)
       if (response.ok) {
         const data = await response.json()
@@ -95,7 +96,7 @@ export function FolderWatcherDashboard() {
   // Fetch watch folders
   const fetchWatchFolders = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const apiUrl = getApiUrl()
       const response = await fetch(`${apiUrl}/api/folder-watcher/folders`)
       if (response.ok) {
         const data = await response.json()
@@ -111,7 +112,7 @@ export function FolderWatcherDashboard() {
   // Fetch detailed statistics
   const fetchStatistics = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const apiUrl = getApiUrl()
       const response = await fetch(`${apiUrl}/api/folder-watcher/statistics`)
       if (response.ok) {
         const data = await response.json()
@@ -139,7 +140,7 @@ export function FolderWatcherDashboard() {
   const startWatcher = async () => {
     setActionLoading('start')
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const apiUrl = getApiUrl()
       const response = await fetch(`${apiUrl}/api/folder-watcher/start`, {
         method: 'POST'
       })
@@ -163,7 +164,7 @@ export function FolderWatcherDashboard() {
   const stopWatcher = async () => {
     setActionLoading('stop')
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const apiUrl = getApiUrl()
       const response = await fetch(`${apiUrl}/api/folder-watcher/stop`, {
         method: 'POST'
       })
@@ -192,7 +193,7 @@ export function FolderWatcherDashboard() {
 
     setActionLoading('add')
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const apiUrl = getApiUrl()
       const response = await fetch(`${apiUrl}/api/folder-watcher/folders`, {
         method: 'POST',
         headers: {
@@ -234,7 +235,7 @@ export function FolderWatcherDashboard() {
 
     setActionLoading(`remove-${folderId}`)
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const apiUrl = getApiUrl()
       const response = await fetch(`${apiUrl}/api/folder-watcher/folders/${folderId}`, {
         method: 'DELETE'
       })
@@ -260,7 +261,7 @@ export function FolderWatcherDashboard() {
     setActionLoading(`${action}-${folderId}`)
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const apiUrl = getApiUrl()
       const response = await fetch(`${apiUrl}/api/folder-watcher/folders/${folderId}/${action}`, {
         method: 'POST'
       })

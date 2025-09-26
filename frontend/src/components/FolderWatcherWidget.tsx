@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { getApiUrl } from '@/config/api';
 import { 
   FolderIcon, 
   ClockIcon, 
@@ -119,7 +120,7 @@ export default function FolderWatcherWidget() {
 
   const fetchStatus = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const apiUrl = getApiUrl()
       const response = await fetch(`${apiUrl}/api/folder-watcher/status`);
       if (response.ok) {
         const data = await response.json();
@@ -135,7 +136,7 @@ export default function FolderWatcherWidget() {
 
   const fetchNotifications = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const apiUrl = getApiUrl()
       const response = await fetch(`${apiUrl}/api/folder-watcher/notifications?limit=5`);
       if (response.ok) {
         const data = await response.json();
@@ -149,7 +150,7 @@ export default function FolderWatcherWidget() {
 
   const clearNotifications = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const apiUrl = getApiUrl()
       const response = await fetch(`${apiUrl}/api/folder-watcher/notifications`, {
         method: 'DELETE'
       });

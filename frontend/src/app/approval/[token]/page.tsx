@@ -1,6 +1,7 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
+import { getApiUrl } from '@/config/api';
 import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 
@@ -37,7 +38,7 @@ export default function ApprovalPage() {
     try {
       setLoading(true);
       
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const apiUrl = getApiUrl();
       const response = await fetch(`${apiUrl}/api/approval/${token}`, {
         method: 'GET',
         headers: {

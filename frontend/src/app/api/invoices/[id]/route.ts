@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getApiUrl } from '@/config/api';
 
 export async function PUT(
   request: NextRequest,
@@ -8,7 +9,7 @@ export async function PUT(
     const { id } = await params;
     const updateData = await request.json();
     
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const apiUrl = getApiUrl();
     
     const response = await fetch(`${apiUrl}/api/invoices/${id}`, {
       method: 'PUT',

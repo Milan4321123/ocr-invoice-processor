@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getApiUrl } from '@/config/api';
 
 export async function POST(
   request: NextRequest,
@@ -12,7 +13,7 @@ export async function POST(
     const recipientEmail = searchParams.get('recipient_email');
     const recipientName = searchParams.get('recipient_name');
     
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const apiUrl = getApiUrl();
     
     // Build the query string
     const queryParams = new URLSearchParams();

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { getApiUrl } from '@/config/api';
 import { testSupabaseConnection } from '@/lib/supabase';
 
 // Force dynamic rendering to prevent static generation errors
@@ -18,7 +19,7 @@ export default function ConnectivityTestPage() {
   const testConnections = async () => {
     // Test backend health
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const backendUrl = getApiUrl();
       const response = await fetch(`${backendUrl}/api/health`);
       const data = await response.json();
       
@@ -77,7 +78,7 @@ export default function ConnectivityTestPage() {
   const testDirectBackend = async () => {
     setLoginTest('Testing direct backend login...');
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const backendUrl = getApiUrl();
       const formData = new FormData();
       formData.append('username', 'admin');
       formData.append('password', 'admin123');

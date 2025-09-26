@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { getApiUrl } from '@/config/api';
 import { useParams, useRouter } from 'next/navigation';
 import InvoiceEditorDashboard from '@/components/InvoiceEditorDashboard';
 import { AlertTriangle, ArrowLeft } from 'lucide-react';
@@ -25,7 +26,7 @@ export default function InvoiceEditorPage() {
 
       try {
         // Use the existing editor endpoint to validate and fetch invoice data
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const apiUrl = getApiUrl();
         const response = await fetch(`${apiUrl}/api/invoices/${invoiceId}/editor`);
         
         if (response.ok) {

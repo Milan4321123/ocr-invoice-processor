@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getApiUrl } from '@/config/api';
 
 export async function POST(request: NextRequest) {
   try {
