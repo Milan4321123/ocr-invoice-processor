@@ -9,7 +9,7 @@ export async function GET(
     const { id: invoiceId } = await params;
 
     // Proxy to backend API
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || process.env.INTERNAL_API_URL || 'http://localhost:8000';
+    const backendUrl = getApiUrl();
     const response = await fetch(`${backendUrl}/api/invoices/${invoiceId}/editor`, {
       method: 'GET',
       headers: {
@@ -48,7 +48,7 @@ export async function PUT(
     const body = await request.json();
 
     // Proxy to backend API
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || process.env.INTERNAL_API_URL || 'http://localhost:8000';
+    const backendUrl = getApiUrl();
     const response = await fetch(`${backendUrl}/api/invoices/${invoiceId}/editor`, {
       method: 'PUT',
       headers: {
