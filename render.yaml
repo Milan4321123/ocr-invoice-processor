@@ -12,6 +12,8 @@ services:
         value: 3.11.9
       - key: NODE_ENV
         value: production
+      - key: FRONTEND_URL
+        value: https://ocr-invoice-frontend.onrender.com
     healthCheckPath: /api/health
     
   # Frontend Web Service  
@@ -27,6 +29,8 @@ services:
         value: 18.19.0
       - key: NODE_ENV
         value: production
+      - key: NEXT_PUBLIC_API_URL
+        value: https://ocr-invoice-backend.onrender.com
     healthCheckPath: /
 
 # Environment variables that need to be set in Render dashboard:
