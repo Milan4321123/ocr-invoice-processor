@@ -35,12 +35,13 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # Switch to non-root user
 USER nextjs
 
-# Expose port
+# Expose port (will be overridden by Render's PORT env var)
 EXPOSE 3000
+ENV PORT=3000
 
-# Health check
+# Health check - use PORT env var
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:3000 || exit 1
+    CMD curl -f http://localhost:${PORT:-3000} || exit 1
 
-# Start command
+# Start command - Next.js will use PORT env var automatically
 CMD ["node", "server.js"]
