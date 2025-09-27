@@ -35,9 +35,10 @@ class PDFUrlService:
             return f"{api_base}/api/pdf/view/{invoice_id}"
         
         if self.use_mock_storage:
-            # Use mock storage for development/demo
+            # Use mock storage for development/demo with full backend URL
             file_name = os.path.basename(file_path)
-            return f"/api/mock-storage/{file_name}"
+            api_base = self.api_base_url or os.getenv("API_BASE_URL", "http://localhost:8000")
+            return f"{api_base}/api/mock-storage/{file_name}"
         else:
             # Use Supabase storage for production
             return self._construct_supabase_url(file_path)
