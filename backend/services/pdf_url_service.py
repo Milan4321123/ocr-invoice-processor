@@ -30,7 +30,8 @@ class PDFUrlService:
         
         # If we have invoice_id, use secure API endpoint
         if invoice_id:
-            api_base = os.getenv("NEXT_PUBLIC_API_URL", "http://localhost:8000")
+            # Use backend URL, not frontend URL for PDF access
+            api_base = self.api_base_url or os.getenv("API_BASE_URL", "http://localhost:8000")
             return f"{api_base}/api/pdf/view/{invoice_id}"
         
         if self.use_mock_storage:
